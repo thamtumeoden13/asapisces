@@ -12,6 +12,10 @@ import { SimpleCardType } from "@/components/SimpleCard";
 import ProjectDetailList from "@/components/ProjectDetailList";
 import Hero from "@/components/Hero";
 import About2 from "@/components/About2";
+import Story from "@/components/awwwards/Story";
+import Features from "@/components/awwwards/Features";
+import Contact from "@/components/awwwards/Contact";
+import Footer from "@/components/awwwards/Footer";
 
 export default async function Home({
   searchParams,
@@ -22,6 +26,10 @@ export default async function Home({
     <>
       <Hero />
       <About2 />
+      <Features />
+      <Story />
+      <Contact />
+      <Footer />
     </>
   );
   const query = (await searchParams).query;

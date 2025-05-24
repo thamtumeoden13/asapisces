@@ -1,30 +1,27 @@
-"use client"
+"use client";
 
 import React, { MouseEventHandler } from "react";
 import clsx, { ClassValue } from "clsx";
 import Marker from "./Marker";
 import { Element, Link as LinkScroll } from "react-scroll";
 
-const Button = (
-  {
-    icon,
-    children,
-    href,
-    containerClassName,
-    markerFill,
-    to,
-    onClick,
-  }:
-    {
-      icon: string;
-      children: React.ReactNode;
-      href?: string;
-      containerClassName?: ClassValue,
-      markerFill?: string,
-      to?: string,
-      onClick?: MouseEventHandler<HTMLButtonElement>,
-    }
-) => {
+const Button = ({
+  icon,
+  children,
+  href,
+  containerClassName,
+  markerFill,
+  to,
+  onClick,
+}: {
+  icon: string;
+  children: React.ReactNode;
+  href?: string;
+  containerClassName?: ClassValue;
+  markerFill?: string;
+  to?: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+}) => {
   const Inner = ({ to = "" }: { to?: string }) => (
     <LinkScroll to={to} offset={-100} spy={true} smooth={true}>
       <span
@@ -57,7 +54,7 @@ const Button = (
     <a
       className={clsx(
         "relative p-0.5 g5 rounded-2xl shadow-500 group",
-        containerClassName,
+        containerClassName
       )}
       href={href}
     >
@@ -67,7 +64,7 @@ const Button = (
     <button
       className={clsx(
         "relative p-0.5 g5 rounded-2xl shadow-500 group",
-        containerClassName,
+        containerClassName
       )}
       onClick={onClick}
     >

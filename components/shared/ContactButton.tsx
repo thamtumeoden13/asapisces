@@ -12,7 +12,7 @@ export const ContactButton = async () => {
       <a
         target="_blank"
         rel="noopener noreferrer"
-        href="https://zalo.me/0904177100"
+        href="https://zalo.me/0971196061"
         className={"flex items-center justify-center"}
       >
         <img
