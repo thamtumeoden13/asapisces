@@ -23,7 +23,7 @@ export function useImageGallery() {
   }
   return context
 }
-
+ 
 interface ImageGalleryProviderProps {
   children: ReactNode
 }
