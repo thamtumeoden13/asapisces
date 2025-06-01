@@ -6,6 +6,7 @@ import Benefits from "@/components/brainwave/Benefits";
 import Collaboration from "@/components/brainwave/Collaboration";
 import ButtonGradient from "@/components/svg/ButtonGradient";
 import Services from "@/components/brainwave/Services";
+import Pricing from "@/components/brainwave/Pricing";
 
 const page = () => {
   return (
@@ -15,6 +16,7 @@ const page = () => {
         <Benefits />
         <Collaboration />
         <Services />
+        <Pricing />
       </div>
       <ButtonGradient />
     </>

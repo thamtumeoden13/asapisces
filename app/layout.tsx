@@ -2,16 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "easymde/dist/easymde.min.css"
 import { Toaster } from "@/components/ui/toaster";
-import { IBM_Plex_Sans } from "next/font/google";
-import { cn } from "@/lib/utils";
 import Script from "next/script";
-import GoogleAnalytics from "@/analytics/GoogleAnalytics";
-
-const IBMPlex = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-ibm-plex'
-});
 
 export default function RootLayout({
   children,
@@ -36,7 +27,6 @@ export default function RootLayout({
         </Script>
       </head>
       <body
-        className={cn("font-IBMPlex antialiased", IBMPlex.variable)}
       >
         {/* <GoogleAnalytics /> */}
         {children}
