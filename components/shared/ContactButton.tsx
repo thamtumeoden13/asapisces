@@ -1,9 +1,6 @@
 import React from 'react'
 
-import Ping from "@/components/Ping";
-import { client } from "@/sanity/lib/client";
-import { writeClient } from "@/sanity/lib/write-client";
-import { after } from "next/server";
+import Image from 'next/image';
 
 export const ContactButton = async () => {
 
@@ -15,9 +12,11 @@ export const ContactButton = async () => {
         href="https://zalo.me/0971196061"
         className={"flex items-center justify-center"}
       >
-        <img
+        <Image
           src="/icons8-zalo.svg"
           alt="contact"
+          width={20}
+          height={20}
           className={"size-20 object-contain z-10"}
         />
       </a>

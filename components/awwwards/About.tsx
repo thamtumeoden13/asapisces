@@ -4,7 +4,8 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 
 import { ScrollTrigger } from "gsap/all";
-import AnimatiedTitle from "./shared/AnimatiedTitle";
+import AnimatiedTitle from "@/components/shared/AnimatiedTitle";
+import Image from "next/image";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -36,7 +37,7 @@ const About = () => {
         </h2>
         <AnimatiedTitle
           title="Disc<b>o</b>ver the World's l<b>a</b>rgest shared adventure"
-          containerClass="mt-5 !text-black text-center"
+          containerClass="mt-5 !text-white text-center"
         />
         <div className="about-subtext">
           <p>The Game of Games begins-your life, now an epic MMORPG</p>
@@ -45,10 +46,12 @@ const About = () => {
       </div>
       <div className="w-screen h-dvh" id="clip">
         <div className="mask-clip-path about-image">
-          <img
-            src="img/about.webp"
+          <Image
+            src="/img/about.webp"
             alt="Background"
             className="absolute top-0 left-0 object-cover size-full"
+            fill
+            priority
           />
         </div>
       </div>

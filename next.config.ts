@@ -20,6 +20,22 @@ const nextConfig: NextConfig = {
   },
   devIndicators: {
   },
+  webpack(config) {
+    config.module.rules.push({
+      test: /\.glb$/,
+      use: [
+        {
+          loader: 'file-loader',
+          options: {
+            publicPath: '/_next/static/assets/',
+            outputPath: 'static/assets/',
+            name: '[name].[hash].[ext]',
+          },
+        },
+      ],
+    });
+    return config;
+  },
   async headers() {
     return [
       {

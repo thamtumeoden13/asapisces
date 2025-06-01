@@ -7,10 +7,10 @@ export default function Layout({
   children: React.ReactNode;
 }>) {
   return (
-    <main>
-      <Navbar />
+    <div className="bg-n-1">
+      <Navbar className="!text-black" containerClassName="!bg-white" />
       {children}
       <ContactButton />
-    </main>
+    </div>
   );
 }

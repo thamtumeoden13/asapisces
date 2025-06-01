@@ -8,7 +8,7 @@ import "react-vertical-timeline-component/style.min.css";
 
 import { skills, experiences } from "@/constants";
 import Image from "next/image";
-// import Cta from "../components/CTA";
+import Cta from "@/components/porfolio/CTA";
 
 const About = () => {
   return (
@@ -62,9 +62,9 @@ const About = () => {
 
         <div className="flex mt-12">
           <VerticalTimeline className="max-w-7xl">
-            {experiences.map((experience) => (
+            {experiences.map((experience, index) => (
               <VerticalTimelineElement
-                key={experience.company_name}
+                key={`experience.company_name-${index}`}
                 date={experience.date}
                 icon={
                   <div className="flex items-center justify-center w-full h-full">
@@ -113,7 +113,7 @@ const About = () => {
       </div>
       <hr className="border-slate-200" />
 
-      {/* <Cta /> */}
+      <Cta />
     </section>
   );
 };

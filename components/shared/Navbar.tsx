@@ -5,16 +5,23 @@ import { useWindowScroll } from "react-use";
 import gsap from "gsap";
 import Image from "next/image";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Awwwards", route: "/" },
   { name: "Brainwave", route: "/brainwave" },
-  { name: "Prologue"},
-  { name: "Porfolio", route: "/porfolio" },
+  { name: "Prologue" },
+  { name: "Portfolio", route: "/portfolio" },
   { name: "Contact" },
 ];
 
-const Navbar = () => {
+const Navbar = ({
+  containerClassName,
+  className,
+}: {
+  containerClassName?: string;
+  className?: string;
+}) => {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isIndicatorActive, setIsIndicatorActive] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -65,27 +72,28 @@ const Navbar = () => {
   return (
     <div
       ref={navContainerRef}
-      className="fixed inset-x-0 z-50 h-16 transition-all duration-700 border-none top-4 sm:inset-x-6"
+      className={cn(
+        "fixed inset-x-0 z-50 h-16 transition-all duration-700 border-none top-4 sm:inset-x-6",
+        containerClassName
+      )}
     >
       <header className="absolute w-full -translate-y-1/2 top-1/2">
         <nav className="flex items-center justify-between p-4 size-full">
           <div className="flex items-center gap-7">
-            <Image
-              src="/img/logo.png"
-              alt="logo"
-              width={40}
-              height={40}
-              className="w-10"
-            />
-
-            {/* <Button
-              id="product-button"
-              title="Products"
-              rightIcon={<TiLocationArrow />}
-              containerClass={
-                "bg-blue-50 md:flex hidden items-center justify-center gap-1"
+            <Link
+              href="/"
+              className={
+                "flex items-center gap-2 text-2xl font-bold text-white"
               }
-            /> */}
+            >
+              <Image
+                src="/img/logo.png"
+                alt="logo"
+                width={40}
+                height={40}
+                className="w-10"
+              />
+            </Link>
           </div>
 
           <div className="flex items-center h-full">
@@ -96,7 +104,7 @@ const Navbar = () => {
                     <Link
                       href={item.route}
                       key={item.name}
-                      className="nav-hover-btn"
+                      className={cn("nav-hover-btn", className)}
                     >
                       {item.name}
                     </Link>
@@ -106,7 +114,7 @@ const Navbar = () => {
                   <a
                     key={item.name}
                     href={`#${item.name.toLowerCase()}`}
-                    className="nav-hover-btn"
+                    className={cn("nav-hover-btn", className)}
                   >
                     {item.name}
                   </a>

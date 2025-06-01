@@ -158,6 +158,7 @@ const config: Config = {
         100: "2px 2px 0px 0px rgb(0, 0, 0)",
         200: "2px 2px 0px 2px rgb(0, 0, 0)",
         300: "2px 2px 0px 2px rgb(241, 89, 41)",
+        card: '0px 1px 2px 0px rgba(0, 0, 0, 0.05)'
 
         // 100: '0px 4px 4px rgba(0, 0, 0, 0.25), 0px 16px 24px rgba(0, 0, 0, 0.25), inset 0px 3px 6px #1959AD',
         // 200: '0px 4px 4px rgba(0, 0, 0, 0.25), 0px 16px 24px rgba(0, 0, 0, 0.25), inset 0px 4px 10px #3391FF',

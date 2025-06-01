@@ -11,7 +11,7 @@ import { AppleCardsCarousel } from "@/components/AppleCardsCarousel";
 import { SimpleCardType } from "@/components/SimpleCard";
 import ProjectDetailList from "@/components/ProjectDetailList";
 import Hero from "@/components/Hero";
-import About2 from "@/components/About2";
+import About from "@/components/awwwards/About";
 import Story from "@/components/awwwards/Story";
 import Features from "@/components/awwwards/Features";
 import Contact from "@/components/awwwards/Contact";
@@ -25,7 +25,7 @@ export default async function Home({
   return (
     <>
       <Hero />
-      <About2 />
+      <About />
       <Features />
       <Story />
       <Contact />

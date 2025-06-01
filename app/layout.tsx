@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "easymde/dist/easymde.min.css"
+import "easymde/dist/easymde.min.css";
 import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
 
@@ -26,8 +26,7 @@ export default function RootLayout({
         `}
         </Script>
       </head>
-      <body
-      >
+      <body>
         {/* <GoogleAnalytics /> */}
         {children}
         <Toaster />
@@ -37,29 +36,40 @@ export default function RootLayout({
 }
 
 export const metadata: Metadata = {
-  title: "CÔNG TY TNHH KIẾN TRÚC XÂY DỰNG ART SUNDAY",
-  description: "Thiết Kế Và Thi Công Kiến Trúc: Nhà Phố, Biệt Thự, Khách Sạn, Nhà Thờ, Nhà Giáo Lý Và Nội Thất Chuyên Nghiệp",
-  keywords: ["Biệt Thự", "Nhà Phố", "Nội Thất", "Công Trình Công Giáo"],
+  title: "asapisces | Modern Web Developer & AI Agent Explorer",
+  description:
+    "Trang cá nhân của một lập trình viên hiện đại – nơi giới thiệu sản phẩm, chia sẻ ý tưởng về Web, AI Agent và công nghệ mới.",
+  keywords: [
+    "modern web developer",
+    "AI Agent",
+    "asapisces",
+    "developer portfolio",
+    "software engineer",
+    "personal projects",
+    "AI product ideas"
+  ],
   openGraph: {
-    title: "Kiến Trúc, Xây Dựng | ART SUNDAY",
-    description: "Thiết Kế Và Thi Công Kiến Trúc: Nhà Phố, Biệt Thự, Khách Sạn, Nhà Thờ, Nhà Giáo Lý Và Nội Thất Chuyên Nghiệp.",
-    url: "https://artsunday.vn/",
+    title: "asapisces | Web Dev & AI Ideas",
+    description:
+      "Sản phẩm cá nhân, demo công nghệ và những ý tưởng về Web & AI Agent – tất cả được viết bởi một lập trình viên hiện đại.",
+    url: "https://asapisces.com",
     images: [
       {
-        url: "https://images.pexels.com/photos/3797991/pexels-photo-3797991.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-        alt: "noi-that",
+        url: "https://your-image-hosting.com/og-modern-dev.jpg",
+        alt: "asapisces - modern web developer",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@twitterhandle",
-    title: "Kiến Trúc, Xây Dựng | ART SUNDAY",
-    description: "Thiết Kế Và Thi Công Kiến Trúc: Nhà Phố, Biệt Thự, Khách Sạn, Nhà Thờ, Nhà Giáo Lý Và Nội Thất Chuyên Nghiệp.",
+    site: "@yourhandle",
+    title: "asapisces | Modern Web Dev Portfolio",
+    description:
+      "Trang portfolio và ý tưởng AI của một lập trình viên yêu công nghệ hiện đại.",
     images: [
       {
-        url: "https://images.pexels.com/photos/3797991/pexels-photo-3797991.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-        alt: "noi-that",
+        url: "https://your-image-hosting.com/og-modern-dev.jpg",
+        alt: "asapisces - modern dev blog",
       },
     ],
   },
