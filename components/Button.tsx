@@ -40,7 +40,7 @@ const Button = ({
           />
         )}
         <span
-          className={"relative z-2 font-poppins base-bold text-p1 uppercase"}
+          className={"relative z-2 font-sans base-bold text-p1 uppercase"}
         >
           {children}
         </span>

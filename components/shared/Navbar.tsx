@@ -10,7 +10,7 @@ const navItems = [
   { name: "Awwwards", route: "/" },
   { name: "Brainwave", route: "/brainwave" },
   { name: "Prologue"},
-  { name: "About" },
+  { name: "Porfolio", route: "/porfolio" },
   { name: "Contact" },
 ];
 

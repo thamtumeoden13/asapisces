@@ -71,6 +71,7 @@
     "react-slidedown": "^2.4.7",
     "react-three-fiber": "^6.0.13",
     "react-use": "^17.6.0",
+    "react-vertical-timeline-component": "^3.5.3",
     "sanity": "^3.68.3",
     "sanity-plugin-markdown": "^5.0.0",
     "server-only": "^0.0.1",
