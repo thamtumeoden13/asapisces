@@ -15,7 +15,7 @@ export default function Layout({
       {/* <Header /> */}
       <Navbar />
       {children}
-      <ContactButton />
+      {/* <ContactButton /> */}
       {/* <Footer /> */}
     </main>
   );
