@@ -229,8 +229,7 @@ const config: Config = {
       addBase({});
       addComponents({
         ".container": {
-          "@apply max-w-[77.5rem] mx-auto px-5 md:px-10 xl:max-w-[87.5rem]":
-            {},
+          "@apply max-w-[77.5rem] mx-auto px-5 md:px-10 xl:max-w-[87.5rem]": {},
         },
         ".h1": {
           "@apply font-semibold text-[2.5rem] leading-[3.25rem] md:text-[2.75rem] md:leading-[3.75rem] lg:text-[3.25rem] lg:leading-[4.0625rem] xl:text-[3.75rem] xl:leading-[4.5rem]":
@@ -263,8 +262,7 @@ const config: Config = {
           "@apply text-sm": {},
         },
         ".tagline": {
-          "@apply font-grotesk font-light text-xs uppercase":
-            {},
+          "@apply font-grotesk font-light text-xs uppercase": {},
         },
         ".quote": {
           "@apply font-code text-lg leading-normal": {},
