@@ -188,6 +188,9 @@ const config: Config = {
         640: "640px",
         960: "960px",
         1230: "1230px",
+        0.25: "0.0625rem",
+        7.5: "1.875rem",
+        15: "3.75rem",
       },
       zIndex: {
         1: "1",
@@ -206,7 +209,17 @@ const config: Config = {
         256: "0 0 256px",
         100: "0 0 100%",
       },
+      opacity: {
+        15: ".15",
+      },
+      letterSpacing: {
+        tagline: ".15em",
+      },
+      transitionDuration: {
+        DEFAULT: "200ms",
+      },
       transitionTimingFunction: {
+        DEFAULT: "linear",
         "out-flex": "cubic-bezier(0.05, 0.6, 0.4, 0.9)",
       },
       backgroundImage: {
