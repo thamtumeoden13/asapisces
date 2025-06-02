@@ -8,7 +8,7 @@ import "react-vertical-timeline-component/style.min.css";
 
 import { skills, experiences } from "@/constants";
 import Image from "next/image";
-import Cta from "@/components/porfolio/CTA";
+import Cta from "@/components/portfolio/CTA";
 
 const About = () => {
   return (
