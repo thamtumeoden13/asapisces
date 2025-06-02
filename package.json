@@ -36,7 +36,7 @@
     "@radix-ui/react-toast": "^1.2.2",
     "@radix-ui/react-tooltip": "^1.1.5",
     "@react-three/drei": "^3.11.2",
-    "@react-three/fiber": "^9.0.0-alpha.8",
+    "@react-three/fiber": "^9.1.2",
     "@sanity/image-url": "^1.1.0",
     "@sanity/vision": "^3.68.3",
     "@tabler/icons-react": "^3.24.0",
@@ -79,9 +79,11 @@
     "styled-components": "^6.1.13",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
-    "three": "^0.171.0"
+    "three": "^0.171.0",
+    "use-asset": "^1.0.4"
   },
   "devDependencies": {
+    "@babel/core": "^7.27.4",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20",
     "@types/react": "^18",

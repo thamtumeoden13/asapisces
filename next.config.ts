@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   },
   devIndicators: {
   },
+  transpilePackages: ['three'],
   webpack(config) {
     config.module.rules.push({
       test: /\.glb$/,
