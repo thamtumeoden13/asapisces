@@ -4,7 +4,7 @@ import React, { Suspense, useState, useEffect } from "react";
 import emailjs from "@emailjs/browser";
 // import Loader from "@/components/portfolio/Loader";
 import { Canvas } from "@react-three/fiber";
-// import Fox from "@/models/Fox";
+import Fox from "@/models/Fox";
 
 import useAlert from "@/hooks/useAlert";
 import Alert from "@/components/portfolio/Alert";
@@ -151,12 +151,12 @@ const Contact = () => {
           <ambientLight intensity={0.5} />
 
           {/* <Suspense fallback={<Loader />}> */}
-          {/* <Fox
+          <Fox
             currentAnimation={currentAnimation}
             position={[0.5, 0.35, 0]}
             rotation={[12.6, -0.6, 0]}
             scale={[0.5, 0.5, 0.5]}
-          /> */}
+          />
           {/* </Suspense> */}
         </Canvas>
       </div>

@@ -1,4 +1,3 @@
-import { ContactButton } from "@/components/shared/ContactButton";
 import Navbar from "@/components/shared/Navbar";
 
 export default function Layout({
@@ -10,7 +9,6 @@ export default function Layout({
     <div className="bg-n-1">
       <Navbar className="!text-black" containerClassName="!bg-white" />
       {children}
-      <ContactButton />
     </div>
   );
 }

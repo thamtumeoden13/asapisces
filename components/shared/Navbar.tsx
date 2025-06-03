@@ -12,7 +12,7 @@ const navItems = [
   { name: "Brainwave", route: "/brainwave" },
   { name: "Prologue" },
   { name: "Portfolio", route: "/portfolio" },
-  { name: "Contact" },
+  { name: "Contact", route: "/portfolio/contact" },
 ];
 
 const Navbar = ({
