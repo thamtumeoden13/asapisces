@@ -1,7 +1,7 @@
 import React from 'react'
 
 import Ping from "@/components/Ping";
-import { client, clientNoCache } from "@/sanity/lib/client";
+import { clientNoCache } from "@/sanity/lib/client";
 import { writeClient } from "@/sanity/lib/write-client";
 import { after } from "next/server";
 

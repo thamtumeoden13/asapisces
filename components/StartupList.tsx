@@ -1,12 +1,7 @@
 import React from 'react'
-import { formatDate } from "@/lib/utils";
-import { EyeIcon } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import { Author, Startup } from "@/sanity/types";
 import StartupCard from './StartupCard';
-import { PROJECTS_BY_CONSTRUCTION_ID_QUERY, PROJECTS_BY_QUERY } from '@/sanity/lib/queries';
+import { PROJECTS_BY_CONSTRUCTION_ID_QUERY } from '@/sanity/lib/queries';
 import { sanityFetch } from '@/sanity/lib/live';
 
 export type StartupCardType = Omit<Startup, "author"> & { author?: Author };

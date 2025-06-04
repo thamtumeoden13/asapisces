@@ -1,8 +1,5 @@
 import React from 'react'
-import { EyeIcon } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import { Author, Construction } from "@/sanity/types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { CloudinaryImage } from "./shared/CloudinaryImage";
