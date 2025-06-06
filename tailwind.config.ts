@@ -52,10 +52,19 @@ const config: Config = {
       colors: {
         primary: {
           100: "#FFE8F0",
+          200: "#cac5fe",
           DEFAULT: "#f1592b",
           admin: "#25388C",
         },
         secondary: "#FBE843",
+        success:{
+          100: "#49de50",
+          200: "#42c748",
+        },
+        destructive:{
+          100: "#f75353",
+          200: "#c44141",
+        },
         black: {
           100: "#333333",
           200: "#141413",
@@ -81,14 +90,14 @@ const config: Config = {
         s4: "#1959AD",
         s5: "#263466",
         light: {
-          100: "#D6E0FF",
+          100: "#d6e0ff",
           200: "#EED1AC",
           300: "#F8F8FF",
-          400: "#EDF1F1",
+          400: "#6870a6",
           500: "#8D8D8D",
-          600: "#F9FAFB",
+          600: "#4f557d",
           700: "#E2E8F0",
-          800: "#F8FAFC",
+          800: "#24273a",
         },
         dark: {
           100: "#16191E",
@@ -233,6 +242,7 @@ const config: Config = {
         "benefit-card-4": "url(assets/benefits/card-4.svg)",
         "benefit-card-5": "url(assets/benefits/card-5.svg)",
         "benefit-card-6": "url(assets/benefits/card-6.svg)",
+        "pattern": "url(pattern.png)",
       },
     },
   },

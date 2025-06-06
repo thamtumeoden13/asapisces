@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { name: "Awwwards", route: "/" },
   { name: "Brainwave", route: "/brainwave" },
-  { name: "Prologue" },
+  { name: "PrepWise", route: "/interview" },
   { name: "Portfolio", route: "/portfolio" },
   { name: "Contact", route: "/portfolio/contact" },
 ];

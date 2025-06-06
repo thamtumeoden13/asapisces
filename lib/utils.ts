@@ -1,3 +1,4 @@
+import { interviewCovers, mappings } from "@/constants";
 import { clientNoCache } from "@/sanity/lib/client";
 import { clsx, type ClassValue } from "clsx";
 import MarkdownIt from "markdown-it";
@@ -17,7 +18,6 @@ export function formatDate(date: string) {
 export function parseServerActionResponse<T>(response: T) {
   return JSON.parse(JSON.stringify(response));
 }
-
 
 // ERROR HANDLER
 export const handleError = (error: unknown) => {
@@ -41,7 +41,7 @@ export const navVariants = {
     opacity: 0,
     y: -50,
     transition: {
-      type: 'spring',
+      type: "spring",
       stiffness: 300,
       damping: 140,
     },
@@ -50,17 +50,22 @@ export const navVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'spring',
+      type: "spring",
       stiffness: 80,
       delay: 1,
     },
   },
 };
 
-export const slideIn = (direction: string, type: string, delay: number, duration: number) => ({
+export const slideIn = (
+  direction: string,
+  type: string,
+  delay: number,
+  duration: number
+) => ({
   hidden: {
-    x: direction === 'left' ? '-100%' : direction === 'right' ? '100%' : 0,
-    y: direction === 'up' ? '100%' : direction === 'down' ? '100%' : 0,
+    x: direction === "left" ? "-100%" : direction === "right" ? "100%" : 0,
+    y: direction === "up" ? "100%" : direction === "down" ? "100%" : 0,
   },
   show: {
     x: 0,
@@ -69,12 +74,15 @@ export const slideIn = (direction: string, type: string, delay: number, duration
       type,
       delay,
       duration,
-      ease: 'easeOut',
+      ease: "easeOut",
     },
   },
 });
 
-export const staggerContainer = (staggerChildren?: number, delayChildren?: number) => ({
+export const staggerContainer = (
+  staggerChildren?: number,
+  delayChildren?: number
+) => ({
   hidden: {},
   show: {
     transition: {
@@ -93,7 +101,7 @@ export const textVariant = (delay: number) => ({
     y: 0,
     opacity: 1,
     transition: {
-      type: 'spring',
+      type: "spring",
       duration: 1.25,
       delay,
     },
@@ -119,16 +127,21 @@ export const textVariant2 = {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'tween',
-      ease: 'easeIn',
+      type: "tween",
+      ease: "easeIn",
     },
   },
 };
 
-export const fadeIn = (direction: string, type: string, delay: number, duration: number) => ({
+export const fadeIn = (
+  direction: string,
+  type: string,
+  delay: number,
+  duration: number
+) => ({
   hidden: {
-    x: direction === 'left' ? 100 : direction === 'right' ? -100 : 0,
-    y: direction === 'up' ? 100 : direction === 'down' ? -100 : 0,
+    x: direction === "left" ? 100 : direction === "right" ? -100 : 0,
+    y: direction === "up" ? 100 : direction === "down" ? -100 : 0,
     opacity: 0,
   },
   show: {
@@ -139,21 +152,21 @@ export const fadeIn = (direction: string, type: string, delay: number, duration:
       type,
       delay,
       duration,
-      ease: 'easeOut',
+      ease: "easeOut",
     },
   },
 });
 
 export const planetVariants = (direction: string) => ({
   hidden: {
-    x: direction === 'left' ? '-100%' : '100%',
+    x: direction === "left" ? "-100%" : "100%",
     rotate: 120,
   },
   show: {
     x: 0,
     rotate: 0,
     transition: {
-      type: 'spring',
+      type: "spring",
       duration: 1.8,
       delay: 0.5,
     },
@@ -169,10 +182,10 @@ export const zoomIn = (delay: number, duration: string) => ({
     scale: 1,
     opacity: 1,
     transition: {
-      type: 'tween',
+      type: "tween",
       delay,
       duration,
-      ease: 'easeOut',
+      ease: "easeOut",
     },
   },
 });
@@ -182,7 +195,7 @@ export const footerVariants = {
     opacity: 0,
     y: 50,
     transition: {
-      type: 'spring',
+      type: "spring",
       stiffness: 300,
       damping: 140,
     },
@@ -191,7 +204,7 @@ export const footerVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'spring',
+      type: "spring",
       stiffness: 80,
       delay: 0.5,
     },
@@ -204,12 +217,18 @@ const slugify = ({ title }: { title: string }) => {
   return title
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-    .replace(/\s+/g, '-') // Replace spaces with dashes
-    .replace(/-+/g, '-'); // Remove multiple dashes
+    .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+    .replace(/\s+/g, "-") // Replace spaces with dashes
+    .replace(/-+/g, "-"); // Remove multiple dashes
 };
 
-export const generateUniqueSlug = async ({ title, query }: { title: string, query: string }) => {
+export const generateUniqueSlug = async ({
+  title,
+  query,
+}: {
+  title: string;
+  query: string;
+}) => {
   const baseSlug = slugify({ title });
   let uniqueSlug = baseSlug;
 
@@ -227,16 +246,19 @@ export const generateUniqueSlug = async ({ title, query }: { title: string, quer
 export const mdParser = new MarkdownIt({
   html: true,
 }).use((md) => {
-  const defaultRender = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
-    return self.renderToken(tokens, idx, options);
-  };
+  const defaultRender =
+    md.renderer.rules.link_open ||
+    function (tokens, idx, options, env, self) {
+      return self.renderToken(tokens, idx, options);
+    };
 
   md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
-    const hrefAttr = tokens[idx].attrs?.find(attr => attr[0] === "href");
+    const hrefAttr = tokens[idx].attrs?.find((attr) => attr[0] === "href");
     const href = hrefAttr ? hrefAttr[1] : null;
 
     if (href?.includes("youtube.com") || href?.includes("youtu.be")) {
-      const videoId = href.split("v=")[1]?.split("&")[0] || href.split("/").pop();
+      const videoId =
+        href.split("v=")[1]?.split("&")[0] || href.split("/").pop();
       return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
     }
 
@@ -251,8 +273,47 @@ export const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-
 // Get unique values for filter options
 export const getUniqueValues = <T>(data: T[], key: keyof T) => {
-  return Array.from(new Set(data.map((item) => item[key])))
-}
+  return Array.from(new Set(data.map((item) => item[key])));
+};
+
+const techIconBaseURL = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
+
+const normalizeTechName = (tech: string) => {
+  const key = tech.toLowerCase().replace(/\.js$/, "").replace(/\s+/g, "");
+  return mappings[key as keyof typeof mappings];
+};
+
+const checkIconExists = async (url: string) => {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    return response.ok; // Returns true if the icon exists
+  } catch {
+    return false;
+  }
+};
+
+export const getTechLogos = async (techArray: string[]) => {
+  const logoURLs = techArray.map((tech) => {
+    const normalized = normalizeTechName(tech);
+    return {
+      tech,
+      url: `${techIconBaseURL}/${normalized}/${normalized}-original.svg`,
+    };
+  });
+
+  const results = await Promise.all(
+    logoURLs.map(async ({ tech, url }) => ({
+      tech,
+      url: (await checkIconExists(url)) ? url : "/tech.svg",
+    }))
+  );
+
+  return results;
+};
+
+export const getRandomInterviewCover = () => {
+  const randomIndex = Math.floor(Math.random() * interviewCovers.length);
+  return `/covers${interviewCovers[randomIndex]}`;
+};

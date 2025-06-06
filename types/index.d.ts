@@ -25,7 +25,7 @@ declare type AddImageParams = {
     transformationType: string;
     width: number;
     height: number;
-    config: any;
+    config: Record<string, unknown>;
     secureURL: string;
     transformationURL: string;
     aspectRatio: string | undefined;
@@ -44,7 +44,7 @@ declare type UpdateImageParams = {
     transformationType: string;
     width: number;
     height: number;
-    config: any;
+    config: Record<string, unknown>;
     secureURL: string;
     transformationURL: string;
     aspectRatio: string | undefined;
@@ -128,7 +128,7 @@ declare type TransformationFormProps = {
 };
 
 declare type TransformedImageProps = {
-  image: any;
+  image: IImage;
   type: string;
   title: string;
   transformationConfig: Transformations | null;
@@ -137,21 +137,119 @@ declare type TransformedImageProps = {
   setIsTransforming?: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-declare module '*.mp4' {
+declare module "*.mp4" {
   const src: string;
   export default src;
 }
 
-declare module '*.jpg' {
+declare module "*.jpg" {
   const src: string;
   export default src;
 }
 declare global {
   interface Window {
-    gtag?: (...args: any[]) => void;
+    gtag?: (...args: unknown[]) => void;
   }
 }
 
-declare module 'markdown-it-video';
+declare module "markdown-it-video";
 
-export {};
+declare interface Feedback {
+  id: string;
+  interviewId: string;
+  totalScore: number;
+  categoryScores: Array<{
+    name: string;
+    score: number;
+    comment: string;
+  }>;
+  strengths: string[];
+  areasForImprovement: string[];
+  finalAssessment: string;
+  createdAt: string;
+}
+
+interface Interview {
+  id: string;
+  role: string;
+  level: string;
+  questions: string[];
+  techstack: string[];
+  createdAt: string;
+  userId: string;
+  type: string;
+  finalized: boolean;
+}
+
+interface CreateFeedbackParams {
+  interviewId: string;
+  userId: string;
+  transcript: { role: string; content: string }[];
+  feedbackId?: string;
+}
+
+interface User {
+  name: string;
+  email: string;
+  id: string;
+}
+
+interface InterviewCardProps {
+  id?: string;
+  userId?: string;
+  role: string;
+  type: string;
+  techstack: string[];
+  createdAt?: string;
+}
+
+declare interface AgentProps {
+  userName: string;
+  userId?: string;
+  interviewId?: string;
+  feedbackId?: string;
+  type: "generate" | "interview";
+  questions?: string[];
+}
+
+declare interface RouteParams {
+  params: Promise<Record<string, string>>;
+  searchParams: Promise<Record<string, string>>;
+}
+
+declare interface GetFeedbackByInterviewIdParams {
+  interviewId: string;
+  userId: string;
+}
+
+declare interface GetLatestInterviewsParams {
+  userId: string;
+  limit?: number;
+}
+
+declare interface SignInParams {
+  email: string;
+  idToken: string;
+}
+
+declare interface SignUpParams {
+  uid: string;
+  name: string;
+  email: string;
+  password: string;
+}
+
+declare type FormType = "sign-in" | "sign-up";
+
+declare interface InterviewFormProps {
+  interviewId: string;
+  role: string;
+  level: string;
+  type: string;
+  techstack: string[];
+  amount: number;
+}
+
+declare interface TechIconProps {
+  techStack: string[];
+}
