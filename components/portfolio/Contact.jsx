@@ -36,7 +36,7 @@ const Contact = () => {
           to_email: "ltv.mrvu@gmail.com",
           message: form.message,
         },
-        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
+        process.env.EMAILJS_PUBLIC_KEY
       )
       .then(() => {
         showAlert({
