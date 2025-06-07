@@ -3,6 +3,14 @@ import "./globals.css";
 import "easymde/dist/easymde.min.css";
 import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
+import { Mona_Sans } from "next/font/google";
+
+
+const monaSans = Mona_Sans({
+  variable: "--font-mona-sans",
+  subsets: ["latin"],
+});
+
 
 export default function RootLayout({
   children,
@@ -26,7 +34,7 @@ export default function RootLayout({
         `}
         </Script>
       </head>
-      <body>
+      <body className={`${monaSans.className} antialiased pattern`}>
         {/* <GoogleAnalytics /> */}
         {children}
         <Toaster />
