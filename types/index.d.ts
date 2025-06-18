@@ -230,6 +230,7 @@ declare interface GetLatestInterviewsParams {
 declare interface SignInParams {
   email: string;
   idToken: string;
+  password: string;
 }
 
 declare interface SignUpParams {

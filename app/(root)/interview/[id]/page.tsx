@@ -11,12 +11,14 @@ const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
   const user = await getCurrentUser();
 
+  if(!user) redirect("/sign-in")
+
   const interview = await getInterviewById(id);
 
-  if (!interview) redirect("/");
+  if (!interview) redirect("/interview");
 
   return (
-    <>
+    <div className="flex flex-col gap-12 px-16 mx-auto my-16 max-w-7xl max-sm:px-4 max-sm:my-8 min-h-screen">
       <div className="flex flex-row justify-between gap-4">
         <div className="flex flex-row items-center gap-4 max-sm:flex-col">
           <div className="flex flex-row items-center gap-4">
@@ -40,13 +42,13 @@ const Page = async ({ params }: RouteParams) => {
       </div>
 
       <Agent
-        userName={user!.name!}
-        userId={user?.id}
+        userName={user.name}
+        userId={user.id}
         interviewId={id}
         type="interview"
         questions={interview.questions}
       />
-    </>
+    </div>
   );
 };
 

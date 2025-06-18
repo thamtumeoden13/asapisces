@@ -1,22 +1,19 @@
 "use server";
 
-import { auth, db } from "@/firebase/admin";
+import { auth } from "@/auth";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-// Session duration (1 week)
-const SESSION_DURATION = 60 * 60 * 24 * 7;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-// Set session cookie
-export async function setSessionCookie(idToken: string) {
+const SESSION_DURATION = 60 * 60 * 24 * 7; // 1 week
+
+export async function setSessionCookie(access_token: string) {
   const cookieStore = await cookies();
-
-  // Create session cookie
-  const sessionCookie = await auth.createSessionCookie(idToken, {
-    expiresIn: SESSION_DURATION * 1000, // milliseconds
-  });
-
-  // Set cookie in the browser
-  cookieStore.set("session", sessionCookie, {
+  cookieStore.set("session", access_token, {
     maxAge: SESSION_DURATION,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -26,23 +23,21 @@ export async function setSessionCookie(idToken: string) {
 }
 
 export async function signUp(params: SignUpParams) {
-  const { uid, name, email } = params;
+  const { email, name, password } = params;
 
   try {
-    // check if user exists in db
-    const userRecord = await db.collection("users").doc(uid).get();
-    if (userRecord.exists)
-      return {
-        success: false,
-        message: "User already exists. Please sign in.",
-      };
-
-    // save user to db
-    await db.collection("users").doc(uid).set({
-      name,
+    const { data, error } = await supabase.auth.admin.createUser({
       email,
-      // profileURL,
-      // resumeURL,
+      password,
+      user_metadata: { name },
+    });
+
+    if (error) throw error;
+
+    await supabase.from("users").insert({
+      id: data.user?.id,
+      email,
+      name,
     });
 
     return {
@@ -52,8 +47,13 @@ export async function signUp(params: SignUpParams) {
   } catch (error: unknown) {
     console.error("Error creating user:", error);
 
-    // Handle Firebase specific errors
-    if (error instanceof Error && 'code' in error && (error as { code: string }).code === "auth/email-already-exists") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error &&
+      typeof (error as { message?: string }).message === "string" &&
+      (error as { message: string }).message.includes("already registered")
+    ) {
       return {
         success: false,
         message: "This email is already in use",
@@ -68,20 +68,28 @@ export async function signUp(params: SignUpParams) {
 }
 
 export async function signIn(params: SignInParams) {
-  const { email, idToken } = params;
+  const { email, password } = params;
 
   try {
-    const userRecord = await auth.getUserByEmail(email);
-    if (!userRecord)
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error || !data.session) {
       return {
         success: false,
-        message: "User does not exist. Create an account.",
+        message: "Invalid credentials. Please try again.",
       };
+    }
 
-    await setSessionCookie(idToken);
+    await setSessionCookie(data.session.access_token);
+    return {
+      success: true,
+      message: "Logged in successfully.",
+    };
   } catch (error) {
-    console.log(error);
-
+    console.error(error);
     return {
       success: false,
       message: "Failed to log into account. Please try again.",
@@ -89,43 +97,37 @@ export async function signIn(params: SignInParams) {
   }
 }
 
-// Sign out user by clearing the session cookie
 export async function signOut() {
   const cookieStore = await cookies();
-
   cookieStore.delete("session");
 }
 
-// Get current user from session cookie
 export async function getCurrentUser(): Promise<User | null> {
-  const cookieStore = await cookies();
+  // // Lấy user đang đăng nhập
+  // const {
+  //   data: { user },
+  // } = await supabase.auth.getUser();
 
-  const sessionCookie = cookieStore.get("session")?.value;
-  if (!sessionCookie) return null;
+  const session = await auth();
 
-  try {
-    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+  console.log("getCurrentUser", session);
 
-    // get user info from db
-    const userRecord = await db
-      .collection("users")
-      .doc(decodedClaims.uid)
-      .get();
-    if (!userRecord.exists) return null;
+  if (!session) return null;
 
-    return {
-      ...userRecord.data(),
-      id: userRecord.id,
-    } as User;
-  } catch (error) {
-    console.log(error);
+  // Lấy thông tin user từ bảng "users" trong Supabase
+  const { data: dbUser, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", session.user.id)
+    .single();
 
-    // Invalid or expired session
-    return null;
-  }
+  if (!dbUser || error) return null;
+
+  return {
+    ...dbUser,
+  } as User;
 }
 
-// Check if user is authenticated
 export async function isAuthenticated() {
   const user = await getCurrentUser();
   return !!user;

@@ -1,22 +1,14 @@
 import React, { ReactNode } from "react";
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { clientNoCache } from "@/sanity/lib/client";
 
 import Sidebar from "@/components/admin/Sidebar";
 import Header from "@/components/admin/Header";
-import { AUTHOR_BY_ID_QUERY } from "@/sanity/lib/queries";
 
 import "./admin.css";
+import { getCurrentUser } from "@/lib/actions/auth.action";
 
 const Layout = async ({ children }: { children: ReactNode }) => {
-  const session = await auth();
-  console.log("AuthPage -> session", session);
-
-  let user = null;
-  if (session?.id) {
-    user = await clientNoCache.fetch(AUTHOR_BY_ID_QUERY, { id: session?.id });
-  }
+  const user = await getCurrentUser();
 
   if (!user) redirect("/sign-in");
 

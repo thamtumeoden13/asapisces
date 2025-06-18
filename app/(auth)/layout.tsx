@@ -1,20 +1,14 @@
-import { auth } from "@/auth";
-import { clientNoCache } from "@/sanity/lib/client";
-import { AUTHOR_BY_ID_QUERY } from "@/sanity/lib/queries";
+import { getCurrentUser } from "@/lib/actions/auth.action";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 
 const Layout = async ({ children }: { children: ReactNode }) => {
-  const session = await auth();
+  const user = await getCurrentUser();
 
-  console.log("AuthPage -> session", session);
-  let user = null;
-  if (session?.id) {
-    user = await clientNoCache.fetch(AUTHOR_BY_ID_QUERY, { id: session?.id });
-  }
+  console.log("Sign In Page",user)
 
-  if (user) redirect("/admin");
+  if (user) redirect("/");
 
   return (
     <main className="auth-container">

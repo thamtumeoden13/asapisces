@@ -1,25 +1,32 @@
 "use server";
 
 import { feedbackSchema } from "@/constants";
-import { db } from "@/firebase/admin";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
-// import { firestore } from "firebase-admin";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role key for RLS bypass in server actions
+);
 
 export async function getInterviewByUserId(
   userId: string
 ): Promise<Interview[] | null> {
   if (!userId) return null;
 
-  const interviews = await db
-    .collection("interviews")
-    .where("userId", "==", userId)
-    .orderBy("createdAt", "desc")
-    .get();
-  return interviews.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Interview[];
+  const { data, error } = await supabase
+    .from("interviews")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    return null;
+  }
+
+  return data as Interview[];
 }
 
 export async function getLatestInterviewByUserId(
@@ -29,24 +36,35 @@ export async function getLatestInterviewByUserId(
 
   if (!userId) return null;
 
-  const interviews = await db
-    .collection("interviews")
-    .orderBy("createdAt", "desc")
-    .where("finalized", "==", true)
-    .where("userId", "!=", userId)
-    .limit(limit)
-    .get();
+  const { data, error } = await supabase
+    .from("interviews")
+    .select("*")
+    .eq("finalized", true)
+    .neq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-  return interviews.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Interview[];
+  if (error) {
+    console.error(error);
+    return null;
+  }
+
+  return data as Interview[];
 }
 
 export async function getInterviewById(id: string): Promise<Interview | null> {
-  const interview = await db.collection("interviews").doc(id).get();
+  const { data, error } = await supabase
+    .from("interviews")
+    .select("*")
+    .eq("id", id)
+    .single();
 
-  return interview.data() as Interview | null;
+  if (error) {
+    console.error(error);
+    return null;
+  }
+
+  return data as Interview;
 }
 
 export async function createFeedback(params: CreateFeedbackParams) {
@@ -59,8 +77,6 @@ export async function createFeedback(params: CreateFeedbackParams) {
           `- ${sentence.role}: ${sentence.content} \n`
       )
       .join("");
-
-    console.log('before generateObject', formattedTranscript)
 
     const {
       object: {
@@ -91,26 +107,27 @@ export async function createFeedback(params: CreateFeedbackParams) {
         "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
     });
 
-    console.log('before add feedbacks',{totalScore,
-        categoryScores,
-        strengths,
-        areasForImprovement,
-        finalAssessment,})
+    const { data, error } = await supabase.from("feedbacks").insert([
+      {
+        interview_id: interviewId,
+        user_id: userId,
+        total_score: totalScore,
+        category_scores: categoryScores,
+        strengths: strengths,
+        areas_for_improvement: areasForImprovement,
+        final_assessment: finalAssessment,
+        created_at: new Date().toISOString(),
+      },
+    ]).select("id");
 
-    const feedback = await db.collection("feedbacks").add({
-      interviewId,
-      userId,
-      totalScore,
-      categoryScores,
-      strengths,
-      areasForImprovement,
-      finalAssessment,
-      createdAt: new Date().toISOString(),
-    });
+    if (error) {
+      console.error(error);
+      return { success: false };
+    }
 
     return {
       success: true,
-      feedbackId: feedback.id,
+      feedbackId: data?.[0]?.id,
     };
   } catch (error) {
     console.error(error);
@@ -120,24 +137,23 @@ export async function createFeedback(params: CreateFeedbackParams) {
   }
 }
 
-
 export async function getFeedbackByInterviewId(
   params: GetFeedbackByInterviewIdParams
 ): Promise<Feedback | null> {
   const { interviewId, userId } = params;
 
-  const feedback = await db
-    .collection("feedbacks")
-    .where("interviewId", "==", interviewId)
-    .where("userId", "==", userId)
+  const { data, error } = await supabase
+    .from("feedbacks")
+    .select("*")
+    .eq("interview_id", interviewId)
+    .eq("user_id", userId)
     .limit(1)
-    .get();
+    .single();
 
-    if(feedback.empty) return null
+  if (error || !data) {
+    console.error(error);
+    return null;
+  }
 
-    const feedbackDoc = feedback.docs[0];
-
-  return {
-    id: feedbackDoc.id, ...feedbackDoc.data()
-  } as Feedback;
+  return data as Feedback;
 }

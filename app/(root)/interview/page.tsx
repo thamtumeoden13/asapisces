@@ -8,14 +8,19 @@ import {
 
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import React from "react";
 
 const Page = async () => {
   const user = await getCurrentUser();
 
+  if (!user) redirect("/sign-in");
+
   const [userInterviews, latestInterviews] = await Promise.all([
-    await getInterviewByUserId("1bNzrdFkiNXDdJA6YRfe6rJSB2v1"),
-    await getLatestInterviewByUserId({ userId: "1bNzrdFkiNXDdJA6YRfe6rJSB2v1" }),
+    await getInterviewByUserId(user?.id),
+    await getLatestInterviewByUserId({
+      userId: user?.id,
+    }),
   ]);
 
   const hasPastInterviews = (userInterviews ?? []).length > 0;
@@ -31,7 +36,7 @@ const Page = async () => {
           </p>
 
           <Button asChild className="btn-primary max-sm:w-full">
-            <Link href={"/interview"}>Start an Interview</Link>
+            <Link href={"/interview/generate"}>Start an Interview</Link>
           </Button>
         </div>
 
