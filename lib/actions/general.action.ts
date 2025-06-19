@@ -26,7 +26,19 @@ export async function getInterviewByUserId(
     return null;
   }
 
-  return data as Interview[];
+  const _data = data.map((interview) => ({
+    id: interview.id,
+    role: interview.role,
+    level: interview.level,
+    questions: interview.questions,
+    techstack: interview.techstack,
+    createdAt: interview.created_at,
+    userId: interview.user_id,
+    type: interview.type,
+    finalized: interview.finalized,
+  }));
+
+  return _data as Interview[];
 }
 
 export async function getLatestInterviewByUserId(
@@ -49,7 +61,19 @@ export async function getLatestInterviewByUserId(
     return null;
   }
 
-  return data as Interview[];
+  const _data = data.map((interview) => ({
+    id: interview.id,
+    role: interview.role,
+    level: interview.level,
+    questions: interview.questions,
+    techstack: interview.techstack,
+    createdAt: interview.created_at,
+    userId: interview.user_id,
+    type: interview.type,
+    finalized: interview.finalized,
+  }));
+
+  return _data as Interview[];
 }
 
 export async function getInterviewById(id: string): Promise<Interview | null> {
@@ -107,18 +131,21 @@ export async function createFeedback(params: CreateFeedbackParams) {
         "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
     });
 
-    const { data, error } = await supabase.from("feedbacks").insert([
-      {
-        interview_id: interviewId,
-        user_id: userId,
-        total_score: totalScore,
-        category_scores: categoryScores,
-        strengths: strengths,
-        areas_for_improvement: areasForImprovement,
-        final_assessment: finalAssessment,
-        created_at: new Date().toISOString(),
-      },
-    ]).select("id");
+    const { data, error } = await supabase
+      .from("feedbacks")
+      .insert([
+        {
+          interview_id: interviewId,
+          user_id: userId,
+          total_score: totalScore,
+          category_scores: categoryScores,
+          strengths: strengths,
+          areas_for_improvement: areasForImprovement,
+          final_assessment: finalAssessment,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select("id");
 
     if (error) {
       console.error(error);
@@ -155,5 +182,14 @@ export async function getFeedbackByInterviewId(
     return null;
   }
 
-  return data as Feedback;
+  return {
+    id: data?.id,
+    interviewId: data?.interview_id,
+    totalScore: data?.total_score,
+    categoryScores: data?.category_scores,
+    strengths: data?.strengths,
+    areasForImprovement: data?.areas_for_improvement,
+    finalAssessment: data?.final_assessment,
+    createdAt: data?.created_at,
+  } as Feedback;
 }
