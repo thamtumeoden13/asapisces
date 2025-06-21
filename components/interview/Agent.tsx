@@ -73,7 +73,7 @@ const Agent = ({
     if (callStatus === CallStatus.FINISHED) {
       console.log({ type, messages });
       if (type == "generate") {
-        router.push("/");
+        router.push("/interview");
       } else {
         handleGenerateFeedback(messages);
       }
@@ -93,7 +93,7 @@ const Agent = ({
       router.push(`/interview/${interviewId}/feedback`);
     } else {
       console.log("Error save feedback");
-      router.push("/");
+      router.push("/interview");
     }
   };
 
