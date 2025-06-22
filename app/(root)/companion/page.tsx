@@ -10,39 +10,34 @@ import {
 import { getSubjectColor } from "@/lib/utils";
 // import "./companion.css";
 
-
 const Page = async () => {
-  // const companions = await getAllCompanions({ limit: 3 });
-  // const recentSessionsCompanions = await getRecentSessions(10);
-
-  // console.log("companions[0]", companions[0]);
+  const companions = await getAllCompanions({ limit: 3 });
+  const recentSessionsCompanions = await getRecentSessions(10);
 
   return (
-    <main className="mx-auto px-14 flex flex-col gap-8 min-h-screen max-w-[1400px] pt-24 max-sm:px-2">
-      <div className="flex flex-col gap-8 max-sm:px-2">
-        <h1 className="text-3xl underline text-black-400">Popular Companions</h1>
+    <div className="mx-auto px-14 flex flex-col gap-8 bg-background h-full max-w-[1400px] py-10 max-sm:px-2">
+      <h1 className="text-3xl underline text-black-400">Popular Companions</h1>
 
-        <section className="home-section">
-          {recentSessions.slice(0, 3).map((companion) => (
-            <CompanionCard
-              key={companion.id}
-              {...companion}
-              bookmarked={false}
-              color={getSubjectColor(companion.subject)}
-            />
-          ))}
-        </section>
-
-        <section className="home-section">
-          <CompanionList
-            title="Recently completed sessions"
-            companions={recentSessions}
-            className="w-2/3 max-lg:w-full"
+      <section className="home-section">
+        {companions.map((companion) => (
+          <CompanionCard
+            key={companion.id}
+            {...companion}
+            bookmarked={false}
+            color={getSubjectColor(companion.subject)}
           />
-          <CTA />
-        </section>
-      </div>
-    </main>
+        ))}
+      </section>
+
+      <section className="home-section">
+        <CompanionList
+          title="Recently completed sessions"
+          companions={recentSessionsCompanions}
+          className="w-2/3 max-lg:w-full"
+        />
+        <CTA />
+      </section>
+    </div>
   );
 };
 

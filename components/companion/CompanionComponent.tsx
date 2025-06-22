@@ -157,7 +157,7 @@ const CompanionComponent = ({
             </div>
           </div>
 
-          <p className="font-bold text-2xl">{name}</p>
+          <p className="font-bold text-black-300 text-2xl">{name}</p>
         </div>
 
         <div className="user-section">
@@ -169,7 +169,7 @@ const CompanionComponent = ({
               height={130}
               className="rounded-lg"
             />
-            <p className="font-bold text-2xl">{userName}</p>
+            <p className="font-bold text-2xl text-black-300">{userName}</p>
           </div>
           <button
             className="btn-mic"
@@ -182,7 +182,7 @@ const CompanionComponent = ({
               width={36}
               height={36}
             />
-            <p className="max-sm:hidden">
+            <p className="max-sm:hidden text-black-100">
               {isMuted ? "Turn on microphone" : "Turn off microphone"}
             </p>
           </button>

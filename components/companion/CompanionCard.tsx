@@ -60,7 +60,7 @@ const CompanionCard = ({
         <p className="text-sm text-black-100">{duration} minutes</p>
       </div>
 
-      <Link href={`/companions/${id}`} className="w-full">
+      <Link href={`/companion/companions/${id}`} className="w-full">
         <button className="justify-center w-full btn-primary-2">
           Launch Lesson
         </button>

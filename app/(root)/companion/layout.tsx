@@ -6,9 +6,12 @@ export default function Layout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="bg-n-1">
-      <Navbar className="!text-black-400" containerClassName="!bg-light border" />
+    <main className="bg-n-1 mx-auto px-14 flex flex-col gap-8 min-h-screen pt-24 max-sm:px-2">
+      <Navbar
+        className="!text-black-400"
+        containerClassName="!bg-light border"
+      />
       {children}
-    </div>
+    </main>
   );
 }
