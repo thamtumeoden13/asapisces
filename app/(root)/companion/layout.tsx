@@ -1,11 +1,5 @@
 import Navbar from "@/components/shared/Navbar";
-import type { Metadata } from "next";
-import "./companion.css";
 
-export const metadata: Metadata = {
-  title: "Converso",
-  description: "Real-time AI Teaching Platform",
-};
 export default function Layout({
   children,
 }: Readonly<{
@@ -13,7 +7,7 @@ export default function Layout({
 }>) {
   return (
     <div className="bg-n-1">
-      <Navbar className="!text-black" containerClassName="!bg-white" />
+      <Navbar className="!text-black-400" containerClassName="!bg-light border" />
       {children}
     </div>
   );

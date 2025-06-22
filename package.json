@@ -19,6 +19,7 @@
   "dependencies": {
     "@ai-sdk/google": "^1.2.19",
     "@auth/supabase-adapter": "^1.9.1",
+    "@clerk/nextjs": "^6.22.0",
     "@emailjs/browser": "^4.4.1",
     "@fullcalendar/core": "^6.1.17",
     "@fullcalendar/daygrid": "^6.1.17",
@@ -58,6 +59,7 @@
     "firebase-admin": "^13.4.0",
     "framer-motion": "^11.13.1",
     "gsap": "^3.12.5",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.456.0",
     "maath": "^0.10.8",
     "markdown-it": "^14.1.0",

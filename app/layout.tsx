@@ -19,8 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        {/* Google Analytics Script */}
+      {/* <head>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-DXR752DMTX"
           strategy="afterInteractive"
@@ -33,7 +32,7 @@ export default function RootLayout({
           gtag('config', 'G-DXR752DMTX');
         `}
         </Script>
-      </head>
+      </head> */}
       <body className={`${monaSans.className} antialiased pattern`}>
         {/* <GoogleAnalytics /> */}
         {children}

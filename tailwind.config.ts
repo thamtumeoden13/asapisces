@@ -1,10 +1,9 @@
 import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
 import { fontFamily } from "tailwindcss/defaultTheme";
-
-const {
-  default: flattenColorPalette,
-} = require("tailwindcss/lib/util/flattenColorPalette");
+import flattenColorPalette from "tailwindcss/lib/util/flattenColorPalette";
+import tailwindcssAnimate from "tailwindcss-animate";
+import typography from "@tailwindcss/typography";
 
 const config: Config = {
   darkMode: ["class"],
@@ -25,6 +24,8 @@ const config: Config = {
         "meteor-effect": "meteor 5s linear infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fadeIn 0.5s ease-in-out",
+        "slide-up": "slideUp 0.3s ease-out",
       },
       keyframes: {
         scroll: {
@@ -48,20 +49,32 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
       },
       colors: {
         primary: {
           100: "#FFE8F0",
           200: "#cac5fe",
-          DEFAULT: "#f1592b",
           admin: "#25388C",
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
         },
-        secondary: "#FBE843",
-        success:{
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+        },
+        success: {
           100: "#49de50",
           200: "#42c748",
         },
-        destructive:{
+        destructive: {
           100: "#f75353",
           200: "#c44141",
         },
@@ -135,10 +148,54 @@ const config: Config = {
           12: "#2E2A41",
           13: "#6C7275",
         },
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        muted: {
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
+        },
+        accent: {
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
+        },
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+        card: {
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
+        },
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
+        },
+        cta: {
+          DEFAULT: "var(--cta)",
+          gold: "var(--cta-gold)",
+        },
+        sidebar: {
+          DEFAULT: "var(--sidebar)",
+          foreground: "var(--sidebar-foreground)",
+          primary: "var(--sidebar-primary)",
+          "primary-foreground": "var(--sidebar-primary-foreground)",
+          accent: "var(--sidebar-accent)",
+          "accent-foreground": "var(--sidebar-accent-foreground)",
+          border: "var(--sidebar-border)",
+          ring: "var(--sidebar-ring)",
+        },
+        chart: {
+          1: "var(--chart-1)",
+          2: "var(--chart-2)",
+          3: "var(--chart-3)",
+          4: "var(--chart-4)",
+          5: "var(--chart-5)",
+        },
       },
       destructive: {
-        DEFAULT: "hsl(var(--destructive))",
-        foreground: "hsl(var(--destructive-foreground))",
+        // DEFAULT: "hsl(var(--destructive))",
+        // foreground: "hsl(var(--destructive-foreground))",
+        DEFAULT: "var(--destructive)",
+        foreground: "var(--destructive-foreground)",
       },
       fontFamily: {
         "ibm-plex": ["var(--font-ibm-plex)"],
@@ -150,8 +207,11 @@ const config: Config = {
         "robert-medium": ["robert-medium", "sanf-serif"],
         "robert-regular": ["robert-regular", "sanf-serif"],
         grotesk: "var(--font-grotesk)",
-        sans: ["var(--font-sora)", ...fontFamily.sans],
+        // sans: ["var(--font-sora)", ...fontFamily.sans],
         code: "var(--font-code)",
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "monospace"],
+        bricolage: ["Bricolage Grotesque", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -162,12 +222,14 @@ const config: Config = {
         40: "40px",
         half: "50%",
         "7xl": "40px",
+        xl: "calc(var(--radius) + 4px)",
+        "4xl": "2rem",
       },
       boxShadow: {
         100: "2px 2px 0px 0px rgb(0, 0, 0)",
         200: "2px 2px 0px 2px rgb(0, 0, 0)",
         300: "2px 2px 0px 2px rgb(241, 89, 41)",
-        card: '0px 1px 2px 0px rgba(0, 0, 0, 0.05)'
+        card: "0px 1px 2px 0px rgba(0, 0, 0, 0.05)",
 
         // 100: '0px 4px 4px rgba(0, 0, 0, 0.25), 0px 16px 24px rgba(0, 0, 0, 0.25), inset 0px 3px 6px #1959AD',
         // 200: '0px 4px 4px rgba(0, 0, 0, 0.25), 0px 16px 24px rgba(0, 0, 0, 0.25), inset 0px 4px 10px #3391FF',
@@ -242,16 +304,15 @@ const config: Config = {
         "benefit-card-4": "url(assets/benefits/card-4.svg)",
         "benefit-card-5": "url(assets/benefits/card-5.svg)",
         "benefit-card-6": "url(assets/benefits/card-6.svg)",
-        "pattern": "url(pattern.png)",
+        pattern: "url(pattern.png)",
       },
     },
   },
   plugins: [
-    require("tailwindcss-animate"),
-    require("@tailwindcss/typography"),
+    tailwindcssAnimate,
+    typography,
     addVariablesForColors,
-    plugin(function ({ addBase, addComponents, addUtilities }) {
-      addBase({});
+    plugin(function ({ addComponents, addUtilities }) {
       addComponents({
         ".container": {
           "@apply max-w-[77.5rem] mx-auto px-5 md:px-10 xl:max-w-[87.5rem]": {},
@@ -305,8 +366,8 @@ const config: Config = {
   ],
 };
 function addVariablesForColors({ addBase, theme }: any) {
-  let allColors = flattenColorPalette(theme("colors"));
-  let newVars = Object.fromEntries(
+  const allColors = flattenColorPalette(theme("colors"));
+  const newVars = Object.fromEntries(
     Object.entries(allColors).map(([key, val]) => [`--${key}`, val])
   );
 
