@@ -212,14 +212,14 @@ const CompanionComponent = ({
           {messages.map((message, index) => {
             if (message.role === "assistant") {
               return (
-                <p key={message.content + index} className="max-sm:text-sm">
+                <p key={message.content + index} className="max-sm:text-sm text-black-200">
                   {name.split(" ")[0].replace("/[.,]/g", "")}: {message.content}
                 </p>
               );
             } else {
               <p
                 key={message.content + index}
-                className="text-primary max-sm:text-sm"
+                className="text-primary text-black-200 max-sm:text-sm"
               >
                 {userName}: {message.content}
               </p>;
