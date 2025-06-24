@@ -2,7 +2,6 @@ import React from "react";
 import CompanionCard from "@/components/companion/CompanionCard";
 import CompanionList from "@/components/companion/CompanionList";
 import CTA from "@/components/companion/CTA";
-import { recentSessions } from "@/constants";
 import {
   getAllCompanions,
   getRecentSessions,
@@ -13,7 +12,6 @@ import { getSubjectColor } from "@/lib/utils";
 const Page = async () => {
   const companions = await getAllCompanions({ limit: 3 });
   const recentSessionsCompanions = await getRecentSessions(10);
-
   return (
     <div className="mx-auto px-14 flex flex-col gap-8 bg-background h-full max-w-[1400px] py-10 max-sm:px-2">
       <h1 className="text-3xl underline text-black-400">Popular Companions</h1>
@@ -23,7 +21,6 @@ const Page = async () => {
           <CompanionCard
             key={companion.id}
             {...companion}
-            bookmarked={false}
             color={getSubjectColor(companion.subject)}
           />
         ))}

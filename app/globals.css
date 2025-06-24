@@ -1197,7 +1197,7 @@
   /* Companion */
 
   .home-section {
-    @apply flex items-start justify-between w-full gap-4 max-lg:flex-col-reverse max-lg:items-center;
+    @apply flex justify-between w-full gap-4 max-lg:flex-col-reverse max-lg:items-center;
   }
 
   .companions-grid {
