@@ -7,7 +7,8 @@ import {
   getRecentSessions,
 } from "@/lib/actions/companion.actions";
 import { getSubjectColor } from "@/lib/utils";
-// import "./companion.css";
+
+import EnhancedCompanionComponent from "@/components/companion/enhanced-companion-component"
 
 const Page = async () => {
   const companions = await getAllCompanions({ limit: 3 });
@@ -26,7 +27,7 @@ const Page = async () => {
         ))}
       </section>
 
-      <section className="home-section">
+      <section className="home-section !items-start">
         <CompanionList
           title="Recently completed sessions"
           companions={recentSessionsCompanions}
@@ -34,6 +35,7 @@ const Page = async () => {
         />
         <CTA />
       </section>
+      <EnhancedCompanionComponent />
     </div>
   );
 };
