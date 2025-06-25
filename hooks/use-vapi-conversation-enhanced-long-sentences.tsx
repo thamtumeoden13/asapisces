@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { vapi } from "@/lib/vapi.sdk"
 import { configureAssistant } from "@/lib/vapi-config"
 import { calculateAdvancedSimilarity, resetSimilarityContext } from "@/lib/enhanced-similarity-for-long-sentences"
-import type { VapiMessage, VapiCallState, ConversationState, TranscriptLine } from "@/types/podcast"
-import { CallStatus } from "@/types/podcast"
+import type { VapiMessage, VapiCallState, ConversationState, TranscriptLine } from "../types/podcast"
+import { CallStatus } from "../types/podcast"
 
 interface UseVapiConversationProps {
   steps: TranscriptLine[]
@@ -30,7 +30,6 @@ export const useVapiConversation = ({
     status: CallStatus.INACTIVE,
   })
 
-  // Enhanced conversation state with similarity info
   const [conversationState, setConversationState] = useState<ConversationState & { similarity?: any }>({
     currentStep: 0,
     totalSteps: steps.length,
@@ -38,7 +37,6 @@ export const useVapiConversation = ({
     similarity: null,
   })
 
-  // Enhanced messages with similarity data
   const [messages, setMessages] = useState<
     Array<{
       role: "user" | "assistant"
@@ -52,10 +50,11 @@ export const useVapiConversation = ({
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
 
-  // Refs for managing async operations
+  // Enhanced refs for long sentence handling
   const currentStepRef = useRef(conversationState.currentStep)
   const partialInputTimeoutRef = useRef<NodeJS.Timeout>()
   const isCallReadyRef = useRef(false)
+  const lastTranscriptRef = useRef<string>("")
 
   // Update ref when step changes
   useEffect(() => {
@@ -65,78 +64,105 @@ export const useVapiConversation = ({
   const currentStep = conversationState.currentStep
   const currentLine = steps[currentStep] || null
 
-  // Enhanced message handler with advanced similarity
+  // Enhanced message handler with better long sentence support
   const handleMessage = useCallback(
     (message: VapiMessage) => {
       console.log("📨 Received VAPI message:", message)
 
-      if (message.type === "transcript" && message.transcriptType === "final") {
-        const newMessage = {
-          role: message.role,
-          content: message.transcript,
-          timestamp: Date.now(),
+      if (message.type === "transcript") {
+        // Handle both partial and final transcripts for better UX
+        if (message.transcriptType === "partial") {
+          // Update UI to show user is speaking
+          lastTranscriptRef.current = message.transcript
+          console.log("🎤 Partial transcript:", message.transcript)
+          return
         }
 
-        // Handle user responses with advanced similarity
-        if (message.role === "user" && currentLine?.speaker === "Gwen") {
-          const contextId = `${companionId}-step-${currentStepRef.current}`
-
-          // Calculate advanced similarity
-          const similarityResult = calculateAdvancedSimilarity(message.transcript, currentLine.text, contextId, {
-            allowPartial: true,
-            semanticMatching: true,
-            strictMode: false,
-          })
-
-          // Enhanced message with similarity data
-          const enhancedMessage = {
-            ...newMessage,
-            similarity: similarityResult,
-            isPartial: similarityResult.isPartialMatch,
+        if (message.transcriptType === "final") {
+          const newMessage = {
+            role: message.role,
+            content: message.transcript,
+            timestamp: Date.now(),
           }
 
-          setMessages((prev) => [enhancedMessage, ...prev])
+          // Handle user responses with enhanced similarity for long sentences
+          if (message.role === "user" && currentLine?.speaker === "Gwen") {
+            const contextId = `${companionId}-step-${currentStepRef.current}`
 
-          // Handle partial input (user still speaking)
-          if (similarityResult.isPartialMatch) {
-            setConversationState((prev) => ({
-              ...prev,
-              feedback: similarityResult.feedback,
+            // Detect if this is a long sentence
+            const expectedWords = currentLine.text.split(/\s+/)
+            const isLongSentence = expectedWords.length >= 15
+
+            console.log(`🔍 Analyzing ${isLongSentence ? "LONG" : "short"} sentence (${expectedWords.length} words)`)
+
+            // Calculate enhanced similarity with long sentence awareness
+            const similarityResult = calculateAdvancedSimilarity(message.transcript, currentLine.text, contextId, {
+              allowPartial: true,
+              semanticMatching: true,
+              strictMode: false,
+              isLongSentence,
+            })
+
+            console.log("📊 Similarity result:", {
+              score: similarityResult.score,
+              completeness: similarityResult.completenessRatio,
+              isPartial: similarityResult.isPartialMatch,
+              shouldWait: similarityResult.shouldWaitForMore,
+            })
+
+            // Enhanced message with similarity data
+            const enhancedMessage = {
+              ...newMessage,
               similarity: similarityResult,
-            }))
-
-            // Clear existing timeout and set new one
-            if (partialInputTimeoutRef.current) {
-              clearTimeout(partialInputTimeoutRef.current)
+              isPartial: similarityResult.isPartialMatch,
             }
 
-            // Wait for more input before final evaluation
-            partialInputTimeoutRef.current = setTimeout(() => {
-              // Force final evaluation after timeout
-              const finalResult = calculateAdvancedSimilarity(message.transcript, currentLine.text, contextId, {
-                allowPartial: false, // Force final evaluation
-                semanticMatching: true,
-                strictMode: false,
-              })
+            setMessages((prev) => [enhancedMessage, ...prev])
 
-              handleFinalSimilarityResult(finalResult, currentStepRef.current)
-            }, 3000) // Wait 3 seconds for more input
+            // Enhanced handling for partial input and long sentences
+            if (similarityResult.shouldWaitForMore || similarityResult.isPartialMatch) {
+              setConversationState((prev) => ({
+                ...prev,
+                feedback: similarityResult.feedback,
+                similarity: similarityResult,
+              }))
 
-            return
+              // Clear existing timeout and set new one with longer delay for long sentences
+              if (partialInputTimeoutRef.current) {
+                clearTimeout(partialInputTimeoutRef.current)
+              }
+
+              const timeoutDuration = isLongSentence ? 5000 : 3000 // Longer timeout for long sentences
+
+              partialInputTimeoutRef.current = setTimeout(() => {
+                console.log("⏰ Timeout reached, forcing final evaluation")
+                // Force final evaluation after timeout
+                const finalResult = calculateAdvancedSimilarity(message.transcript, currentLine.text, contextId, {
+                  allowPartial: false,
+                  semanticMatching: true,
+                  strictMode: false,
+                  isLongSentence,
+                })
+
+                handleFinalSimilarityResult(finalResult, currentStepRef.current)
+              }, timeoutDuration)
+
+              return
+            }
+
+            // Handle complete input immediately
+            handleFinalSimilarityResult(similarityResult, currentStepRef.current)
+          } else {
+            // Non-user messages (assistant messages)
+            setMessages((prev) => [newMessage, ...prev])
           }
-
-          // Handle complete input immediately
-          handleFinalSimilarityResult(similarityResult, currentStepRef.current)
-        } else {
-          // Non-user messages (assistant messages)
-          setMessages((prev) => [newMessage, ...prev])
         }
       }
     },
     [currentLine, companionId],
   )
 
-  // Handle final similarity result and determine next action
+  // Enhanced final similarity result handler
   const handleFinalSimilarityResult = useCallback(
     (similarityResult: any, stepIndex: number) => {
       // Clear any pending timeout
@@ -145,8 +171,31 @@ export const useVapiConversation = ({
         partialInputTimeoutRef.current = undefined
       }
 
-      // Determine if user should advance (lowered threshold for better UX)
-      const shouldAdvance = similarityResult.score >= 0.5 // More lenient threshold
+      // Enhanced threshold logic for long sentences
+      const currentLineText = steps[stepIndex]?.text || ""
+      const isLongSentence = currentLineText.split(/\s+/).length >= 15
+
+      // Adjust advancement threshold based on sentence length
+      let advancementThreshold = 0.5 // Default threshold
+
+      if (isLongSentence) {
+        // For long sentences, require higher completeness
+        if (similarityResult.completenessRatio >= 0.7 && similarityResult.score >= 0.4) {
+          advancementThreshold = 0.4 // Lower score threshold if good completeness
+        } else {
+          advancementThreshold = 0.6 // Higher threshold for incomplete long sentences
+        }
+      }
+
+      const shouldAdvance = similarityResult.score >= advancementThreshold
+
+      console.log(`🎯 Final evaluation (step ${stepIndex}):`, {
+        score: similarityResult.score,
+        threshold: advancementThreshold,
+        completeness: similarityResult.completenessRatio,
+        shouldAdvance,
+        isLongSentence,
+      })
 
       // Update conversation state
       setConversationState((prev) => ({
@@ -162,23 +211,19 @@ export const useVapiConversation = ({
       // Clean up context if advancing
       if (shouldAdvance) {
         resetSimilarityContext(`${companionId}-step-${stepIndex}`)
-
-        // Log successful completion
         console.log(`✅ Step ${stepIndex} completed with score: ${similarityResult.score.toFixed(2)}`)
       } else {
-        // Log retry needed
         console.log(`🔄 Step ${stepIndex} needs retry. Score: ${similarityResult.score.toFixed(2)}`)
       }
     },
-    [companionId],
+    [companionId, steps],
   )
 
   // Function to send Leo's message
   const sendLeoMessage = useCallback((line: TranscriptLine, stepIndex: number) => {
-    console.log(`🎤 Attempting to send Leo's message (step ${stepIndex}):`, line.text)
+    console.log(`🎤 Sending Leo's message (step ${stepIndex}):`, line.text)
 
     try {
-      // Method 1: Try add-message
       vapi.send({
         type: "add-message",
         message: {
@@ -186,25 +231,12 @@ export const useVapiConversation = ({
           content: line.text,
         },
       })
-      console.log("✅ Sent via add-message")
-
-      // Method 2: Also try direct say (if available)
-      setTimeout(() => {
-        try {
-          vapi.send({
-            type: "say",
-            message: line.text,
-          })
-          console.log("✅ Sent via say command")
-        } catch (error) {
-          console.log("ℹ️ Say command not available:", error)
-        }
-      }, 100)
+      console.log("✅ Sent Leo's message successfully")
     } catch (error) {
       console.error("❌ Failed to send Leo's message:", error)
     }
 
-    // Add to local messages regardless
+    // Add to local messages
     setMessages((prev) => [
       {
         role: "assistant",
@@ -236,7 +268,7 @@ export const useVapiConversation = ({
             currentStep: 1,
           }))
         }, 3000)
-      }, 1000) // 1 second delay to ensure VAPI is ready
+      }, 1000)
     }
   }, [steps, sendLeoMessage])
 
@@ -310,13 +342,21 @@ export const useVapiConversation = ({
         }))
       }, 3000)
     } else if (currentLine?.speaker === "Gwen" && callState.status === CallStatus.ACTIVE) {
-      console.log(`👤 Waiting for user (step ${currentStep}):`, currentLine.text)
+      const isLongSentence = currentLine.text.split(/\s+/).length >= 15
+      console.log(
+        `👤 Waiting for user (step ${currentStep}, ${isLongSentence ? "LONG" : "short"} sentence):`,
+        currentLine.text,
+      )
 
-      // Wait for user response
+      // Enhanced feedback for long sentences
+      const feedback = isLongSentence
+        ? `🎯 Your turn (this is a longer sentence, take your time): "${currentLine.text}"`
+        : `🎯 Your turn: "${currentLine.text}"`
+
       setConversationState((prev) => ({
         ...prev,
         isWaitingForUser: true,
-        feedback: `🎯 Your turn: "${currentLine.text}"`,
+        feedback,
       }))
     }
   }, [currentStep, currentLine, callState.status, sendLeoMessage])
@@ -338,8 +378,6 @@ export const useVapiConversation = ({
     setCallState({ status: CallStatus.CONNECTING })
 
     const assistantConfig = configureAssistant(voice, style)
-    console.log("🔧 Assistant config:", assistantConfig)
-
     const assistantOverrides = {
       variableValues: {
         subject,
@@ -348,7 +386,6 @@ export const useVapiConversation = ({
       },
       clientMessages: ["transcript"] as const,
     }
-    console.log("🔧 Assistant overrides:", assistantOverrides)
 
     try {
       vapi.start(assistantConfig, assistantOverrides)
@@ -393,6 +430,7 @@ export const useVapiConversation = ({
     })
     setMessages([])
     isCallReadyRef.current = false
+    lastTranscriptRef.current = ""
   }, [steps.length, companionId])
 
   // Additional utility functions
@@ -422,10 +460,15 @@ export const useVapiConversation = ({
     // Reset context for current step
     resetSimilarityContext(`${companionId}-step-${conversationState.currentStep}`)
 
+    const isLongSentence = currentLine ? currentLine.text.split(/\s+/).length >= 15 : false
+    const feedback = isLongSentence
+      ? `🎯 Let's try again (take your time with this longer sentence): "${currentLine?.text}"`
+      : `🎯 Let's try again: "${currentLine?.text}"`
+
     setConversationState((prev) => ({
       ...prev,
       isWaitingForUser: true,
-      feedback: currentLine ? `🎯 Let's try again: "${currentLine.text}"` : "Ready to continue!",
+      feedback,
       similarity: null,
     }))
   }, [companionId, conversationState.currentStep, currentLine])
@@ -454,7 +497,7 @@ export const useVapiConversation = ({
     resetConversation,
     skipToStep,
     retryCurrentStep,
-    manualTriggerLeo, // NEW: Manual trigger for testing
+    manualTriggerLeo,
 
     // Computed values
     progress: conversationState.totalSteps > 0 ? (currentStep / conversationState.totalSteps) * 100 : 0,

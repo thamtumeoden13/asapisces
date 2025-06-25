@@ -3,6 +3,7 @@
 
 import { useState } from "react"
 import EnhancedCompanionConversation from "@/components/companion/enhanced-companion-conversation"
+import EnhancedCompanionConversationWithGroupedDisplay from "@/components/companion/enhanced-companion-conversation-with-grouped-display"
 import { TopicSelector } from "@/components/companion/topic-selector"
 import type { TopicKey } from "@/types/podcast"
 
@@ -39,7 +40,7 @@ export default function ConversationPage() {
               <div className="text-sm text-gray-600">Completed: {completedTopics.size}/10 topics</div>
             </div>
 
-            <EnhancedCompanionConversation
+            <EnhancedCompanionConversationWithGroupedDisplay
               selectedTopic={selectedTopic}
               onTopicComplete={handleTopicComplete}
               companionId="positive-thinking-podcast"
