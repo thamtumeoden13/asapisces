@@ -9,7 +9,7 @@ export default function Layout({
     <main className="bg-n-1 mx-auto px-14 flex flex-col gap-8 min-h-screen pt-24 max-sm:px-2">
       <Navbar
         className="!text-black-400"
-        containerClassName="!bg-light border"
+        containerClassName="!bg-blue-100 border"
       />
       {children}
     </main>

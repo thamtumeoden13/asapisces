@@ -30,7 +30,6 @@ export default function VapiConversationPage() {
 
         {!selectedTopic ? (
           <div className="space-y-6">
-            {/* Mode Selector */}
             <div className="flex justify-center space-x-4">
               <button
                 onClick={() => setMode("podcast")}

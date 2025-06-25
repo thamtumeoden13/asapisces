@@ -79,7 +79,7 @@ export const useVapiConversation = ({
 
           // Simple similarity check
           const similarity = calculateSimilarity(userInput, expectedResponse);
-
+          console.log({ similarity });
           let feedback = "";
           if (similarity > 0.8) {
             feedback = "✅ Excellent response!";

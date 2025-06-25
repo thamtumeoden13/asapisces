@@ -5,15 +5,15 @@ import { vapi } from "../lib/vapi.sdk";
 import {
   configurePodcastAssistant,
   configureConversationAssistant,
-} from "../lib/vapi-config";
+} from "@/lib/vapi-config";
 import {
   type VapiCallState,
   type VapiEventHandlers,
   type TranscriptMessage,
   type CallStatusEnum,
   MessageTypeEnum,
-} from "../types/vapi.d";
-import type { TranscriptLine } from "../types/podcast";
+} from "@/types/vapi";
+import type { TranscriptLine } from "@/types/podcast";
 
 interface UseEnhancedVapiProps {
   steps: TranscriptLine[];
