@@ -55,6 +55,7 @@ export const useVapiConversation = ({
   // Refs for managing async operations
   const currentStepRef = useRef(conversationState.currentStep)
   const partialInputTimeoutRef = useRef<NodeJS.Timeout>()
+  const isCallReadyRef = useRef(false)
 
   // Update ref when step changes
   useEffect(() => {
@@ -67,6 +68,8 @@ export const useVapiConversation = ({
   // Enhanced message handler with advanced similarity
   const handleMessage = useCallback(
     (message: VapiMessage) => {
+      console.log("📨 Received VAPI message:", message)
+
       if (message.type === "transcript" && message.transcriptType === "final") {
         const newMessage = {
           role: message.role,
@@ -170,15 +173,76 @@ export const useVapiConversation = ({
     [companionId],
   )
 
-  // VAPI Event Handlers (unchanged)
+  // Function to send Leo's message
+  const sendLeoMessage = useCallback((line: TranscriptLine, stepIndex: number) => {
+    console.log(`🎤 Attempting to send Leo's message (step ${stepIndex}):`, line.text)
+
+    try {
+      // Method 1: Try add-message
+      vapi.send({
+        type: "add-message",
+        message: {
+          role: "assistant",
+          content: line.text,
+        },
+      })
+      console.log("✅ Sent via add-message")
+
+      // Method 2: Also try direct say (if available)
+      setTimeout(() => {
+        try {
+          vapi.send({
+            type: "say",
+            message: line.text,
+          })
+          console.log("✅ Sent via say command")
+        } catch (error) {
+          console.log("ℹ️ Say command not available:", error)
+        }
+      }, 100)
+    } catch (error) {
+      console.error("❌ Failed to send Leo's message:", error)
+    }
+
+    // Add to local messages regardless
+    setMessages((prev) => [
+      {
+        role: "assistant",
+        content: line.text,
+        timestamp: Date.now(),
+      },
+      ...prev,
+    ])
+  }, [])
+
+  // VAPI Event Handlers
   const handleCallStart = useCallback(() => {
+    console.log("📞 Call started - Setting up conversation")
     setCallState({ status: CallStatus.ACTIVE })
-    console.log("📞 Call started")
+    isCallReadyRef.current = true
+
     console.log("🎯 First line:", steps[0]?.speaker, "-", steps[0]?.text?.substring(0, 50) + "...")
-  }, [steps])
+
+    // If first line is Leo, send it immediately
+    if (steps[0]?.speaker === "Leo") {
+      console.log("🚀 First line is Leo - sending immediately")
+      setTimeout(() => {
+        sendLeoMessage(steps[0], 0)
+
+        // Move to next step
+        setTimeout(() => {
+          setConversationState((prev) => ({
+            ...prev,
+            currentStep: 1,
+          }))
+        }, 3000)
+      }, 1000) // 1 second delay to ensure VAPI is ready
+    }
+  }, [steps, sendLeoMessage])
 
   const handleCallEnd = useCallback(() => {
     setCallState({ status: CallStatus.FINISHED })
+    isCallReadyRef.current = false
     console.log("📞 Call ended")
 
     // Clean up all similarity contexts
@@ -193,20 +257,24 @@ export const useVapiConversation = ({
   }, [steps.length, companionId])
 
   const handleSpeechStart = useCallback(() => {
+    console.log("🎤 Speech started")
     setIsSpeaking(true)
   }, [])
 
   const handleSpeechEnd = useCallback(() => {
+    console.log("🎤 Speech ended")
     setIsSpeaking(false)
   }, [])
 
   const handleError = useCallback((error: Error) => {
-    console.error("VAPI Error:", error)
+    console.error("❌ VAPI Error:", error)
     setCallState({ status: CallStatus.ERROR, error: error.message })
   }, [])
 
   // Setup VAPI event listeners
   useEffect(() => {
+    console.log("🔧 Setting up VAPI event listeners")
+
     vapi.on("call-start", handleCallStart)
     vapi.on("call-end", handleCallEnd)
     vapi.on("message", handleMessage)
@@ -215,6 +283,7 @@ export const useVapiConversation = ({
     vapi.on("error", handleError)
 
     return () => {
+      console.log("🧹 Cleaning up VAPI event listeners")
       vapi.off("call-start", handleCallStart)
       vapi.off("call-end", handleCallEnd)
       vapi.off("message", handleMessage)
@@ -224,71 +293,14 @@ export const useVapiConversation = ({
     }
   }, [handleCallStart, handleCallEnd, handleMessage, handleSpeechStart, handleSpeechEnd, handleError])
 
-  // Handle first message when call starts
+  // Auto-advance conversation for Leo's lines (skip step 0 as handled above)
   useEffect(() => {
-    if (callState.status === CallStatus.ACTIVE && currentStep === 0 && currentLine?.speaker === "Leo") {
-      // Small delay to ensure VAPI is ready
-      const timer = setTimeout(() => {
-        console.log("🎬 Starting conversation with Leo's first line:", currentLine.text)
-
-        // Send Leo's first message to VAPI
-        vapi.send({
-          type: "add-message",
-          message: {
-            role: "assistant",
-            content: currentLine.text,
-          },
-        })
-
-        // Add to local messages
-        setMessages((prev) => [
-          {
-            role: "assistant",
-            content: currentLine.text,
-            timestamp: Date.now(),
-          },
-          ...prev,
-        ])
-
-        // Move to next step after a delay
-        setTimeout(() => {
-          setConversationState((prev) => ({
-            ...prev,
-            currentStep: prev.currentStep + 1,
-          }))
-        }, 3000) // Slightly longer delay for first message
-      }, 500) // Small delay to ensure VAPI is ready
-
-      return () => clearTimeout(timer)
-    }
-  }, [callState.status, currentStep, currentLine])
-
-  // Auto-advance conversation for Leo's lines
-  useEffect(() => {
-    // Skip step 0 as it's handled by the first message effect above
-    if (currentStep === 0) return
+    if (currentStep === 0 || !isCallReadyRef.current) return
 
     if (currentLine?.speaker === "Leo" && callState.status === CallStatus.ACTIVE) {
       console.log(`🗣️ Leo speaking (step ${currentStep}):`, currentLine.text)
 
-      // Send Leo's message to VAPI
-      vapi.send({
-        type: "add-message",
-        message: {
-          role: "assistant",
-          content: currentLine.text,
-        },
-      })
-
-      // Add to local messages
-      setMessages((prev) => [
-        {
-          role: "assistant",
-          content: currentLine.text,
-          timestamp: Date.now(),
-        },
-        ...prev,
-      ])
+      sendLeoMessage(currentLine, currentStep)
 
       // Move to next step after a delay
       setTimeout(() => {
@@ -296,7 +308,7 @@ export const useVapiConversation = ({
           ...prev,
           currentStep: prev.currentStep + 1,
         }))
-      }, 2500) // Slightly longer delay for better pacing
+      }, 3000)
     } else if (currentLine?.speaker === "Gwen" && callState.status === CallStatus.ACTIVE) {
       console.log(`👤 Waiting for user (step ${currentStep}):`, currentLine.text)
 
@@ -307,7 +319,7 @@ export const useVapiConversation = ({
         feedback: `🎯 Your turn: "${currentLine.text}"`,
       }))
     }
-  }, [currentStep, currentLine, callState.status])
+  }, [currentStep, currentLine, callState.status, sendLeoMessage])
 
   // Check for conversation completion
   useEffect(() => {
@@ -322,7 +334,11 @@ export const useVapiConversation = ({
 
   // Control functions
   const startCall = useCallback(() => {
+    console.log("🚀 Starting VAPI call...")
     setCallState({ status: CallStatus.CONNECTING })
+
+    const assistantConfig = configureAssistant(voice, style)
+    console.log("🔧 Assistant config:", assistantConfig)
 
     const assistantOverrides = {
       variableValues: {
@@ -332,11 +348,19 @@ export const useVapiConversation = ({
       },
       clientMessages: ["transcript"] as const,
     }
+    console.log("🔧 Assistant overrides:", assistantOverrides)
 
-    vapi.start(configureAssistant(voice, style), assistantOverrides)
+    try {
+      vapi.start(assistantConfig, assistantOverrides)
+      console.log("✅ VAPI start called successfully")
+    } catch (error) {
+      console.error("❌ Failed to start VAPI:", error)
+      setCallState({ status: CallStatus.ERROR, error: error.message })
+    }
   }, [subject, topic, style, voice])
 
   const endCall = useCallback(() => {
+    console.log("🛑 Ending call...")
     vapi.stop()
     setCallState({ status: CallStatus.FINISHED })
   }, [])
@@ -345,9 +369,12 @@ export const useVapiConversation = ({
     const currentMuteState = vapi.isMuted()
     vapi.setMuted(!currentMuteState)
     setIsMuted(!currentMuteState)
+    console.log(`🔇 Mute toggled: ${!currentMuteState}`)
   }, [])
 
   const resetConversation = useCallback(() => {
+    console.log("🔄 Resetting conversation...")
+
     // Clean up all similarity contexts
     for (let i = 0; i < steps.length; i++) {
       resetSimilarityContext(`${companionId}-step-${i}`)
@@ -365,12 +392,15 @@ export const useVapiConversation = ({
       similarity: null,
     })
     setMessages([])
+    isCallReadyRef.current = false
   }, [steps.length, companionId])
 
   // Additional utility functions
   const skipToStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex >= 0 && stepIndex < steps.length) {
+        console.log(`⏭️ Skipping to step ${stepIndex}`)
+
         // Clean up current step context
         resetSimilarityContext(`${companionId}-step-${conversationState.currentStep}`)
 
@@ -387,6 +417,8 @@ export const useVapiConversation = ({
   )
 
   const retryCurrentStep = useCallback(() => {
+    console.log(`🔄 Retrying step ${conversationState.currentStep}`)
+
     // Reset context for current step
     resetSimilarityContext(`${companionId}-step-${conversationState.currentStep}`)
 
@@ -397,6 +429,14 @@ export const useVapiConversation = ({
       similarity: null,
     }))
   }, [companionId, conversationState.currentStep, currentLine])
+
+  // Manual trigger for testing
+  const manualTriggerLeo = useCallback(() => {
+    if (currentLine?.speaker === "Leo") {
+      console.log("🎯 Manual trigger for Leo's line")
+      sendLeoMessage(currentLine, currentStep)
+    }
+  }, [currentLine, currentStep, sendLeoMessage])
 
   return {
     // State
@@ -414,6 +454,7 @@ export const useVapiConversation = ({
     resetConversation,
     skipToStep,
     retryCurrentStep,
+    manualTriggerLeo, // NEW: Manual trigger for testing
 
     // Computed values
     progress: conversationState.totalSteps > 0 ? (currentStep / conversationState.totalSteps) * 100 : 0,

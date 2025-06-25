@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
-import { useVapiConversation } from "@/hooks/use-vapi-conversation-enhanced"; // Updated import
+import { useVapiConversation } from "@/hooks/use-vapi-conversation-enhanced-debug"; // Updated import
 import { SimilarityDebugPanel } from "@/components/companion/similarity-debug-panel"; // New component
 import { podcastTopics, topicTitles } from "@/data/podcast-topics";
 import {
