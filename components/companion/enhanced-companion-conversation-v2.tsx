@@ -551,7 +551,7 @@ const EnhancedCompanionConversationV2 = ({
                         <p className="text-sm text-gray-700">{sessionInsights.sessionSummary}</p>
                       </div>
 
-                      {sessionInsights.keyAchievements.length > 0 && (
+                      {sessionInsights.keyAchievements?.length > 0 && (
                         <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                           <h4 className="font-medium text-green-800 mb-2">Achievements</h4>
                           <div className="space-y-1">
@@ -569,7 +569,7 @@ const EnhancedCompanionConversationV2 = ({
                         <p className="text-sm text-blue-700">{sessionInsights.personalizedFeedback}</p>
                       </div>
 
-                      {sessionInsights.nextSessionRecommendations.length > 0 && (
+                      {sessionInsights.nextSessionRecommendations?.length > 0 && (
                         <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                           <h4 className="font-medium text-purple-800 mb-2">Next Session Recommendations</h4>
                           <div className="space-y-1">
