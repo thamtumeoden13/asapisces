@@ -7,12 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useVapiConversation } from "@/hooks/use-vapi-conversation-enhanced-debug"
 import { EnhancedVoiceRecognition, type SpeechQualityMetrics } from "@/lib/enhanced-voice-recognition"
 import { ConversationAnalytics, type ConversationInsights } from "@/lib/conversation-analytics"
-import { RealTimeFeedbackPanel } from "@/components/companion/real-time-feedback-panel"
 import { podcastTopics, topicTitles } from "@/data/podcast-topics"
 import { type TopicKey, type CompanionComponentProps, CallStatus } from "@/types/podcast"
 import soundwaves from "@/constants/soundwaves.json"
@@ -108,6 +106,37 @@ const EnhancedCompanionConversationV2 = ({
       onTopicComplete?.(currentTopic)
     },
   })
+
+  // COMPLETELY REWRITTEN message grouping logic for correct ordering
+  const groupedMessages = (() => {
+    // Step 1: Sort messages by timestamp (oldest first for processing)
+    const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp)
+
+    // Step 2: Group consecutive messages by same speaker
+    const groups: any[] = []
+    let currentGroup: any = null
+
+    sortedMessages.forEach((message) => {
+      if (!currentGroup || currentGroup.role !== message.role) {
+        // Start new group
+        currentGroup = {
+          role: message.role,
+          speaker: message.role === "assistant" ? name.split(" ")[0] : userName,
+          messages: [message],
+          timestamp: message.timestamp,
+        }
+        groups.push(currentGroup)
+      } else {
+        // Add to existing group
+        currentGroup.messages.push(message)
+        // Update group timestamp to latest message
+        currentGroup.timestamp = message.timestamp
+      }
+    })
+
+    // Step 3: Reverse groups array so newest groups appear first
+    return groups.reverse()
+  })()
 
   // Control Lottie animation
   useEffect(() => {
@@ -383,7 +412,7 @@ const EnhancedCompanionConversationV2 = ({
                       variant="outline"
                       onClick={toggleMute}
                       disabled={callState.status !== "ACTIVE"}
-                      className="text-xs"
+                      className="text-xs bg-transparent"
                     >
                       {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </Button>
@@ -391,7 +420,7 @@ const EnhancedCompanionConversationV2 = ({
                       variant="outline"
                       onClick={retryCurrentStep}
                       disabled={callState.status !== "ACTIVE" || !conversationState.isWaitingForUser}
-                      className="text-xs"
+                      className="text-xs bg-transparent"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </Button>
@@ -399,7 +428,7 @@ const EnhancedCompanionConversationV2 = ({
                       variant="outline"
                       onClick={resetConversation}
                       disabled={callState.status === "ACTIVE"}
-                      className="text-xs"
+                      className="text-xs bg-transparent"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </Button>
@@ -431,60 +460,95 @@ const EnhancedCompanionConversationV2 = ({
                 </TabsList>
 
                 <TabsContent value="conversation" className="space-y-4">
-                  {/* Current Line Display */}
+                  {/* Current Line Display - Keep original red gradient */}
                   {currentLine && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Badge variant={currentLine.speaker === "Leo" ? "default" : "secondary"}>
-                          {currentLine.speaker}
-                        </Badge>
-                        {conversationState.isWaitingForUser && (
-                          <Badge variant="outline" className="animate-pulse">
-                            Your turn!
+                    <div className="p-5 bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50 border-2 border-purple-300 rounded-lg shadow-md relative overflow-hidden">
+                      {/* Animated background accent */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-100/20 to-rose-100/20 animate-pulse"></div>
+
+                      <div className="relative z-10">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Badge
+                            variant={currentLine.speaker === "Leo" ? "default" : "secondary"}
+                            className="text-sm font-medium"
+                          >
+                            {currentLine.speaker}
                           </Badge>
-                        )}
-                        {isSpeaking && (
-                          <Badge variant="outline" className="bg-green-50">
-                            🎤 Listening...
+                          {conversationState.isWaitingForUser && (
+                            <Badge
+                              variant="outline"
+                              className="animate-pulse bg-yellow-50 text-yellow-700 border-yellow-300"
+                            >
+                              🎯 Your turn!
+                            </Badge>
+                          )}
+                          {isSpeaking && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                              🎤 Listening...
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 font-semibold">
+                            ⚡ CURRENT
                           </Badge>
-                        )}
+                        </div>
+                        <p className="text-lg font-semibold text-gray-900 leading-relaxed">{currentLine.text}</p>
                       </div>
-                      <p className="text-sm">{currentLine.text}</p>
                     </div>
                   )}
 
-                  {/* Message History */}
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {messages.length === 0 ? (
+                  {/* Grouped Message History - Fixed Ordering */}
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {groupedMessages.length === 0 ? (
                       <p className="text-gray-500 text-center py-8">Start a session to begin the conversation</p>
                     ) : (
-                      messages.map((message, index) => (
+                      groupedMessages.map((group, groupIndex) => (
                         <div
-                          key={index}
+                          key={`${group.role}-${group.timestamp}-${groupIndex}`}
                           className={cn(
-                            "p-3 rounded-lg border",
-                            message.role === "assistant"
-                              ? "bg-blue-50 border-blue-200"
-                              : "bg-green-50 border-green-200",
+                            "p-4 rounded-lg border-l-4 shadow-sm",
+                            group.role === "assistant"
+                              ? "bg-blue-50 border-l-blue-400 border border-blue-200"
+                              : "bg-green-50 border-l-green-400 border border-green-200",
                           )}
                         >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <Badge variant={message.role === "assistant" ? "default" : "secondary"}>
-                                  {message.role === "assistant" ? name.split(" ")[0] : userName}
+                          {/* Group Header */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={group.role === "assistant" ? "default" : "secondary"} className="text-sm">
+                                {group.speaker}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {group.messages.length} message{group.messages.length > 1 ? "s" : ""}
+                              </Badge>
+                              {group.messages.some((msg: any) => msg.similarity) && (
+                                <Badge variant="outline" className="text-xs">
+                                  {Math.round(
+                                    group.messages.find((msg: any) => msg.similarity)?.similarity?.score * 100 || 0,
+                                  )}
+                                  % match
                                 </Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {new Date(group.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+
+                          {/* Group Messages - Display in chronological order within group */}
+                          <div className="space-y-2">
+                            {group.messages.map((message: any, messageIndex: number) => (
+                              <div
+                                key={`${message.timestamp}-${messageIndex}`}
+                                className="text-sm text-gray-700 leading-relaxed"
+                              >
+                                <p className="mb-1">{message.content}</p>
                                 {message.similarity && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {Math.round(message.similarity.score * 100)}% match
-                                  </Badge>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Similarity: {Math.round(message.similarity.score * 100)}%
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-sm">{message.content}</p>
-                            </div>
-                            <span className="text-xs text-gray-500 ml-2">
-                              {new Date(message.timestamp).toLocaleTimeString()}
-                            </span>
+                            ))}
                           </div>
                         </div>
                       ))
@@ -593,28 +657,6 @@ const EnhancedCompanionConversationV2 = ({
 
         {/* Enhanced Sidebar with Real-time Feedback */}
         <div className="space-y-6">
-          {/* Real-time Feedback Panel */}
-          {/* <RealTimeFeedbackPanel
-            speechMetrics={speechMetrics}
-            pronunciationScore={pronunciationFeedback?.score || 0}
-            responseTime={realTimeMetrics.responseTime}
-            confidenceLevel={realTimeMetrics.confidenceLevel}
-            currentStreak={conversationState.currentStep}
-            sessionStats={{
-              totalAttempts: messages.filter((m) => m.role === "user").length,
-              successfulAttempts: messages.filter((m) => m.role === "user" && m.similarity && m.similarity.score > 0.7)
-                .length,
-              averageScore: speechMetrics
-                ? ((speechMetrics.pronunciation + speechMetrics.fluency + speechMetrics.clarity) / 3) * 100
-                : 0,
-              improvementTrend: Math.random() * 10 - 5, // Mock improvement trend
-            }}
-            recentFeedback={
-              pronunciationFeedback ? [...pronunciationFeedback.feedback, ...pronunciationFeedback.improvements] : []
-            }
-            isActive={callState.status === CallStatus.ACTIVE}
-          /> */}
-
           {/* Topic Overview */}
           <Card>
             <CardHeader>
@@ -667,7 +709,7 @@ const EnhancedCompanionConversationV2 = ({
                   size="sm"
                   onClick={resetConversation}
                   disabled={callState.status === "ACTIVE"}
-                  className="w-full"
+                  className="w-full bg-transparent"
                 >
                   Reset Conversation
                 </Button>
