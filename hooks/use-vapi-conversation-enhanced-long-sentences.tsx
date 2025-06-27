@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { vapi } from "@/lib/vapi.sdk"
 import { configureAssistant } from "@/lib/vapi-config"
-import { calculateAdvancedSimilarity, resetSimilarityContext } from "@/lib/enhanced-similarity-for-long-sentences"
+import { calculateAdvancedSimilarity, resetSimilarityContext } from "../lib/enhanced-similarity-for-long-sentences"
 import type { VapiMessage, VapiCallState, ConversationState, TranscriptLine } from "../types/podcast"
 import { CallStatus } from "../types/podcast"
 
@@ -221,9 +221,10 @@ export const useVapiConversation = ({
 
   // Function to send Leo's message
   const sendLeoMessage = useCallback((line: TranscriptLine, stepIndex: number) => {
-    console.log(`🎤 Sending Leo's message (step ${stepIndex}):`, line.text)
+    console.log(`🎤 Sending Leo's complete message (step ${stepIndex}):`, line.text)
 
     try {
+      // Send as a single complete message
       vapi.send({
         type: "add-message",
         message: {
@@ -231,17 +232,32 @@ export const useVapiConversation = ({
           content: line.text,
         },
       })
-      console.log("✅ Sent Leo's message successfully")
+
+      // Also try to ensure it's spoken as one unit
+      setTimeout(() => {
+        vapi.send({
+          type: "conversation-update",
+          message: {
+            type: "assistant-message",
+            content: line.text,
+            shouldSpeak: true,
+            preventInterruption: true,
+          },
+        })
+      }, 100)
+
+      console.log("✅ Sent Leo's complete message successfully")
     } catch (error) {
       console.error("❌ Failed to send Leo's message:", error)
     }
 
-    // Add to local messages
+    // Add to local messages as single complete message
     setMessages((prev) => [
       {
         role: "assistant",
         content: line.text,
         timestamp: Date.now(),
+        isComplete: true, // Mark as complete message
       },
       ...prev,
     ])
@@ -332,15 +348,24 @@ export const useVapiConversation = ({
     if (currentLine?.speaker === "Leo" && callState.status === CallStatus.ACTIVE) {
       console.log(`🗣️ Leo speaking (step ${currentStep}):`, currentLine.text)
 
+      // Send complete message to VAPI with proper formatting
       sendLeoMessage(currentLine, currentStep)
 
-      // Move to next step after a delay
+      // Calculate delay based on sentence length for natural pacing
+      const wordCount = currentLine.text.split(/\s+/).length
+      const baseDelay = 2000 // 2 seconds base
+      const additionalDelay = Math.min(wordCount * 100, 4000) // Max 4 seconds additional
+      const totalDelay = baseDelay + additionalDelay
+
+      console.log(`⏱️ Leo will speak for ${totalDelay}ms (${wordCount} words)`)
+
+      // Move to next step after calculated delay
       setTimeout(() => {
         setConversationState((prev) => ({
           ...prev,
           currentStep: prev.currentStep + 1,
         }))
-      }, 3000)
+      }, totalDelay)
     } else if (currentLine?.speaker === "Gwen" && callState.status === CallStatus.ACTIVE) {
       const isLongSentence = currentLine.text.split(/\s+/).length >= 15
       console.log(

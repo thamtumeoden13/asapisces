@@ -61,7 +61,7 @@ export const ConversationPageWithEnhancedSimilarity = ({
             <CardTitle className="text-2xl">Enhanced Conversation Practice</CardTitle>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <Switch checked={showDebug} onCheckedChange={setShowDebug} />
+                {/* <Switch checked={showDebug} onCheckedChange={setShowDebug} /> */}
                 <span className="text-sm">Debug Mode</span>
               </div>
               <Badge variant={callState.status === "ACTIVE" ? "default" : "secondary"}>{callState.status}</Badge>

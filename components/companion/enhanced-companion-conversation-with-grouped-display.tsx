@@ -1,24 +1,25 @@
-"use client"
+"use client";
 
-import React, { useRef } from "react"
-import Lottie, { type LottieRefCurrentProps } from "lottie-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useVapiConversation } from "@/hooks/use-vapi-conversation-enhanced-long-sentences"
-import { EnhancedConversationDisplayGrouped } from "@/components/companion/enhanced-conversation-display-grouped"
-import { ConversationFlowDisplay } from "@/components/companion/conversation-flow-display"
-import { DebugPanel } from "@/components/companion/debug-panel"
-import { podcastTopics, topicTitles } from "@/data/podcast-topics"
-import type { TopicKey, CompanionComponentProps } from "@/types/podcast"
+import React, { useRef, useCallback } from "react";
+import Lottie, { type LottieRefCurrentProps } from "lottie-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useVapiConversation } from "@/hooks/use-vapi-conversation-enhanced-long-sentences";
+import { EnhancedConversationDisplayGrouped } from "@/components/companion/enhanced-conversation-display-grouped";
+import { ConversationFlowDisplay } from "@/components/companion/conversation-flow-display";
+import { DebugPanel } from "@/components/companion/debug-panel";
+import { podcastTopics, topicTitles } from "@/data/podcast-topics";
+import type { TopicKey, CompanionComponentProps } from "@/types/podcast";
+import { LeoSpeechMonitor } from "@/components/companion/leo-speech-monitor";
 import soundwaves from "@/constants/soundwaves.json";
 
-
-const cn = (...classes: (string | undefined)[]) => classes.filter(Boolean).join(" ")
+const cn = (...classes: (string | undefined)[]) =>
+  classes.filter(Boolean).join(" ");
 
 const getSubjectColor = (subject: string) => {
   const colors: Record<string, string> = {
@@ -27,13 +28,14 @@ const getSubjectColor = (subject: string) => {
     science: "#10B981",
     history: "#F59E0B",
     default: "#6B7280",
-  }
-  return colors[subject] || colors.default
-}
+  };
+  return colors[subject] || colors.default;
+};
 
-interface EnhancedCompanionConversationProps extends Partial<CompanionComponentProps> {
-  selectedTopic?: TopicKey
-  onTopicComplete?: (topic: TopicKey) => void
+interface EnhancedCompanionConversationProps
+  extends Partial<CompanionComponentProps> {
+  selectedTopic?: TopicKey;
+  onTopicComplete?: (topic: TopicKey) => void;
 }
 
 const EnhancedCompanionConversationWithGroupedDisplay = ({
@@ -48,19 +50,33 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
   selectedTopic,
   onTopicComplete,
 }: EnhancedCompanionConversationProps) => {
-  const lottieRef = useRef<LottieRefCurrentProps>(null)
+  const lottieRef = useRef<LottieRefCurrentProps>(null);
 
   // State for debug mode and view preferences
-  const [showDebug, setShowDebug] = React.useState(process.env.NODE_ENV === "development")
-  const [activeTab, setActiveTab] = React.useState("conversation")
+  const [showDebug, setShowDebug] = React.useState(
+    process.env.NODE_ENV === "development"
+  );
+  const [activeTab, setActiveTab] = React.useState("conversation");
+  const [leoSpeechStatus, setLeoSpeechStatus] = React.useState<{
+    isDelivering: boolean;
+    currentSentence: string;
+    progress: number;
+  }>({
+    isDelivering: false,
+    currentSentence: "",
+    progress: 0,
+  });
+
+  // Remove local callState and use hookCallState instead
+  // const [callState, setCallState] = useState({ status: CallStatus.INACTIVE, sessionId: "", error: "" })
 
   // Get steps for current topic
-  const currentTopic = (selectedTopic || topic) as TopicKey
-  const steps = podcastTopics[currentTopic] || []
+  const currentTopic = (selectedTopic || topic) as TopicKey;
+  const steps = podcastTopics[currentTopic] || [];
 
   // Use enhanced VAPI conversation hook
   const {
-    callState,
+    callState: hookCallState,
     conversationState,
     messages,
     isSpeaking,
@@ -84,48 +100,97 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
     style,
     voice,
     onSessionComplete: () => onTopicComplete?.(currentTopic),
-  })
+  });
+
+  // Use hookCallState throughout the component
+  const callState = hookCallState;
 
   // Control Lottie animation based on speaking state
   React.useEffect(() => {
     if (lottieRef.current) {
       if (isSpeaking) {
-        lottieRef.current.play()
+        lottieRef.current.play();
       } else {
-        lottieRef.current.stop()
+        lottieRef.current.stop();
       }
     }
-  }, [isSpeaking])
+  }, [isSpeaking]);
+
+  // Monitor Leo's speech delivery
+  React.useEffect(() => {
+    if (currentLine?.speaker === "Leo" && callState.status === "ACTIVE") {
+      setLeoSpeechStatus({
+        isDelivering: true,
+        currentSentence: currentLine.text,
+        progress: 0,
+      });
+
+      // Calculate expected delivery time
+      const wordCount = currentLine.text.split(/\s+/).length;
+      const expectedDuration = wordCount * 150 + 3000; // 150ms per word + 3s base
+
+      // Update progress
+      const interval = setInterval(() => {
+        setLeoSpeechStatus((prev) => {
+          const newProgress = Math.min(
+            prev.progress + 100 / (expectedDuration / 100),
+            100
+          );
+          return { ...prev, progress: newProgress };
+        });
+      }, 100);
+
+      // Complete after expected duration
+      setTimeout(() => {
+        setLeoSpeechStatus({
+          isDelivering: false,
+          currentSentence: "",
+          progress: 100,
+        });
+        clearInterval(interval);
+      }, expectedDuration);
+
+      return () => clearInterval(interval);
+    }
+  }, [currentLine, callState.status]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ACTIVE":
-        return "bg-green-500"
+        return "bg-green-500";
       case "CONNECTING":
-        return "bg-yellow-500 animate-pulse"
+        return "bg-yellow-500 animate-pulse";
       case "ERROR":
-        return "bg-red-500"
+        return "bg-red-500";
       default:
-        return "bg-gray-500"
+        return "bg-gray-500";
     }
-  }
+  };
 
   const getStatusText = (status: string) => {
     switch (status) {
       case "INACTIVE":
-        return "Ready to Start"
+        return "Ready to Start";
       case "CONNECTING":
-        return "Connecting..."
+        return "Connecting...";
       case "ACTIVE":
-        return "Active Call"
+        return "Active Call";
       case "FINISHED":
-        return "Call Ended"
+        return "Call Ended";
       case "ERROR":
-        return "Error"
+        return "Error";
       default:
-        return status
+        return status;
     }
-  }
+  };
+
+  const handleStartCall = useCallback(() => {
+    console.log("🚀 Starting VAPI call with enhanced config...");
+    // setCallState({ status: CallStatus.CONNECTING })
+
+    // Use startCall from the hook instead of window.VAPI
+    startCall();
+  }, [startCall]);
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -134,16 +199,22 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <CardTitle className="text-2xl">{topicTitles[currentTopic]}</CardTitle>
-              <p className="text-gray-600">Enhanced Voice Conversation Practice</p>
+              <CardTitle className="text-2xl">
+                {topicTitles[currentTopic]}
+              </CardTitle>
+              <p className="text-gray-600">
+                Enhanced Voice Conversation Practice
+              </p>
             </div>
             <div className="flex items-center space-x-4">
               {/* Debug Mode Toggle */}
               <div className="flex items-center space-x-2">
-                <Switch checked={showDebug} onCheckedChange={setShowDebug} />
+                {/* <Switch checked={showDebug} onCheckedChange={setShowDebug} /> */}
                 <span className="text-sm">Debug</span>
               </div>
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(callState.status)}`} />
+              <div
+                className={`w-3 h-3 rounded-full ${getStatusColor(callState.status)}`}
+              />
               <Badge variant="outline">{getStatusText(callState.status)}</Badge>
             </div>
           </div>
@@ -195,8 +266,12 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
                 <div
                   className={cn(
                     "absolute transition-opacity duration-1000",
-                    callState.status === "FINISHED" || callState.status === "INACTIVE" ? "opacity-100" : "opacity-0",
-                    callState.status === "CONNECTING" && "opacity-100 animate-pulse",
+                    callState.status === "FINISHED" ||
+                      callState.status === "INACTIVE"
+                      ? "opacity-100"
+                      : "opacity-0",
+                    callState.status === "CONNECTING" &&
+                      "opacity-100 animate-pulse"
                   )}
                 >
                   <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center">
@@ -206,10 +281,15 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
                 <div
                   className={cn(
                     "absolute transition-opacity duration-100",
-                    callState.status === "ACTIVE" ? "opacity-100" : "opacity-0",
+                    callState.status === "ACTIVE" ? "opacity-100" : "opacity-0"
                   )}
                 >
-                  <Lottie lottieRef={lottieRef} animationData={soundwaves} autoplay={false} className="w-32 h-32" />
+                  <Lottie
+                    lottieRef={lottieRef}
+                    animationData={soundwaves}
+                    autoplay={false}
+                    className="w-32 h-32"
+                  />
                 </div>
               </div>
 
@@ -229,15 +309,60 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
                 </div>
               </div>
 
+              {/* Leo Speech Monitor */}
+              {currentLine?.speaker === "Leo" && (
+                <div className="w-full">
+                  <LeoSpeechMonitor
+                    currentLine={currentLine}
+                    isSpeaking={isSpeaking}
+                    callState={callState}
+                  />
+                </div>
+              )}
+
+              {/* Leo Speech Status */}
+              {leoSpeechStatus.isDelivering &&
+                currentLine?.speaker === "Leo" && (
+                  <div className="w-full">
+                    <Card className="border-blue-200 bg-blue-50">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Badge variant="default" className="animate-pulse">
+                            🎤 Leo Speaking
+                          </Badge>
+                          <span className="text-xs text-blue-700">
+                            {Math.round(leoSpeechStatus.progress)}% complete
+                          </span>
+                        </div>
+                        <Progress
+                          value={leoSpeechStatus.progress}
+                          className="h-2 mb-2"
+                        />
+                        <p className="text-xs text-blue-600 leading-relaxed">
+                          "{leoSpeechStatus.currentSentence}"
+                        </p>
+                        <div className="mt-2 text-xs text-blue-500">
+                          💡 Leo is delivering this complete sentence. Please
+                          wait for him to finish.
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
               {/* Enhanced Control Buttons */}
               <div className="w-full space-y-3">
                 <Button
-                  onClick={callState.status === "ACTIVE" ? endCall : startCall}
+                  onClick={
+                    callState.status === "ACTIVE" ? endCall : handleStartCall
+                  }
                   disabled={callState.status === "CONNECTING"}
                   className={cn(
                     "w-full",
-                    callState.status === "ACTIVE" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700",
-                    callState.status === "CONNECTING" && "animate-pulse",
+                    callState.status === "ACTIVE"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-green-600 hover:bg-green-700",
+                    callState.status === "CONNECTING" && "animate-pulse"
                   )}
                 >
                   {callState.status === "ACTIVE"
@@ -259,7 +384,10 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
                   <Button
                     variant="outline"
                     onClick={retryCurrentStep}
-                    disabled={callState.status !== "ACTIVE" || !conversationState.isWaitingForUser}
+                    disabled={
+                      callState.status !== "ACTIVE" ||
+                      !conversationState.isWaitingForUser
+                    }
                     className="text-xs"
                   >
                     🔄 Retry
@@ -317,7 +445,9 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
                   conversationState={conversationState}
                   currentLine={currentLine}
                   onManualTrigger={manualTriggerLeo}
-                  onSkipStep={() => skipToStep(conversationState.currentStep + 1)}
+                  onSkipStep={() =>
+                    skipToStep(conversationState.currentStep + 1)
+                  }
                 />
               </TabsContent>
             )}
@@ -325,7 +455,7 @@ const EnhancedCompanionConversationWithGroupedDisplay = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default EnhancedCompanionConversationWithGroupedDisplay
+export default EnhancedCompanionConversationWithGroupedDisplay;

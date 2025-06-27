@@ -43,6 +43,7 @@ export const createVapiConfig = (
 });
 
 export const configureAssistant = (voice: string, style: string) => {
+  console.log("voice",voice)
   const voiceId =
     voices[voice as keyof typeof voices][
       style as keyof (typeof voices)[keyof typeof voices]
