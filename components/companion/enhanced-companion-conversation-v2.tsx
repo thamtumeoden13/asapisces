@@ -132,6 +132,7 @@ const EnhancedCompanionConversationV2 = ({
       onTopicComplete?.(currentTopic);
     },
   });
+
   // COMPLETELY REWRITTEN message grouping logic with newest messages first within groups
   const groupedMessages = (() => {
     // Step 1: Sort messages by timestamp (oldest first for processing)
@@ -171,6 +172,7 @@ const EnhancedCompanionConversationV2 = ({
 
     return reversedGroups;
   })();
+
   // Control Lottie animation
   useEffect(() => {
     if (lottieRef.current) {
@@ -210,7 +212,7 @@ const EnhancedCompanionConversationV2 = ({
     }
   };
 
-  // Enhanced message handling with speech analysis
+  // Enhanced message handling with speech analysis - REDUCED re-renders
   useEffect(() => {
     const latestMessage = messages[0];
     if (
@@ -238,30 +240,30 @@ const EnhancedCompanionConversationV2 = ({
       );
       setPronunciationFeedback(feedback);
 
-      // Record step completion in analytics
-      analytics.current.recordStepCompletion(currentSessionId, {
-        stepNumber: conversationState.currentStep,
-        expectedText: currentLine.text,
-        userText: latestMessage.content,
-        responseTime: realTimeMetrics.responseTime,
-        accuracyScore: feedback.score,
-        pronunciationScore: mockMetrics.pronunciation * 100,
-        fluencyScore: mockMetrics.fluency * 100,
-      });
+      // Record step completion in analytics - COMMENTED OUT to reduce re-renders
+      // analytics.current.recordStepCompletion(currentSessionId, {
+      //   stepNumber: conversationState.currentStep,
+      //   expectedText: currentLine.text,
+      //   userText: latestMessage.content,
+      //   responseTime: realTimeMetrics.responseTime,
+      //   accuracyScore: feedback.score,
+      //   pronunciationScore: mockMetrics.pronunciation * 100,
+      //   fluencyScore: mockMetrics.fluency * 100,
+      // });
 
-      // Update real-time metrics
-      setRealTimeMetrics({
-        responseTime: Math.random() * 3000 + 1000,
-        confidenceLevel: mockMetrics.clarity * 100,
-        speechClarity: mockMetrics.pronunciation * 100,
-      });
+      // Update real-time metrics - COMMENTED OUT to reduce re-renders
+      // setRealTimeMetrics({
+      //   responseTime: Math.random() * 3000 + 1000,
+      //   confidenceLevel: mockMetrics.clarity * 100,
+      //   speechClarity: mockMetrics.pronunciation * 100,
+      // });
     }
   }, [
     messages,
     currentSessionId,
     currentLine,
     conversationState.currentStep,
-    realTimeMetrics.responseTime,
+    // realTimeMetrics.responseTime, // Removed to prevent re-render loop
   ]);
 
   const getStatusColor = (status: string) => {
@@ -554,11 +556,11 @@ const EnhancedCompanionConversationV2 = ({
                 </TabsList>
 
                 <TabsContent value="conversation" className="space-y-4">
-                  {/* Current Line Display - Keep original red gradient */}
+                  {/* Current Line Display - Updated with purple gradient */}
                   {currentLine && (
                     <div className="p-5 bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50 border-2 border-purple-300 rounded-lg shadow-md relative overflow-hidden">
                       {/* Animated background accent */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-100/20 to-rose-100/20 animate-pulse"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-100/20 to-indigo-100/20 animate-pulse"></div>
 
                       <div className="relative z-10">
                         <div className="flex items-center space-x-2 mb-3">
@@ -568,7 +570,7 @@ const EnhancedCompanionConversationV2 = ({
                                 ? "default"
                                 : "secondary"
                             }
-                            className="text-sm font-medium"
+                            className="text-sm font-medium bg-purple-100 text-purple-800 border-purple-300"
                           >
                             {currentLine.speaker}
                           </Badge>
@@ -590,19 +592,19 @@ const EnhancedCompanionConversationV2 = ({
                           )}
                           <Badge
                             variant="outline"
-                            className="bg-purple-50 text-purple-700 border-purple-300 font-semibold"
+                            className="bg-purple-100 text-purple-700 border-purple-300 font-semibold"
                           >
                             ⚡ CURRENT
                           </Badge>
                         </div>
-                        <p className="text-lg font-semibold text-gray-900 leading-relaxed">
+                        <p className="text-lg font-semibold text-purple-900 leading-relaxed">
                           {currentLine.text}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Grouped Message History - Fixed Ordering */}
+                  {/* Grouped Message History - Fixed Ordering with newest messages first within groups */}
                   <div className="space-y-4 max-h-96 overflow-y-auto">
                     {groupedMessages.length === 0 ? (
                       <p className="text-gray-500 text-center py-8">
@@ -654,7 +656,7 @@ const EnhancedCompanionConversationV2 = ({
                             </span>
                           </div>
 
-                          {/* Group Messages - Display in chronological order within group */}
+                          {/* Group Messages - Display newest messages first within each group */}
                           <div className="space-y-2">
                             {group.messages.map(
                               (message: any, messageIndex: number) => (

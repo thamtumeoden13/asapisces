@@ -223,7 +223,7 @@ export const useVapiConversation = ({
         const isOurMessage = sentMessagesRef.current.has(messageContent);
         if (isOurMessage && message.role === "assistant") {
           console.log(
-            "🎯 This is our sent message, not adding duplicate:",
+            "🎯 This is our sent message, already displayed, skipping duplicate:",
             messageContent
           );
           return;
@@ -309,9 +309,11 @@ export const useVapiConversation = ({
             messageContent
           );
         } else if (message.role === "assistant") {
-          // Assistant messages
-          console.log("➕ Adding assistant message:", messageContent);
-          setMessages((prev) => [newMessage, ...prev]);
+          // Assistant messages from VAPI - but we already display them immediately, so skip
+          console.log(
+            "🎯 Assistant message from VAPI, already displayed locally, skipping:",
+            messageContent
+          );
         }
 
         lastProcessedMessageRef.current = messageKey;
@@ -332,11 +334,11 @@ export const useVapiConversation = ({
     [currentLine, companionId, handleFinalSimilarityResult]
   );
 
-  // Function to send Leo's message with dynamic timing
+  // Function to send Leo's message with dynamic timing - MODIFIED to show message immediately
   const sendLeoMessage = useCallback(
     (line: TranscriptLine, stepIndex: number) => {
       console.log(
-        `🎤 Attempting to send Leo's message (step ${stepIndex}):`,
+        `🎤 Sending Leo's message immediately (step ${stepIndex}):`,
         line.text
       );
 
@@ -349,6 +351,17 @@ export const useVapiConversation = ({
       // Track that we're sending this message
       sentMessagesRef.current.add(line.text.trim());
 
+      // 🚀 ADD MESSAGE TO UI IMMEDIATELY - This is the key change!
+      const immediateMessage = {
+        role: "assistant" as const,
+        content: line.text,
+        timestamp: Date.now(),
+      };
+
+      console.log("✨ Adding Leo's message to UI immediately:", line.text);
+      setMessages((prev) => [immediateMessage, ...prev]);
+
+      // Then send to VAPI (this will trigger the voice)
       try {
         // Method 1: Try add-message
         vapi.send({
@@ -358,7 +371,7 @@ export const useVapiConversation = ({
             content: line.text,
           },
         });
-        console.log("✅ Sent via add-message");
+        console.log("✅ Sent to VAPI via add-message");
 
         // Method 2: Also try direct say (if available)
         setTimeout(() => {
@@ -367,23 +380,14 @@ export const useVapiConversation = ({
               type: "say",
               message: line.text,
             });
-            console.log("✅ Sent via say command");
+            console.log("✅ Sent to VAPI via say command");
           } catch (error) {
             console.log("ℹ️ Say command not available:", error);
           }
         }, 100);
       } catch (error) {
-        console.error("❌ Failed to send Leo's message:", error);
-
-        // If VAPI fails, add message locally as fallback
-        setMessages((prev) => [
-          {
-            role: "assistant",
-            content: line.text,
-            timestamp: Date.now(),
-          },
-          ...prev,
-        ]);
+        console.error("❌ Failed to send Leo's message to VAPI:", error);
+        // Message is already in UI, so no need for fallback
       }
 
       // Return the calculated speaking time for use in scheduling
