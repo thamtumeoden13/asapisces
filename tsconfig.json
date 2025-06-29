@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "hoc/SectionWrapper.jsx", "components/Loader.jsx", "lib/splitTranscript.js", "lib/splitTranscript.js"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "hoc/SectionWrapper.jsx", "components/Loader.jsx", "scripts/splitTranscript.js", "scripts/splitTranscript.js", "scripts/example-usage.ts","scripts/real-world-example.ts"],
   "exclude": ["node_modules"]
 }

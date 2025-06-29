@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +35,6 @@ import {
   Brain,
   Zap,
 } from "lucide-react";
-
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
 
