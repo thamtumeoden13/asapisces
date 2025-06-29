@@ -86,6 +86,10 @@ const EnhancedCompanionConversationV2 = ({
     speechClarity: 0,
   });
 
+  const [activeTab, setActiveTab] = useState<
+    "conversation" | "feedback" | "analytics"
+  >("conversation");
+
   // Initialize enhanced services
   const voiceRecognition = useRef(
     new EnhancedVoiceRecognition({
@@ -548,11 +552,45 @@ const EnhancedCompanionConversationV2 = ({
               <CardTitle>Live Conversation</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="conversation" className="w-full">
+              <Tabs
+                defaultValue="conversation"
+                value={activeTab}
+                className="w-full"
+              >
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="conversation">Conversation</TabsTrigger>
-                  <TabsTrigger value="feedback">Feedback</TabsTrigger>
-                  <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                  <TabsTrigger
+                    className={`${activeTab == "conversation" && "text-white-100"}`}
+                    style={{
+                      backgroundColor:
+                        activeTab == "conversation" ? "#313c72" : "transparent",
+                    }}
+                    value="conversation"
+                    onClick={() => setActiveTab("conversation")}
+                  >
+                    Conversation
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="feedback"
+                    className={`${activeTab == "feedback" && "text-white-100"}`}
+                    style={{
+                      backgroundColor:
+                        activeTab == "feedback" ? "#313c72" : "transparent",
+                    }}
+                    onClick={() => setActiveTab("feedback")}
+                  >
+                    Feedback
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="analytics"
+                    className={`${activeTab == "analytics" && "text-white-100"}`}
+                    style={{
+                      backgroundColor:
+                        activeTab == "analytics" ? "#313c72" : "transparent",
+                    }}
+                    onClick={() => setActiveTab("analytics")}
+                  >
+                    Analytics
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="conversation" className="space-y-4">
