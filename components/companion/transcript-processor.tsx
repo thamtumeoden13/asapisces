@@ -4,10 +4,10 @@ import { useState, useMemo } from "react";
 
 import {
   processTranscript,
-  createTopicConfig,
   PodcastDataUtils,
   type TopicConfig,
 } from "@/scripts/transcript-processor";
+import { TopicConfigEditor } from "./topic-config-editor";
 
 // Sample data for demo
 const SAMPLE_TRANSCRIPT = `Leo: Hey hey hey! What’s up, everybody? 
@@ -304,21 +304,24 @@ const SAMPLE_TOPIC_CONFIG: TopicConfig[] = [
     title: "Key Vocabulary",
   },
 ];
-export default function TranscriptProcessor() {
+export default function TranscriptProcessorComponent() {
   const [rawTranscript, setRawTranscript] = useState(SAMPLE_TRANSCRIPT);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpeaker, setSelectedSpeaker] = useState<string>("all");
+  const [topicConfig, setTopicConfig] =
+    useState<TopicConfig[]>(SAMPLE_TOPIC_CONFIG);
+  const [isEditingConfig, setIsEditingConfig] = useState(false);
 
   // Process transcript
   const processedData = useMemo(() => {
     if (!rawTranscript.trim()) return null;
 
-    return processTranscript(rawTranscript, SAMPLE_TOPIC_CONFIG, {
+    return processTranscript(rawTranscript, topicConfig, {
       defaultTopic: "intro",
       minTextLength: 3,
       enableScoring: true,
     });
-  }, [rawTranscript]);
+  }, [rawTranscript, topicConfig]);
 
   // Create utils instance
   const utils = useMemo(() => {
@@ -376,11 +379,13 @@ export default function TranscriptProcessor() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Podcast Transcript Processor</h1>
+      <h1 className="text-3xl font-bold mb-6 text-black-200">
+        Podcast Transcript Processor
+      </h1>
 
       {/* Input Section */}
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">
+        <label className="block text-sm font-medium mb-2 text-black-100">
           Raw Transcript:
         </label>
         <textarea
@@ -389,6 +394,25 @@ export default function TranscriptProcessor() {
           className="w-full h-32 p-3 border rounded-lg"
           placeholder="Paste your transcript here..."
         />
+      </div>
+
+      {/* Topic Configuration Editor */}
+      {isEditingConfig && (
+        <TopicConfigEditor
+          config={topicConfig}
+          onChange={setTopicConfig}
+          onClose={() => setIsEditingConfig(false)}
+        />
+      )}
+
+      {/* Toggle Config Editor Button */}
+      <div className="mb-6">
+        <button
+          onClick={() => setIsEditingConfig(!isEditingConfig)}
+          className="px-4 py-2 bg-pink-500 text-white-100 rounded-lg hover:bg-pink-600"
+        >
+          {isEditingConfig ? "Hide" : "Edit"} Topic Configuration
+        </button>
       </div>
 
       {/* Statistics */}
@@ -405,9 +429,9 @@ export default function TranscriptProcessor() {
             {stats.totalTopics}
           </p>
         </div>
-        <div className="bg-purple-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-purple-800">Processing Time</h3>
-          <p className="text-2xl font-bold text-purple-600">
+        <div className="bg-pink-100 p-4 rounded-lg">
+          <h3 className="font-semibold text-pink-800">Processing Time</h3>
+          <p className="text-2xl font-bold text-pink-600">
             {processedData.metadata.processingTime}ms
           </p>
         </div>
@@ -457,7 +481,7 @@ export default function TranscriptProcessor() {
           </button>
           <button
             onClick={() => handleDownload("markdown")}
-            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
+            className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
           >
             Download MD
           </button>
@@ -466,11 +490,13 @@ export default function TranscriptProcessor() {
 
       {/* Topic Breakdown */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold mb-3">Topic Breakdown</h2>
+        <h2 className="text-xl font-bold mb-3 text-black-300">
+          Topic Breakdown
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {Object.entries(stats.topicBreakdown).map(([topic, data]) => (
-            <div key={topic} className="bg-gray-50 p-3 rounded-lg">
-              <h3 className="font-semibold">{data.title}</h3>
+            <div key={topic} className="bg-blue-50 p-3 rounded-lg">
+              <h3 className="font-semibold text-blue-800">{data.title}</h3>
               <p className="text-sm text-gray-600">{data.count} entries</p>
             </div>
           ))}
@@ -479,10 +505,10 @@ export default function TranscriptProcessor() {
 
       {/* Results */}
       <div>
-        <h2 className="text-xl font-bold mb-3">
+        <h2 className="text-xl font-bold mb-3 text-black-400">
           Transcript Entries ({filteredResults.length})
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[90vh] rounded-lg bg-gray-50 p-8 overflow-auto">
           {filteredResults.map((entry, index) => (
             <div
               key={index}
