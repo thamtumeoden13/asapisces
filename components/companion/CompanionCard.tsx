@@ -13,6 +13,7 @@ interface CompanionCardProps {
   duration: number;
   color: string;
   bookmarked: boolean;
+  href?: string;
 }
 
 const CompanionCard = ({
@@ -23,6 +24,7 @@ const CompanionCard = ({
   duration,
   color,
   bookmarked,
+  href = "/companion/companions",
 }: CompanionCardProps) => {
   const pathname = usePathname();
   const handleBookmark = async () => {
@@ -32,6 +34,7 @@ const CompanionCard = ({
       await addBookmark(id, pathname);
     }
   };
+
   return (
     <article className="companion-card" style={{ backgroundColor: color }}>
       <div className="flex items-center justify-between">
@@ -60,7 +63,7 @@ const CompanionCard = ({
         <p className="text-sm text-black-100">{duration} minutes</p>
       </div>
 
-      <Link href={`/companion/companions/${id}`} className="w-full">
+      <Link href={`${href}/${id}`} className="w-full">
         <button className="justify-center w-full btn-primary-2">
           Launch Lesson
         </button>

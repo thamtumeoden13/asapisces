@@ -1,37 +1,3 @@
-// TypeScript type definitions
-export interface PodcastEntry {
-  speaker: "Leo" | "Gwen";
-  text: string;
-}
-
-export interface TopicConfig {
-  key: string;
-  keyword: string;
-  title?: string;
-  description?: string;
-  priority?: number;
-}
-
-export type PodcastTopics = Record<string, PodcastEntry[]>;
-export type TopicTitles = Record<string, string>;
-
-export interface ProcessorResult {
-  podcastTopics: PodcastTopics;
-  topicTitles: TopicTitles;
-  metadata: {
-    totalEntries: number;
-    totalTopics: number;
-    speakers: string[];
-    processingTime: number;
-  };
-}
-
-export interface ProcessorOptions {
-  defaultTopic?: string;
-  minTextLength?: number;
-  caseSensitive?: boolean;
-  enableScoring?: boolean;
-}
 
 /**
  * Main transcript processor function

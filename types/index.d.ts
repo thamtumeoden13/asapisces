@@ -339,4 +339,39 @@ interface CompanionComponentProps {
   userImage: string;
   voice: string;
   style: string;
+  transcriptData: processedData;
+}
+
+interface PodcastEntry {
+  speaker: "Leo" | "Gwen";
+  text: string;
+}
+
+interface TopicConfig {
+  key: string;
+  keyword: string;
+  title?: string;
+  description?: string;
+  priority?: number;
+}
+
+type PodcastTopics = Record<string, PodcastEntry[]>;
+type TopicTitles = Record<string, string>;
+
+interface ProcessorResult {
+  podcastTopics: PodcastTopics;
+  topicTitles: TopicTitles;
+  metadata: {
+    totalEntries: number;
+    totalTopics: number;
+    speakers: string[];
+    processingTime: number;
+  };
+}
+
+export interface ProcessorOptions {
+  defaultTopic?: string;
+  minTextLength?: number;
+  caseSensitive?: boolean;
+  enableScoring?: boolean;
 }

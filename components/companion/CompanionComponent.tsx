@@ -7,13 +7,8 @@ import Image from "next/image";
 import Lottie, { LottieRefCurrentProps } from "lottie-react";
 import soundwaves from "@/constants/soundwaves.json";
 import { addToSessionHistory } from "@/lib/actions/companion.actions";
+import { CallStatus, Message } from "@/types/podcast";
 
-enum CallStatus {
-  INACTIVE = "INACTIVE",
-  CONNECTING = "CONNECTING",
-  ACTIVE = "ACTIVE",
-  FINISHED = "FINISHED",
-}
 const CompanionComponent = ({
   companionId,
   subject,
@@ -56,7 +51,6 @@ const CompanionComponent = ({
       serverMessages: [],
     };
 
-    // @ts-expect-error vapi.start may have incompatible types, but is expected to work here
     vapi.start(configureAssistant(voice, style), assistantOverride);
   };
 
@@ -201,8 +195,8 @@ const CompanionComponent = ({
             {callStatus === CallStatus.ACTIVE
               ? "End Session"
               : callStatus === CallStatus.CONNECTING
-              ? "Connecting..."
-              : "Start Session"}
+                ? "Connecting..."
+                : "Start Session"}
           </button>
         </div>
       </section>
@@ -212,7 +206,10 @@ const CompanionComponent = ({
           {messages.map((message, index) => {
             if (message.role === "assistant") {
               return (
-                <p key={message.content + index} className="max-sm:text-sm text-black-200">
+                <p
+                  key={message.content + index}
+                  className="max-sm:text-sm text-black-200"
+                >
                   {name.split(" ")[0].replace("/[.,]/g", "")}: {message.content}
                 </p>
               );

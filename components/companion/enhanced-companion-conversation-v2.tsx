@@ -17,7 +17,7 @@ import {
   ConversationAnalytics,
   type ConversationInsights,
 } from "@/lib/conversation-analytics";
-import { podcastTopics, topicTitles } from "@/data/podcast-topics";
+// import { podcastTopics, topicTitles } from "@/data/podcast-topics";
 import {
   type TopicKey,
   type CompanionComponentProps,
@@ -35,6 +35,7 @@ import {
   Brain,
   Zap,
 } from "lucide-react";
+import { PodcastTopics, TopicTitles } from "@/types";
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
 
@@ -51,6 +52,8 @@ const getSubjectColor = (subject: string) => {
 
 interface EnhancedCompanionConversationV2Props
   extends Partial<CompanionComponentProps> {
+  topicTitles: TopicTitles;
+  podcastTopics: PodcastTopics;
   selectedTopic?: TopicKey;
   onTopicComplete?: (topic: TopicKey) => void;
 }
@@ -59,6 +62,8 @@ const EnhancedCompanionConversationV2 = ({
   companionId = "demo",
   subject = "english",
   topic = "intro",
+  topicTitles,
+  podcastTopics,
   name = "Leo & Gwen",
   userName = "Student",
   userImage = "/placeholder.svg?height=130&width=130",

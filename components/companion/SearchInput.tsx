@@ -23,7 +23,7 @@ const SearchInput = () => {
 
         router.push(newUrl, { scroll: false });
       } else {
-        if (pathname === "/companion/companions") {
+        if (pathname === "/companion/companions" || pathname === "/companion/conversation") {
           const newUrl = removeKeysFromUrlQuery({
             params: searchParams.toString(),
             keysToRemove: ["topic"],

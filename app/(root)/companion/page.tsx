@@ -8,8 +8,6 @@ import {
 } from "@/lib/actions/companion.actions";
 import { getSubjectColor } from "@/lib/utils";
 
-import EnhancedCompanionComponent from "@/components/companion/enhanced-companion-component"
-
 const Page = async () => {
   const companions = await getAllCompanions({ limit: 3 });
   const recentSessionsCompanions = await getRecentSessions(10);
@@ -35,7 +33,6 @@ const Page = async () => {
         />
         <CTA />
       </section>
-      <EnhancedCompanionComponent />
     </div>
   );
 };
