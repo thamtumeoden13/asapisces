@@ -7,6 +7,7 @@ import {
   calculateAdvancedSimilarity,
   resetSimilarityContext,
 } from "@/lib/enhanced-similarity-for-long-sentences";
+import { VapiEventAnalyzer } from "@/lib/vapi-event-analyzer";
 import type {
   VapiMessage,
   VapiCallState,
@@ -38,7 +39,6 @@ export const useVapiConversation = ({
     status: CallStatus.INACTIVE,
   });
 
-  // Enhanced conversation state with similarity info
   const [conversationState, setConversationState] = useState<
     ConversationState & { similarity?: any }
   >({
@@ -48,7 +48,6 @@ export const useVapiConversation = ({
     similarity: null,
   });
 
-  // Enhanced messages with similarity data
   const [messages, setMessages] = useState<
     Array<{
       role: "user" | "assistant";
@@ -62,25 +61,40 @@ export const useVapiConversation = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
+  // ✨ NEW: Event analyzer for debugging
+  const eventAnalyzer = useRef(new VapiEventAnalyzer());
+  const [debugEvents, setDebugEvents] = useState<any[]>([]);
+
   // Refs for managing async operations and preventing infinite loops
   const currentStepRef = useRef(conversationState.currentStep);
   const isCallReadyRef = useRef(false);
   const messagesRef = useRef(messages);
   const lastProcessedMessageRef = useRef<string>("");
-  const sentMessagesRef = useRef<Set<string>>(new Set()); // Track messages we've sent
-  const conversationCompletedRef = useRef(false); // Track if conversation is completed
-  const sessionCompleteCalledRef = useRef(false); // Track if onSessionComplete was called
-  const currentTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track current timeout
-  const processingUserInputRef = useRef(false); // Prevent multiple similarity calculations
-  const lastSimilarityResultRef = useRef<any>(null); // Cache last similarity result
-  const currentUserSpeechRef = useRef<string>(""); // Track current user speech
-  const speechEndTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track speech end timeout
-  const evaluatedMessagesRef = useRef<Set<string>>(new Set()); // Track evaluated messages
+  const sentMessagesRef = useRef<Set<string>>(new Set());
+  const conversationCompletedRef = useRef(false);
+  const sessionCompleteCalledRef = useRef(false);
+  const currentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processingUserInputRef = useRef(false);
+  const lastSimilarityResultRef = useRef<any>(null);
+  const currentUserSpeechRef = useRef<string>("");
+  const speechEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const evaluatedMessagesRef = useRef<Set<string>>(new Set());
+
+  // State tracking refs
+  const isWaitingForUserRef = useRef(false);
+  const currentSpeakerRef = useRef<string>("");
+  const callStatusRef = useRef<string>(CallStatus.INACTIVE);
 
   // Update refs when values change
   useEffect(() => {
     currentStepRef.current = conversationState.currentStep;
-  }, [conversationState.currentStep]);
+    isWaitingForUserRef.current = conversationState.isWaitingForUser;
+    callStatusRef.current = callState.status;
+  }, [
+    conversationState.currentStep,
+    conversationState.isWaitingForUser,
+    callState.status,
+  ]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -89,26 +103,27 @@ export const useVapiConversation = ({
   const currentStep = conversationState.currentStep;
   const currentLine = steps[currentStep] || null;
 
+  // Update current speaker ref
+  useEffect(() => {
+    currentSpeakerRef.current = currentLine?.speaker || "";
+  }, [currentLine?.speaker]);
+
   // Calculate speaking time based on text length and speaking rate
   const calculateSpeakingTime = useCallback((text: string): number => {
-    // Average speaking rate: 150-160 words per minute
-    // Add buffer time for natural pauses and processing
     const words = text.split(/\s+/).length;
-    const baseTimePerWord = 400; // milliseconds per word (150 WPM)
-    const bufferTime = 2000; // 2 seconds buffer
-    const minimumTime = 3000; // minimum 3 seconds
+    const baseTimePerWord = 400;
+    const bufferTime = 2000;
+    const minimumTime = 3000;
 
     const calculatedTime = words * baseTimePerWord + bufferTime;
     return Math.max(calculatedTime, minimumTime);
   }, []);
 
-  // Handle final similarity result and determine next action - with strict deduplication
+  // Handle final similarity result and determine next action
   const handleFinalSimilarityResult = useCallback(
     (similarityResult: any, stepIndex: number, messageContent: string) => {
-      // Create unique key for this evaluation
       const evaluationKey = `${stepIndex}-${messageContent.trim()}`;
 
-      // Check if we've already evaluated this exact message for this step
       if (evaluatedMessagesRef.current.has(evaluationKey)) {
         console.log(
           "🚫 Already evaluated this message for this step, skipping"
@@ -116,26 +131,20 @@ export const useVapiConversation = ({
         return;
       }
 
-      // Prevent processing if already processing
       if (processingUserInputRef.current) {
         console.log("🚫 Already processing similarity result, skipping");
         return;
       }
 
-      // Mark this message as evaluated
       evaluatedMessagesRef.current.add(evaluationKey);
       processingUserInputRef.current = true;
 
-      // Determine if user should advance (lowered threshold for better UX)
-      const shouldAdvance = similarityResult.score >= 0.5; // More lenient threshold
+      const shouldAdvance = similarityResult.score >= 0.5;
 
       console.log(
         `📊 Final evaluation for step ${stepIndex}: ${similarityResult.score.toFixed(2)} (${shouldAdvance ? "ADVANCE" : "RETRY"})`
       );
-      console.log(`📝 User said: "${messageContent}"`);
-      console.log(`🎯 Expected: "${steps[stepIndex]?.text}"`);
 
-      // Update conversation state
       setConversationState((prev) => ({
         ...prev,
         feedback: similarityResult.feedback,
@@ -146,87 +155,167 @@ export const useVapiConversation = ({
         }),
       }));
 
-      // Clean up context if advancing
       if (shouldAdvance) {
         resetSimilarityContext(`${companionId}-step-${stepIndex}`);
-        console.log(
-          `✅ Step ${stepIndex} completed with score: ${similarityResult.score.toFixed(2)}`
-        );
-      } else {
-        console.log(
-          `🔄 Step ${stepIndex} needs retry. Score: ${similarityResult.score.toFixed(2)}`
-        );
       }
 
-      // Reset processing flag after a delay
       setTimeout(() => {
         processingUserInputRef.current = false;
-      }, 2000); // 2 second cooldown
+      }, 2000);
     },
     [companionId, steps]
   );
 
-  // Enhanced message handler - ONLY process final transcripts
+  // ✨ COMPREHENSIVE: Message handler with detailed event analysis
   const handleMessage = useCallback(
     (message: VapiMessage) => {
+      // Early guard - only process if call is active
+      if (
+        !isCallReadyRef.current ||
+        callStatusRef.current !== CallStatus.ACTIVE
+      ) {
+        console.log("🚫 Ignoring message - call not active:", message.type);
+        return;
+      }
+
       console.log(
-        "📨 Received VAPI message:",
+        "📨 Processing VAPI message:",
         message.type,
         message.transcriptType || "",
+        `Call: ${callStatusRef.current}`,
+        `Waiting: ${isWaitingForUserRef.current}`,
+        `Speaker: ${currentSpeakerRef.current}`,
         message.transcript?.substring(0, 50) + "..."
       );
 
-      // Handle speech events
+      // ✨ ENHANCED: Handle speech events with comprehensive analysis
       if (message.type === "speech-start") {
-        setIsSpeaking(true);
-        currentUserSpeechRef.current = "";
-        console.log("🎤 User started speaking");
+        const analysis = eventAnalyzer.current.analyzeEvent(
+          "speech-start",
+          callStatusRef.current,
+          isWaitingForUserRef.current,
+          currentSpeakerRef.current,
+          currentStepRef.current
+        );
+
+        console.log(`🎤 SPEECH-START Analysis:`, analysis.reason);
+
+        // Update debug events
+        setDebugEvents((prev) => [
+          {
+            type: "speech-start",
+            timestamp: Date.now(),
+            analysis,
+            processed: analysis.shouldProcess,
+          },
+          ...prev.slice(0, 19), // Keep last 20 events
+        ]);
+
+        if (analysis.shouldProcess) {
+          setIsSpeaking(true);
+          currentUserSpeechRef.current = "";
+          console.log("✅ Processing speech-start - User input expected");
+        } else {
+          console.log(`🚫 Ignoring speech-start - ${analysis.reason}`);
+        }
         return;
       }
 
       if (message.type === "speech-end") {
-        setIsSpeaking(false);
-        console.log("🎤 User stopped speaking");
+        const analysis = eventAnalyzer.current.analyzeEvent(
+          "speech-end",
+          callStatusRef.current,
+          isWaitingForUserRef.current,
+          currentSpeakerRef.current,
+          currentStepRef.current
+        );
 
-        // Set a timeout to process the final speech after a brief delay
-        // This ensures we get the final transcript
-        if (speechEndTimeoutRef.current) {
-          clearTimeout(speechEndTimeoutRef.current);
-        }
+        console.log(`🎤 SPEECH-END Analysis:`, analysis.reason);
 
-        speechEndTimeoutRef.current = setTimeout(() => {
-          if (currentUserSpeechRef.current && currentLine?.speaker === "Gwen") {
-            console.log(
-              "⏰ Processing final speech after speech-end:",
-              currentUserSpeechRef.current
-            );
-            // The final transcript should have already been processed
+        // Update debug events
+        setDebugEvents((prev) => [
+          {
+            type: "speech-end",
+            timestamp: Date.now(),
+            analysis,
+            processed: analysis.shouldProcess,
+          },
+          ...prev.slice(0, 19),
+        ]);
+
+        if (analysis.shouldProcess) {
+          setIsSpeaking(false);
+          console.log("✅ Processing speech-end - User input completed");
+
+          if (speechEndTimeoutRef.current) {
+            clearTimeout(speechEndTimeoutRef.current);
           }
-        }, 500); // 500ms delay to ensure final transcript is received
+
+          speechEndTimeoutRef.current = setTimeout(() => {
+            if (
+              currentUserSpeechRef.current &&
+              currentLine?.speaker === "Gwen"
+            ) {
+              console.log(
+                "⏰ Processing final speech after speech-end:",
+                currentUserSpeechRef.current
+              );
+            }
+          }, 500);
+        } else {
+          console.log(`🚫 Ignoring speech-end - ${analysis.reason}`);
+        }
         return;
       }
 
-      // ONLY process final transcripts - ignore partial ones completely
+      // Process transcripts with comprehensive guards
       if (message.type === "transcript" && message.transcriptType === "final") {
         const messageContent = message.transcript.trim();
 
-        // Skip empty messages
         if (!messageContent) {
           console.log("🚫 Empty transcript, skipping");
           return;
         }
 
-        // Create unique message key
-        const messageKey = `${message.role}-${messageContent}-${Date.now()}`;
+        // Enhanced guards for user messages
+        if (message.role === "user") {
+          if (!isWaitingForUserRef.current) {
+            console.log(
+              "🚫 Ignoring user transcript - not waiting for user:",
+              messageContent
+            );
+            return;
+          }
 
-        // Check if this is a message we sent (Leo's message)
-        const isOurMessage = sentMessagesRef.current.has(messageContent);
-        if (isOurMessage && message.role === "assistant") {
-          console.log(
-            "🎯 This is our sent message, already displayed, skipping duplicate:",
-            messageContent
-          );
-          return;
+          if (currentSpeakerRef.current !== "Gwen") {
+            console.log(
+              "🚫 Ignoring user transcript - current step is not Gwen's:",
+              messageContent
+            );
+            return;
+          }
+
+          console.log("👤 Processing VALID user transcript:", messageContent);
+        }
+
+        // Enhanced guards for assistant messages
+        if (message.role === "assistant") {
+          if (isWaitingForUserRef.current) {
+            console.log(
+              "🚫 Ignoring assistant message while waiting for user:",
+              messageContent
+            );
+            return;
+          }
+
+          const isOurMessage = sentMessagesRef.current.has(messageContent);
+          if (isOurMessage) {
+            console.log(
+              "🎯 This is our sent message, already displayed, skipping:",
+              messageContent
+            );
+            return;
+          }
         }
 
         // Check for recent duplicates
@@ -234,7 +323,7 @@ export const useVapiConversation = ({
           (msg) =>
             msg.content.trim() === messageContent &&
             msg.role === message.role &&
-            Date.now() - msg.timestamp < 3000 // 3 second window
+            Date.now() - msg.timestamp < 3000
         );
 
         if (isDuplicate) {
@@ -251,23 +340,16 @@ export const useVapiConversation = ({
           timestamp: Date.now(),
         };
 
-        // Handle user responses - ONLY for final transcripts
+        // Process user responses
         if (message.role === "user" && currentLine?.speaker === "Gwen") {
-          console.log("👤 Processing FINAL user transcript:", messageContent);
-
-          // Update current user speech
           currentUserSpeechRef.current = messageContent;
-
-          // Create evaluation key
           const evaluationKey = `${currentStepRef.current}-${messageContent}`;
 
-          // Skip if already evaluated
           if (evaluatedMessagesRef.current.has(evaluationKey)) {
             console.log("🚫 Already evaluated this exact message, skipping");
             return;
           }
 
-          // Skip if currently processing
           if (processingUserInputRef.current) {
             console.log("🚫 Currently processing another input, skipping");
             return;
@@ -275,25 +357,17 @@ export const useVapiConversation = ({
 
           const contextId = `${companionId}-step-${currentStepRef.current}`;
 
-          console.log(
-            `🎯 Evaluating user input for step ${currentStepRef.current}`
-          );
-          console.log(`📝 User said: "${messageContent}"`);
-          console.log(`🎯 Expected: "${currentLine.text}"`);
-
-          // Calculate advanced similarity
           const similarityResult = calculateAdvancedSimilarity(
             messageContent,
             currentLine.text,
             contextId,
             {
-              allowPartial: false, // Only process complete sentences
+              allowPartial: false,
               semanticMatching: true,
               strictMode: false,
             }
           );
 
-          // Enhanced message with similarity data
           const enhancedMessage = {
             ...newMessage,
             similarity: similarityResult,
@@ -301,40 +375,38 @@ export const useVapiConversation = ({
           };
 
           setMessages((prev) => [enhancedMessage, ...prev]);
-
-          // Process similarity result immediately (no timeout needed for final transcripts)
           handleFinalSimilarityResult(
             similarityResult,
             currentStepRef.current,
             messageContent
           );
-        } else if (message.role === "assistant") {
-          // Assistant messages from VAPI - but we already display them immediately, so skip
-          console.log(
-            "🎯 Assistant message from VAPI, already displayed locally, skipping:",
-            messageContent
-          );
         }
 
-        lastProcessedMessageRef.current = messageKey;
+        lastProcessedMessageRef.current = `${message.role}-${messageContent}-${Date.now()}`;
       }
 
-      // Ignore partial transcripts completely
+      // Handle partial transcripts with guards
       if (
         message.type === "transcript" &&
         message.transcriptType === "partial"
       ) {
-        console.log(
-          "⏸️ Ignoring partial transcript:",
-          message.transcript?.substring(0, 30) + "..."
-        );
+        if (
+          isWaitingForUserRef.current &&
+          message.role === "user" &&
+          currentSpeakerRef.current === "Gwen"
+        ) {
+          console.log(
+            "⏸️ User speaking (partial):",
+            message.transcript?.substring(0, 30) + "..."
+          );
+        }
         return;
       }
     },
     [currentLine, companionId, handleFinalSimilarityResult]
   );
 
-  // Function to send Leo's message with dynamic timing - MODIFIED to show message immediately
+  // Function to send Leo's message
   const sendLeoMessage = useCallback(
     (line: TranscriptLine, stepIndex: number) => {
       console.log(
@@ -342,28 +414,18 @@ export const useVapiConversation = ({
         line.text
       );
 
-      // Calculate speaking time based on text length
       const speakingTime = calculateSpeakingTime(line.text);
-      console.log(
-        `⏱️ Calculated speaking time: ${speakingTime}ms for ${line.text.split(/\s+/).length} words`
-      );
-
-      // Track that we're sending this message
       sentMessagesRef.current.add(line.text.trim());
 
-      // 🚀 ADD MESSAGE TO UI IMMEDIATELY - This is the key change!
       const immediateMessage = {
         role: "assistant" as const,
         content: line.text,
         timestamp: Date.now(),
       };
 
-      console.log("✨ Adding Leo's message to UI immediately:", line.text);
       setMessages((prev) => [immediateMessage, ...prev]);
 
-      // Then send to VAPI (this will trigger the voice)
       try {
-        // Method 1: Try add-message
         vapi.send({
           type: "add-message",
           message: {
@@ -371,36 +433,93 @@ export const useVapiConversation = ({
             content: line.text,
           },
         });
-        console.log("✅ Sent to VAPI via add-message");
 
-        // Method 2: Also try direct say (if available)
         setTimeout(() => {
           try {
             vapi.send({
               type: "say",
               message: line.text,
             });
-            console.log("✅ Sent to VAPI via say command");
           } catch (error) {
             console.log("ℹ️ Say command not available:", error);
           }
         }, 100);
       } catch (error) {
         console.error("❌ Failed to send Leo's message to VAPI:", error);
-        // Message is already in UI, so no need for fallback
       }
 
-      // Return the calculated speaking time for use in scheduling
       return speakingTime;
     },
     [calculateSpeakingTime]
   );
+
+  // ✨ COMPREHENSIVE: Speech event handlers with detailed analysis
+  const handleSpeechStart = useCallback(() => {
+    const analysis = eventAnalyzer.current.analyzeEvent(
+      "speech-start",
+      callStatusRef.current,
+      isWaitingForUserRef.current,
+      currentSpeakerRef.current,
+      currentStepRef.current
+    );
+
+    console.log(`🎤 DIRECT SPEECH-START Handler:`, analysis.reason);
+
+    // Update debug events
+    setDebugEvents((prev) => [
+      {
+        type: "speech-start-direct",
+        timestamp: Date.now(),
+        analysis,
+        processed: analysis.shouldProcess,
+      },
+      ...prev.slice(0, 19),
+    ]);
+
+    if (analysis.shouldProcess) {
+      console.log("✅ Direct speech-start - User input expected");
+      setIsSpeaking(true);
+    } else {
+      console.log(`🚫 Ignoring direct speech-start - ${analysis.reason}`);
+    }
+  }, []);
+
+  const handleSpeechEnd = useCallback(() => {
+    const analysis = eventAnalyzer.current.analyzeEvent(
+      "speech-end",
+      callStatusRef.current,
+      isWaitingForUserRef.current,
+      currentSpeakerRef.current,
+      currentStepRef.current
+    );
+
+    console.log(`🎤 DIRECT SPEECH-END Handler:`, analysis.reason);
+
+    // Update debug events
+    setDebugEvents((prev) => [
+      {
+        type: "speech-end-direct",
+        timestamp: Date.now(),
+        analysis,
+        processed: analysis.shouldProcess,
+      },
+      ...prev.slice(0, 19),
+    ]);
+
+    if (analysis.shouldProcess) {
+      console.log("✅ Direct speech-end - Processing user input");
+      setIsSpeaking(false);
+    } else {
+      console.log(`🚫 Ignoring direct speech-end - ${analysis.reason}`);
+    }
+  }, []);
 
   // VAPI Event Handlers
   const handleCallStart = useCallback(() => {
     console.log("📞 Call started - Setting up conversation");
     setCallState({ status: CallStatus.ACTIVE });
     isCallReadyRef.current = true;
+    callStatusRef.current = CallStatus.ACTIVE;
     conversationCompletedRef.current = false;
     sessionCompleteCalledRef.current = false;
     processingUserInputRef.current = false;
@@ -408,36 +527,29 @@ export const useVapiConversation = ({
     currentUserSpeechRef.current = "";
     evaluatedMessagesRef.current.clear();
 
-    console.log(
-      "🎯 First line:",
-      steps[0]?.speaker,
-      "-",
-      steps[0]?.text?.substring(0, 50) + "..."
-    );
+    // Clear debug events
+    eventAnalyzer.current.clearHistory();
+    setDebugEvents([]);
 
-    // If first line is Leo, send it immediately
     if (steps[0]?.speaker === "Leo") {
-      console.log("🚀 First line is Leo - sending immediately");
       setTimeout(() => {
         const speakingTime = sendLeoMessage(steps[0], 0);
-
-        // Move to next step after calculated speaking time
         currentTimeoutRef.current = setTimeout(() => {
           setConversationState((prev) => ({
             ...prev,
             currentStep: 1,
           }));
         }, speakingTime);
-      }, 1000); // 1 second delay to ensure VAPI is ready
+      }, 1000);
     }
   }, [steps, sendLeoMessage]);
 
   const handleCallEnd = useCallback(() => {
     setCallState({ status: CallStatus.FINISHED });
     isCallReadyRef.current = false;
+    callStatusRef.current = CallStatus.FINISHED;
     console.log("📞 Call ended");
 
-    // Clear any pending timeouts
     if (currentTimeoutRef.current) {
       clearTimeout(currentTimeoutRef.current);
       currentTimeoutRef.current = null;
@@ -448,31 +560,20 @@ export const useVapiConversation = ({
       speechEndTimeoutRef.current = null;
     }
 
-    // Reset processing flags
     processingUserInputRef.current = false;
     lastSimilarityResultRef.current = null;
     currentUserSpeechRef.current = "";
     evaluatedMessagesRef.current.clear();
 
-    // Clean up all similarity contexts
     for (let i = 0; i < steps.length; i++) {
       resetSimilarityContext(`${companionId}-step-${i}`);
     }
   }, [steps.length, companionId]);
 
-  const handleSpeechStart = useCallback(() => {
-    console.log("🎤 Speech started");
-    setIsSpeaking(true);
-  }, []);
-
-  const handleSpeechEnd = useCallback(() => {
-    console.log("🎤 Speech ended");
-    setIsSpeaking(false);
-  }, []);
-
   const handleError = useCallback((error: Error) => {
     console.error("❌ VAPI Error:", error);
     setCallState({ status: CallStatus.ERROR, error: error.message });
+    callStatusRef.current = CallStatus.ERROR;
   }, []);
 
   // Setup VAPI event listeners
@@ -504,7 +605,7 @@ export const useVapiConversation = ({
     handleError,
   ]);
 
-  // Auto-advance conversation for Leo's lines with dynamic timing
+  // Auto-advance conversation with better state management
   useEffect(() => {
     if (
       currentStep === 0 ||
@@ -513,7 +614,6 @@ export const useVapiConversation = ({
     )
       return;
 
-    // Clear any existing timeout
     if (currentTimeoutRef.current) {
       clearTimeout(currentTimeoutRef.current);
       currentTimeoutRef.current = null;
@@ -527,7 +627,6 @@ export const useVapiConversation = ({
 
       const speakingTime = sendLeoMessage(currentLine, currentStep);
 
-      // Move to next step after calculated speaking time
       currentTimeoutRef.current = setTimeout(() => {
         if (!conversationCompletedRef.current) {
           setConversationState((prev) => ({
@@ -545,21 +644,24 @@ export const useVapiConversation = ({
         currentLine.text
       );
 
-      // Reset processing flags for new user input
+      setIsSpeaking(false);
       processingUserInputRef.current = false;
       lastSimilarityResultRef.current = null;
       currentUserSpeechRef.current = "";
 
-      // Wait for user response
       setConversationState((prev) => ({
         ...prev,
         isWaitingForUser: true,
         feedback: `🎯 Your turn: "${currentLine.text}"`,
       }));
+
+      setTimeout(() => {
+        console.log("✅ Ready for user input - State updated");
+      }, 100);
     }
   }, [currentStep, currentLine, callState.status, sendLeoMessage]);
 
-  // Check for conversation completion - with proper guards
+  // Check for conversation completion
   useEffect(() => {
     if (
       currentStep >= steps.length &&
@@ -571,7 +673,6 @@ export const useVapiConversation = ({
       conversationCompletedRef.current = true;
       sessionCompleteCalledRef.current = true;
 
-      // Clear any pending timeouts
       if (currentTimeoutRef.current) {
         clearTimeout(currentTimeoutRef.current);
         currentTimeoutRef.current = null;
@@ -582,7 +683,6 @@ export const useVapiConversation = ({
         speechEndTimeoutRef.current = null;
       }
 
-      // Reset processing flags
       processingUserInputRef.current = false;
       lastSimilarityResultRef.current = null;
       currentUserSpeechRef.current = "";
@@ -593,7 +693,6 @@ export const useVapiConversation = ({
         feedback: "🎉 Conversation completed! Great job!",
       }));
 
-      // Call onSessionComplete only once
       if (onSessionComplete) {
         setTimeout(() => {
           onSessionComplete();
@@ -606,33 +705,26 @@ export const useVapiConversation = ({
   const startCall = useCallback(() => {
     console.log("🚀 Starting VAPI call...");
     setCallState({ status: CallStatus.CONNECTING });
+    callStatusRef.current = CallStatus.CONNECTING;
 
     const assistantConfig = configureAssistant(voice, style);
-    console.log("🔧 Assistant config:", assistantConfig);
-
     const assistantOverrides = {
-      variableValues: {
-        subject,
-        topic,
-        style,
-      },
+      variableValues: { subject, topic, style },
       clientMessages: ["transcript"] as const,
     };
-    console.log("🔧 Assistant overrides:", assistantOverrides);
 
     try {
       vapi.start(assistantConfig, assistantOverrides);
-      console.log("✅ VAPI start called successfully");
     } catch (error) {
       console.error("❌ Failed to start VAPI:", error);
       setCallState({ status: CallStatus.ERROR, error: error.message });
+      callStatusRef.current = CallStatus.ERROR;
     }
   }, [subject, topic, style, voice]);
 
   const endCall = useCallback(() => {
     console.log("🛑 Ending call...");
 
-    // Clear any pending timeouts
     if (currentTimeoutRef.current) {
       clearTimeout(currentTimeoutRef.current);
       currentTimeoutRef.current = null;
@@ -643,7 +735,6 @@ export const useVapiConversation = ({
       speechEndTimeoutRef.current = null;
     }
 
-    // Reset processing flags
     processingUserInputRef.current = false;
     lastSimilarityResultRef.current = null;
     currentUserSpeechRef.current = "";
@@ -651,19 +742,18 @@ export const useVapiConversation = ({
 
     vapi.stop();
     setCallState({ status: CallStatus.FINISHED });
+    callStatusRef.current = CallStatus.FINISHED;
   }, []);
 
   const toggleMute = useCallback(() => {
     const currentMuteState = vapi.isMuted();
     vapi.setMuted(!currentMuteState);
     setIsMuted(!currentMuteState);
-    console.log(`🔇 Mute toggled: ${!currentMuteState}`);
   }, []);
 
   const resetConversation = useCallback(() => {
     console.log("🔄 Resetting conversation...");
 
-    // Clear any pending timeouts
     if (currentTimeoutRef.current) {
       clearTimeout(currentTimeoutRef.current);
       currentTimeoutRef.current = null;
@@ -674,12 +764,10 @@ export const useVapiConversation = ({
       speechEndTimeoutRef.current = null;
     }
 
-    // Clean up all similarity contexts
     for (let i = 0; i < steps.length; i++) {
       resetSimilarityContext(`${companionId}-step-${i}`);
     }
 
-    // Reset refs
     lastProcessedMessageRef.current = "";
     sentMessagesRef.current.clear();
     conversationCompletedRef.current = false;
@@ -689,6 +777,10 @@ export const useVapiConversation = ({
     currentUserSpeechRef.current = "";
     evaluatedMessagesRef.current.clear();
 
+    // Clear debug events
+    eventAnalyzer.current.clearHistory();
+    setDebugEvents([]);
+
     setConversationState({
       currentStep: 0,
       totalSteps: steps.length,
@@ -697,15 +789,14 @@ export const useVapiConversation = ({
     });
     setMessages([]);
     isCallReadyRef.current = false;
+    callStatusRef.current = CallStatus.INACTIVE;
   }, [steps.length, companionId]);
 
-  // Additional utility functions
   const skipToStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex >= 0 && stepIndex < steps.length) {
         console.log(`⏭️ Skipping to step ${stepIndex}`);
 
-        // Clear any pending timeouts
         if (currentTimeoutRef.current) {
           clearTimeout(currentTimeoutRef.current);
           currentTimeoutRef.current = null;
@@ -716,13 +807,11 @@ export const useVapiConversation = ({
           speechEndTimeoutRef.current = null;
         }
 
-        // Reset processing flags
         processingUserInputRef.current = false;
         lastSimilarityResultRef.current = null;
         currentUserSpeechRef.current = "";
         evaluatedMessagesRef.current.clear();
 
-        // Clean up current step context
         resetSimilarityContext(
           `${companionId}-step-${conversationState.currentStep}`
         );
@@ -742,7 +831,6 @@ export const useVapiConversation = ({
   const retryCurrentStep = useCallback(() => {
     console.log(`🔄 Retrying step ${conversationState.currentStep}`);
 
-    // Clear any pending timeouts
     if (currentTimeoutRef.current) {
       clearTimeout(currentTimeoutRef.current);
       currentTimeoutRef.current = null;
@@ -753,13 +841,11 @@ export const useVapiConversation = ({
       speechEndTimeoutRef.current = null;
     }
 
-    // Reset processing flags
     processingUserInputRef.current = false;
     lastSimilarityResultRef.current = null;
     currentUserSpeechRef.current = "";
     evaluatedMessagesRef.current.clear();
 
-    // Reset context for current step
     resetSimilarityContext(
       `${companionId}-step-${conversationState.currentStep}`
     );
@@ -774,10 +860,8 @@ export const useVapiConversation = ({
     }));
   }, [companionId, conversationState.currentStep, currentLine]);
 
-  // Manual trigger for testing
   const manualTriggerLeo = useCallback(() => {
     if (currentLine?.speaker === "Leo") {
-      console.log("🎯 Manual trigger for Leo's line");
       sendLeoMessage(currentLine, currentStep);
     }
   }, [currentLine, currentStep, sendLeoMessage]);
@@ -790,6 +874,9 @@ export const useVapiConversation = ({
     isSpeaking,
     isMuted,
     currentLine,
+
+    // ✨ NEW: Debug data
+    debugEvents,
 
     // Actions
     startCall,

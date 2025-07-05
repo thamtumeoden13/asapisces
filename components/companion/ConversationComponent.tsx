@@ -87,7 +87,7 @@ const ConversationComponent = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-600">
                 {completedTopics.size}
@@ -116,7 +116,7 @@ const ConversationComponent = ({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
         {/* Topic Selection Sidebar */}
         <div className="lg:col-span-1">
           <Card className="sticky top-4">
@@ -129,7 +129,7 @@ const ConversationComponent = ({
             <CardContent className="space-y-6">
               {/* Level Selection */}
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="block mb-2 text-sm font-medium">
                   Your Level
                 </label>
                 <Select
@@ -151,7 +151,7 @@ const ConversationComponent = ({
 
               {/* Voice Style Selection */}
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="block mb-2 text-sm font-medium">
                   Voice Style
                 </label>
                 <Select
@@ -178,10 +178,10 @@ const ConversationComponent = ({
 
               {/* Topic Selection */}
               <div>
-                <label className="text-sm font-medium mb-3 block">
+                <label className="block mb-3 text-sm font-medium">
                   Choose Topic
                 </label>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2 overflow-y-auto max-h-96">
                   {Object.entries(topicTitles).map(([key, title]) => {
                     const topicKey = key as TopicKey;
                     const isCompleted = completedTopics.has(topicKey);
@@ -199,8 +199,8 @@ const ConversationComponent = ({
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex flex-col flex-wrap">
-                            <div className="font-medium text-sm">{title}</div>
-                            <div className="text-xs text-gray-500 mt-1">
+                            <div className="text-sm font-medium">{title}</div>
+                            <div className="mt-1 text-xs text-gray-500">
                               {podcastTopics[topicKey]?.length || 0} steps
                             </div>
                           </div>
@@ -228,7 +228,7 @@ const ConversationComponent = ({
 
               {/* Quick Stats */}
               <div className="pt-4 border-t">
-                <h4 className="font-medium mb-2 flex items-center gap-2">
+                <h4 className="flex items-center gap-2 mb-2 font-medium">
                   <Target className="w-4 h-4" />
                   Quick Stats
                 </h4>
@@ -283,32 +283,32 @@ const ConversationComponent = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full">
                 <span className="text-2xl">🎯</span>
               </div>
-              <h3 className="font-medium mb-2">Choose Your Topic</h3>
+              <h3 className="mb-2 font-medium">Choose Your Topic</h3>
               <p className="text-sm text-gray-600">
                 Select from various conversation topics based on your learning
                 goals and interests.
               </p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-green-100 rounded-full">
                 <span className="text-2xl">🎤</span>
               </div>
-              <h3 className="font-medium mb-2">Practice Speaking</h3>
+              <h3 className="mb-2 font-medium">Practice Speaking</h3>
               <p className="text-sm text-gray-600">
                 Engage in natural conversation with AI companions using advanced
                 voice recognition.
               </p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-purple-100 rounded-full">
                 <span className="text-2xl">📊</span>
               </div>
-              <h3 className="font-medium mb-2">Get Real-time Feedback</h3>
+              <h3 className="mb-2 font-medium">Get Real-time Feedback</h3>
               <p className="text-sm text-gray-600">
                 Receive instant feedback on pronunciation, fluency, and
                 conversation skills.

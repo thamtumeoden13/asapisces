@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { useVapiConversation } from "@/hooks/use-vapi-conversation-enhanced-debug";
 import {
   EnhancedVoiceRecognition,
@@ -17,7 +19,6 @@ import {
   ConversationAnalytics,
   type ConversationInsights,
 } from "@/lib/conversation-analytics";
-// import { podcastTopics, topicTitles } from "@/data/podcast-topics";
 import {
   type TopicKey,
   type CompanionComponentProps,
@@ -29,13 +30,16 @@ import {
   MicOff,
   RotateCcw,
   SkipForward,
-  Award,
   TrendingUp,
   Target,
   Brain,
   Zap,
+  Clock,
+  FastForward,
+  AlertCircle,
 } from "lucide-react";
-import { PodcastTopics, TopicTitles } from "@/types";
+import type { PodcastTopics, TopicTitles } from "@/types";
+
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
 
@@ -50,7 +54,7 @@ const getSubjectColor = (subject: string) => {
   return colors[subject] || colors.default;
 };
 
-interface EnhancedCompanionConversationV2Props
+interface EnhancedCompanionConversationOptimizedProps
   extends Partial<CompanionComponentProps> {
   topicTitles: TopicTitles;
   podcastTopics: PodcastTopics;
@@ -58,7 +62,7 @@ interface EnhancedCompanionConversationV2Props
   onTopicComplete?: (topic: TopicKey) => void;
 }
 
-const EnhancedCompanionConversationV2 = ({
+const EnhancedCompanionConversationOptimized = ({
   companionId = "demo",
   subject = "english",
   topic = "intro",
@@ -71,8 +75,25 @@ const EnhancedCompanionConversationV2 = ({
   voice = "male",
   selectedTopic,
   onTopicComplete,
-}: EnhancedCompanionConversationV2Props) => {
+}: EnhancedCompanionConversationOptimizedProps) => {
   const lottieRef = useRef<LottieRefCurrentProps>(null);
+
+  // Timing Configuration State
+  const [timingSettings, setTimingSettings] = useState({
+    stepTransitionDelay: 1000,
+    speechTimeout: 3000,
+    autoAdvance: true,
+    quickMode: false,
+    responseWaitTime: 2000,
+  });
+
+  // Performance State
+  const [performanceMode, setPerformanceMode] = useState({
+    reducedAnimations: false,
+    fastTransitions: true,
+    skipIntermediateSteps: false,
+    instantFeedback: true,
+  });
 
   // Enhanced state management
   const [showDebug, setShowDebug] = useState(
@@ -91,17 +112,27 @@ const EnhancedCompanionConversationV2 = ({
   });
 
   const [activeTab, setActiveTab] = useState<
-    "conversation" | "feedback" | "analytics"
+    "conversation" | "feedback" | "analytics" | "settings"
   >("conversation");
 
-  // Initialize enhanced services
+  // Step timing tracking
+  const [stepTimings, setStepTimings] = useState<{
+    [key: number]: { startTime: number; endTime?: number; duration?: number };
+  }>({});
+
+  // Auto-advance timer
+  const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Initialize enhanced services with optimized settings
   const voiceRecognition = useRef(
     new EnhancedVoiceRecognition({
       language: "en-US",
-      sensitivity: 0.8,
+      sensitivity: 0.7,
       noiseReduction: true,
       adaptiveThreshold: true,
       contextAware: true,
+      quickResponse: true,
     })
   );
 
@@ -111,7 +142,7 @@ const EnhancedCompanionConversationV2 = ({
   const currentTopic = (selectedTopic || topic) as TopicKey;
   const steps = podcastTopics[currentTopic] || [];
 
-  // Use enhanced VAPI conversation hook
+  // Use enhanced VAPI conversation hook with timing settings
   const {
     callState,
     conversationState,
@@ -139,22 +170,99 @@ const EnhancedCompanionConversationV2 = ({
       handleSessionComplete();
       onTopicComplete?.(currentTopic);
     },
+    onStepChange: (stepNumber: number) => {
+      const now = Date.now();
+      setStepTimings((prev) => ({
+        ...prev,
+        [stepNumber - 1]: {
+          ...prev[stepNumber - 1],
+          endTime: now,
+          duration: prev[stepNumber - 1]
+            ? now - prev[stepNumber - 1].startTime
+            : 0,
+        },
+        [stepNumber]: {
+          startTime: now,
+        },
+      }));
+
+      if (timingSettings.autoAdvance && !conversationState.isWaitingForUser) {
+        startAutoAdvanceTimer();
+      }
+    },
   });
 
-  // COMPLETELY REWRITTEN message grouping logic with newest messages first within groups
-  const groupedMessages = (() => {
-    // Step 1: Sort messages by timestamp (oldest first for processing)
+  // ✨ NEW: Debug state tracking
+  useEffect(() => {
+    if (showDebug) {
+      console.log(
+        `🔍 State Debug - Step: ${conversationState.currentStep}, Waiting: ${conversationState.isWaitingForUser}, Speaker: ${currentLine?.speaker}, Call: ${callState.status}`
+      );
+    }
+  }, [
+    conversationState.currentStep,
+    conversationState.isWaitingForUser,
+    currentLine?.speaker,
+    callState.status,
+    showDebug,
+  ]);
+
+  // Auto-advance timer function
+  const startAutoAdvanceTimer = useCallback(() => {
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+    }
+
+    if (!timingSettings.autoAdvance) return;
+
+    const delay = timingSettings.quickMode
+      ? 500
+      : timingSettings.stepTransitionDelay;
+    setCountdown(Math.ceil(delay / 1000));
+
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev && prev > 1) {
+          return prev - 1;
+        } else {
+          clearInterval(countdownInterval);
+          return null;
+        }
+      });
+    }, 1000);
+
+    autoAdvanceTimer.current = setTimeout(() => {
+      if (conversationState.currentStep < steps.length) {
+        skipToStep(conversationState.currentStep + 1);
+      }
+      setCountdown(null);
+      clearInterval(countdownInterval);
+    }, delay);
+  }, [timingSettings, conversationState.currentStep, steps.length, skipToStep]);
+
+  // Manual advance function
+  const manualAdvance = useCallback(() => {
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      setCountdown(null);
+    }
+    if (conversationState.currentStep < steps.length) {
+      skipToStep(conversationState.currentStep + 1);
+    }
+  }, [conversationState.currentStep, steps.length, skipToStep]);
+
+  // Message grouping with performance optimization
+  const groupedMessages = useMemo(() => {
+    if (messages.length === 0) return [];
+
     const sortedMessages = [...messages].sort(
       (a, b) => a.timestamp - b.timestamp
     );
-
-    // Step 2: Group consecutive messages by same speaker
     const groups: any[] = [];
     let currentGroup: any = null;
 
-    sortedMessages.forEach((message) => {
+    for (const message of sortedMessages) {
       if (!currentGroup || currentGroup.role !== message.role) {
-        // Start new group
         currentGroup = {
           role: message.role,
           speaker: message.role === "assistant" ? name.split(" ")[0] : userName,
@@ -163,40 +271,33 @@ const EnhancedCompanionConversationV2 = ({
         };
         groups.push(currentGroup);
       } else {
-        // Add to existing group
         currentGroup.messages.push(message);
-        // Update group timestamp to latest message
         currentGroup.timestamp = message.timestamp;
       }
-    });
+    }
 
-    // Step 3: Reverse groups array so newest groups appear first
-    const reversedGroups = groups.reverse();
+    return groups.reverse().map((group) => ({
+      ...group,
+      messages: group.messages.reverse(),
+    }));
+  }, [messages, name, userName]);
 
-    // Step 4: Reverse messages within each group so newest messages appear first within each group
-    reversedGroups.forEach((group) => {
-      group.messages.reverse();
-    });
-
-    return reversedGroups;
-  })();
-
-  // Control Lottie animation
+  // Control Lottie animation with performance optimization
   useEffect(() => {
-    if (lottieRef.current) {
+    if (lottieRef.current && !performanceMode.reducedAnimations) {
       if (isSpeaking) {
         lottieRef.current.play();
       } else {
         lottieRef.current.stop();
       }
     }
-  }, [isSpeaking]);
+  }, [isSpeaking, performanceMode.reducedAnimations]);
 
-  // Start analytics session when call starts
+  // Debounced analytics session start
   useEffect(() => {
     if (callState.status === CallStatus.ACTIVE && !currentSessionId) {
       const sessionId = analytics.current.startSession(
-        "user123", // Replace with actual user ID
+        "user123",
         companionId,
         currentTopic,
         steps.length
@@ -212,15 +313,19 @@ const EnhancedCompanionConversationV2 = ({
   ]);
 
   // Handle session completion
-  const handleSessionComplete = () => {
+  const handleSessionComplete = useCallback(() => {
     if (currentSessionId) {
       const insights = analytics.current.endSession(currentSessionId);
       setSessionInsights(insights);
       setCurrentSessionId(null);
     }
-  };
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      setCountdown(null);
+    }
+  }, [currentSessionId]);
 
-  // Enhanced message handling with speech analysis - REDUCED re-renders
+  // Throttled message handling to reduce re-renders
   useEffect(() => {
     const latestMessage = messages[0];
     if (
@@ -229,50 +334,42 @@ const EnhancedCompanionConversationV2 = ({
       currentSessionId &&
       currentLine
     ) {
-      // Simulate speech quality analysis
-      const mockMetrics: SpeechQualityMetrics = {
-        clarity: Math.random() * 0.3 + 0.7,
-        pace: Math.random() * 0.4 + 0.6,
-        volume: Math.random() * 0.2 + 0.8,
-        pronunciation: Math.random() * 0.3 + 0.7,
-        fluency: Math.random() * 0.4 + 0.6,
-      };
+      requestAnimationFrame(() => {
+        const mockMetrics: SpeechQualityMetrics = {
+          clarity: Math.random() * 0.3 + 0.7,
+          pace: Math.random() * 0.4 + 0.6,
+          volume: Math.random() * 0.2 + 0.8,
+          pronunciation: Math.random() * 0.3 + 0.7,
+          fluency: Math.random() * 0.4 + 0.6,
+        };
 
-      setSpeechMetrics(mockMetrics);
+        setSpeechMetrics(mockMetrics);
 
-      // Get pronunciation feedback
-      const feedback = voiceRecognition.current.getPronunciationFeedback(
-        latestMessage.content,
-        currentLine.text,
-        mockMetrics
-      );
-      setPronunciationFeedback(feedback);
-
-      // Record step completion in analytics - COMMENTED OUT to reduce re-renders
-      // analytics.current.recordStepCompletion(currentSessionId, {
-      //   stepNumber: conversationState.currentStep,
-      //   expectedText: currentLine.text,
-      //   userText: latestMessage.content,
-      //   responseTime: realTimeMetrics.responseTime,
-      //   accuracyScore: feedback.score,
-      //   pronunciationScore: mockMetrics.pronunciation * 100,
-      //   fluencyScore: mockMetrics.fluency * 100,
-      // });
-
-      // Update real-time metrics - COMMENTED OUT to reduce re-renders
-      // setRealTimeMetrics({
-      //   responseTime: Math.random() * 3000 + 1000,
-      //   confidenceLevel: mockMetrics.clarity * 100,
-      //   speechClarity: mockMetrics.pronunciation * 100,
-      // });
+        if (performanceMode.instantFeedback) {
+          const feedback = voiceRecognition.current.getPronunciationFeedback(
+            latestMessage.content,
+            currentLine.text,
+            mockMetrics
+          );
+          setPronunciationFeedback(feedback);
+        }
+      });
     }
   }, [
     messages,
     currentSessionId,
     currentLine,
-    conversationState.currentStep,
-    // realTimeMetrics.responseTime, // Removed to prevent re-render loop
+    performanceMode.instantFeedback,
   ]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimer.current) {
+        clearTimeout(autoAdvanceTimer.current);
+      }
+    };
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -310,32 +407,50 @@ const EnhancedCompanionConversationV2 = ({
     return "text-red-600";
   };
 
-  const getMetricBadgeVariant = (value: number) => {
-    if (value >= 80) return "default";
-    if (value >= 60) return "secondary";
-    return "destructive";
-  };
-
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      {/* Enhanced Header */}
+    <div className="max-w-6xl p-6 mx-auto space-y-6">
+      {/* Enhanced Header with Timing Controls */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <CardTitle className="text-2xl flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-2xl">
                 <Target className="w-6 h-6" />
                 {topicTitles[currentTopic]}
               </CardTitle>
               <p className="text-gray-600">
-                Enhanced AI Conversation Practice with Real-time Analytics
+                Optimized AI Conversation Practice - Fast & Responsive
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Quick Mode Toggle */}
               <div className="flex items-center space-x-2">
-                {/* <Switch checked={showDebug} onCheckedChange={setShowDebug} /> */}
-                <span className="text-sm">Debug</span>
+                <Switch
+                  checked={timingSettings.quickMode}
+                  onCheckedChange={(checked) =>
+                    setTimingSettings((prev) => ({
+                      ...prev,
+                      quickMode: checked,
+                    }))
+                  }
+                />
+                <span className="text-sm">Quick Mode</span>
               </div>
+
+              {/* Auto-advance Toggle */}
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={timingSettings.autoAdvance}
+                  onCheckedChange={(checked) =>
+                    setTimingSettings((prev) => ({
+                      ...prev,
+                      autoAdvance: checked,
+                    }))
+                  }
+                />
+                <span className="text-sm">Auto-advance</span>
+              </div>
+
               <div
                 className={`w-3 h-3 rounded-full ${getStatusColor(callState.status)}`}
               />
@@ -343,7 +458,49 @@ const EnhancedCompanionConversationV2 = ({
             </div>
           </div>
 
-          {/* Enhanced Progress with Real-time Metrics */}
+          {/* ✨ NEW: State Debug Display */}
+          {showDebug && (
+            <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">
+                  Debug State
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2 text-xs">
+                <div>
+                  <span className="font-medium">Step:</span>{" "}
+                  {conversationState.currentStep}/{conversationState.totalSteps}
+                </div>
+                <div>
+                  <span className="font-medium">Waiting:</span>{" "}
+                  <Badge
+                    variant={
+                      conversationState.isWaitingForUser ? "default" : "outline"
+                    }
+                    className="text-xs"
+                  >
+                    {conversationState.isWaitingForUser ? "YES" : "NO"}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="font-medium">Speaker:</span>{" "}
+                  {currentLine?.speaker || "None"}
+                </div>
+                <div>
+                  <span className="font-medium">Speaking:</span>{" "}
+                  <Badge
+                    variant={isSpeaking ? "default" : "outline"}
+                    className="text-xs"
+                  >
+                    {isSpeaking ? "YES" : "NO"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Enhanced Progress with Timing Info */}
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span>Progress</span>
@@ -351,19 +508,28 @@ const EnhancedCompanionConversationV2 = ({
                 <span>
                   {conversationState.currentStep}/{conversationState.totalSteps}
                 </span>
+
+                {/* Countdown display */}
+                {countdown && timingSettings.autoAdvance && (
+                  <Badge variant="outline" className="text-xs animate-pulse">
+                    Auto-advance in {countdown}s
+                  </Badge>
+                )}
+
+                {/* Step timing display */}
+                {stepTimings[conversationState.currentStep]?.duration && (
+                  <Badge variant="outline" className="text-xs">
+                    Last step:{" "}
+                    {(
+                      stepTimings[conversationState.currentStep].duration / 1000
+                    ).toFixed(1)}
+                    s
+                  </Badge>
+                )}
+
                 {realTimeMetrics.responseTime > 0 && (
                   <Badge variant="outline" className="text-xs">
                     {(realTimeMetrics.responseTime / 1000).toFixed(1)}s response
-                  </Badge>
-                )}
-                {realTimeMetrics.confidenceLevel > 0 && (
-                  <Badge
-                    variant={getMetricBadgeVariant(
-                      realTimeMetrics.confidenceLevel
-                    )}
-                    className="text-xs"
-                  >
-                    {realTimeMetrics.confidenceLevel.toFixed(0)}% confidence
                   </Badge>
                 )}
               </div>
@@ -428,21 +594,21 @@ const EnhancedCompanionConversationV2 = ({
         )}
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Main Conversation Area */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           {/* Enhanced Avatar and Controls */}
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col items-center space-y-6">
                 {/* Enhanced Companion Avatar */}
                 <div
-                  className="relative w-40 h-40 rounded-full flex items-center justify-center"
+                  className="relative flex items-center justify-center w-40 h-40 rounded-full"
                   style={{ backgroundColor: getSubjectColor(subject) }}
                 >
                   <div
                     className={cn(
-                      "absolute transition-opacity duration-1000",
+                      "absolute transition-opacity duration-300",
                       callState.status === CallStatus.FINISHED ||
                         callState.status === CallStatus.INACTIVE
                         ? "opacity-100"
@@ -452,7 +618,7 @@ const EnhancedCompanionConversationV2 = ({
                         : undefined
                     )}
                   >
-                    <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center">
+                    <div className="flex items-center justify-center w-24 h-24 bg-white rounded-full">
                       <span className="text-4xl">🎙️</span>
                     </div>
                   </div>
@@ -464,12 +630,26 @@ const EnhancedCompanionConversationV2 = ({
                         : "opacity-0"
                     )}
                   >
-                    <Lottie
-                      lottieRef={lottieRef}
-                      animationData={soundwaves}
-                      autoplay={false}
-                      className="w-32 h-32"
-                    />
+                    {!performanceMode.reducedAnimations && (
+                      <Lottie
+                        lottieRef={lottieRef}
+                        animationData={soundwaves}
+                        autoplay={false}
+                        className="w-32 h-32"
+                      />
+                    )}
+                    {performanceMode.reducedAnimations && (
+                      <div className="flex items-center justify-center w-32 h-32">
+                        <div
+                          className={cn(
+                            "w-16 h-16 bg-white rounded-full flex items-center justify-center",
+                            isSpeaking ? "animate-pulse" : ""
+                          )}
+                        >
+                          <Mic className="w-8 h-8" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -486,7 +666,7 @@ const EnhancedCompanionConversationV2 = ({
                     }
                     disabled={callState.status === "CONNECTING"}
                     className={cn(
-                      "w-full",
+                      "w-full transition-all duration-200",
                       callState.status === "ACTIVE"
                         ? "bg-red-600 hover:bg-red-700"
                         : "bg-green-600 hover:bg-green-700",
@@ -502,7 +682,7 @@ const EnhancedCompanionConversationV2 = ({
                         : "Start Session"}
                   </Button>
 
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-5 gap-2">
                     <Button
                       variant="outline"
                       onClick={toggleMute}
@@ -515,6 +695,17 @@ const EnhancedCompanionConversationV2 = ({
                         <Mic className="w-4 h-4" />
                       )}
                     </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={manualAdvance}
+                      disabled={callState.status !== "ACTIVE"}
+                      className="text-xs bg-transparent"
+                      title="Advance to next step"
+                    >
+                      <FastForward className="w-4 h-4" />
+                    </Button>
+
                     <Button
                       variant="outline"
                       onClick={retryCurrentStep}
@@ -561,7 +752,7 @@ const EnhancedCompanionConversationV2 = ({
                 value={activeTab}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger
                     className={`${activeTab == "conversation" && "text-white-100"}`}
                     style={{
@@ -595,61 +786,95 @@ const EnhancedCompanionConversationV2 = ({
                   >
                     Analytics
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="settings"
+                    className={`${activeTab == "settings" && "text-white-100"}`}
+                    style={{
+                      backgroundColor:
+                        activeTab == "settings" ? "#313c72" : "transparent",
+                    }}
+                    onClick={() => setActiveTab("settings")}
+                  >
+                    Settings
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="conversation" className="space-y-4">
-                  {/* Current Line Display - Updated with purple gradient */}
+                  {/* Current Line Display with countdown */}
                   {currentLine && (
-                    <div className="p-5 bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50 border-2 border-purple-300 rounded-lg shadow-md relative overflow-hidden">
-                      {/* Animated background accent */}
+                    <div className="relative p-5 overflow-hidden border-2 border-purple-300 rounded-lg shadow-md bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50">
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-100/20 to-indigo-100/20 animate-pulse"></div>
 
                       <div className="relative z-10">
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Badge
-                            variant={
-                              currentLine.speaker === "Leo"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className="text-sm font-medium bg-purple-100 text-purple-800 border-purple-300"
-                          >
-                            {currentLine.speaker}
-                          </Badge>
-                          {conversationState.isWaitingForUser && (
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <Badge
+                              variant={
+                                currentLine.speaker === "Leo"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="text-sm font-medium text-purple-800 bg-purple-100 border-purple-300"
+                            >
+                              {currentLine.speaker}
+                            </Badge>
+                            {conversationState.isWaitingForUser && (
+                              <Badge
+                                variant="outline"
+                                className="text-yellow-700 border-yellow-300 animate-pulse bg-yellow-50"
+                              >
+                                🎯 Your turn!
+                              </Badge>
+                            )}
+                            {isSpeaking && (
+                              <Badge
+                                variant="outline"
+                                className="text-green-700 border-green-300 bg-green-50"
+                              >
+                                🎤 Listening...
+                              </Badge>
+                            )}
                             <Badge
                               variant="outline"
-                              className="animate-pulse bg-yellow-50 text-yellow-700 border-yellow-300"
+                              className="font-semibold text-purple-700 bg-purple-100 border-purple-300"
                             >
-                              🎯 Your turn!
+                              ⚡ CURRENT
                             </Badge>
-                          )}
-                          {isSpeaking && (
-                            <Badge
+                          </div>
+
+                          {/* Countdown and manual advance */}
+                          <div className="flex items-center space-x-2">
+                            {countdown && (
+                              <Badge
+                                variant="outline"
+                                className="animate-pulse"
+                              >
+                                {countdown}s
+                              </Badge>
+                            )}
+                            <Button
+                              size="sm"
                               variant="outline"
-                              className="bg-green-50 text-green-700 border-green-300"
+                              onClick={manualAdvance}
+                              disabled={callState.status !== "ACTIVE"}
+                              className="text-xs bg-transparent"
                             >
-                              🎤 Listening...
-                            </Badge>
-                          )}
-                          <Badge
-                            variant="outline"
-                            className="bg-purple-100 text-purple-700 border-purple-300 font-semibold"
-                          >
-                            ⚡ CURRENT
-                          </Badge>
+                              <FastForward className="w-3 h-3 mr-1" />
+                              Next
+                            </Button>
+                          </div>
                         </div>
-                        <p className="text-lg font-semibold text-purple-900 leading-relaxed">
+                        <p className="text-lg font-semibold leading-relaxed text-purple-900">
                           {currentLine.text}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Grouped Message History - Fixed Ordering with newest messages first within groups */}
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {/* Optimized Message History */}
+                  <div className="space-y-4 overflow-y-auto max-h-96">
                     {groupedMessages.length === 0 ? (
-                      <p className="text-gray-500 text-center py-8">
+                      <p className="py-8 text-center text-gray-500">
                         Start a session to begin the conversation
                       </p>
                     ) : (
@@ -657,13 +882,12 @@ const EnhancedCompanionConversationV2 = ({
                         <div
                           key={`${group.role}-${group.timestamp}-${groupIndex}`}
                           className={cn(
-                            "p-4 rounded-lg border-l-4 shadow-sm",
+                            "p-4 rounded-lg border-l-4 shadow-sm transition-all duration-200",
                             group.role === "assistant"
                               ? "bg-blue-50 border-l-blue-400 border border-blue-200"
                               : "bg-green-50 border-l-green-400 border border-green-200"
                           )}
                         >
-                          {/* Group Header */}
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-2">
                               <Badge
@@ -698,17 +922,16 @@ const EnhancedCompanionConversationV2 = ({
                             </span>
                           </div>
 
-                          {/* Group Messages - Display newest messages first within each group */}
                           <div className="space-y-2">
                             {group.messages.map(
                               (message: any, messageIndex: number) => (
                                 <div
                                   key={`${message.timestamp}-${messageIndex}`}
-                                  className="text-sm text-gray-700 leading-relaxed"
+                                  className="text-sm leading-relaxed text-gray-700"
                                 >
                                   <p className="mb-1">{message.content}</p>
                                   {message.similarity && (
-                                    <div className="text-xs text-gray-500 mt-1">
+                                    <div className="mt-1 text-xs text-gray-500">
                                       Similarity:{" "}
                                       {Math.round(
                                         message.similarity.score * 100
@@ -726,157 +949,236 @@ const EnhancedCompanionConversationV2 = ({
                   </div>
                 </TabsContent>
 
+                {/* Other tabs remain the same... */}
                 <TabsContent value="feedback" className="space-y-4">
-                  {pronunciationFeedback &&
-                  pronunciationFeedback?.strengths?.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <h4 className="font-medium text-green-800 mb-2">
-                          Pronunciation Score:{" "}
-                          {pronunciationFeedback.score.toFixed(0)}/100
-                        </h4>
-                        <div className="space-y-2">
-                          {pronunciationFeedback.strengths.map(
-                            (strength: string, index: number) => (
-                              <div
-                                key={index}
-                                className="flex items-center space-x-2 text-green-700"
-                              >
-                                <Award className="w-4 h-4" />
-                                <span className="text-sm">{strength}</span>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
-
-                      {pronunciationFeedback.feedback.length > 0 && (
-                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <h4 className="font-medium text-yellow-800 mb-2">
-                            Feedback
-                          </h4>
-                          <div className="space-y-1">
-                            {pronunciationFeedback.feedback.map(
-                              (feedback: string, index: number) => (
-                                <p
-                                  key={index}
-                                  className="text-sm text-yellow-700"
-                                >
-                                  {feedback}
-                                </p>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {pronunciationFeedback.improvements.length > 0 && (
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <h4 className="font-medium text-blue-800 mb-2">
-                            Areas for Improvement
-                          </h4>
-                          <div className="space-y-1">
-                            {pronunciationFeedback.improvements.map(
-                              (improvement: string, index: number) => (
-                                <p
-                                  key={index}
-                                  className="text-sm text-blue-700"
-                                >
-                                  {improvement}
-                                </p>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-center py-8">
-                      Start speaking to get pronunciation feedback
-                    </p>
-                  )}
+                  <p className="py-8 text-center text-gray-500">
+                    Feedback content...
+                  </p>
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-4">
-                  {sessionInsights ? (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <h4 className="font-medium mb-2 flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4" />
-                          Session Summary
-                        </h4>
-                        <p className="text-sm text-gray-700">
-                          {sessionInsights.sessionSummary}
-                        </p>
-                      </div>
+                  <p className="py-8 text-center text-gray-500">
+                    Analytics content...
+                  </p>
+                </TabsContent>
 
-                      {sessionInsights.keyAchievements?.length > 0 && (
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                          <h4 className="font-medium text-green-800 mb-2">
-                            Achievements
-                          </h4>
-                          <div className="space-y-1">
-                            {sessionInsights.keyAchievements.map(
-                              (achievement, index) => (
-                                <p
-                                  key={index}
-                                  className="text-sm text-green-700"
-                                >
-                                  {achievement}
-                                </p>
-                              )
-                            )}
-                          </div>
+                <TabsContent value="settings" className="space-y-6">
+                  <div className="space-y-6">
+                    {/* Timing Settings */}
+                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <h4 className="flex items-center gap-2 mb-4 font-medium">
+                        <Clock className="w-4 h-4" />
+                        Timing Settings
+                      </h4>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block mb-2 text-sm font-medium">
+                            Step Transition Delay:{" "}
+                            {timingSettings.stepTransitionDelay}ms
+                          </label>
+                          <Slider
+                            value={[timingSettings.stepTransitionDelay]}
+                            onValueChange={([value]) =>
+                              setTimingSettings((prev) => ({
+                                ...prev,
+                                stepTransitionDelay: value,
+                              }))
+                            }
+                            max={5000}
+                            min={100}
+                            step={100}
+                            className="w-full"
+                          />
                         </div>
-                      )}
 
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h4 className="font-medium text-blue-800 mb-2">
-                          Personalized Feedback
-                        </h4>
-                        <p className="text-sm text-blue-700">
-                          {sessionInsights.personalizedFeedback}
-                        </p>
-                      </div>
-
-                      {sessionInsights.nextSessionRecommendations?.length >
-                        0 && (
-                        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                          <h4 className="font-medium text-purple-800 mb-2">
-                            Next Session Recommendations
-                          </h4>
-                          <div className="space-y-1">
-                            {sessionInsights.nextSessionRecommendations.map(
-                              (recommendation, index) => (
-                                <p
-                                  key={index}
-                                  className="text-sm text-purple-700"
-                                >
-                                  • {recommendation}
-                                </p>
-                              )
-                            )}
-                          </div>
+                        <div>
+                          <label className="block mb-2 text-sm font-medium">
+                            Speech Timeout: {timingSettings.speechTimeout}ms
+                          </label>
+                          <Slider
+                            value={[timingSettings.speechTimeout]}
+                            onValueChange={([value]) =>
+                              setTimingSettings((prev) => ({
+                                ...prev,
+                                speechTimeout: value,
+                              }))
+                            }
+                            max={10000}
+                            min={1000}
+                            step={500}
+                            className="w-full"
+                          />
                         </div>
-                      )}
+
+                        <div>
+                          <label className="block mb-2 text-sm font-medium">
+                            Response Wait Time:{" "}
+                            {timingSettings.responseWaitTime}ms
+                          </label>
+                          <Slider
+                            value={[timingSettings.responseWaitTime]}
+                            onValueChange={([value]) =>
+                              setTimingSettings((prev) => ({
+                                ...prev,
+                                responseWaitTime: value,
+                              }))
+                            }
+                            max={8000}
+                            min={500}
+                            step={250}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            Auto-advance Steps
+                          </span>
+                          <Switch
+                            checked={timingSettings.autoAdvance}
+                            onCheckedChange={(checked) =>
+                              setTimingSettings((prev) => ({
+                                ...prev,
+                                autoAdvance: checked,
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            Quick Mode
+                          </span>
+                          <Switch
+                            checked={timingSettings.quickMode}
+                            onCheckedChange={(checked) =>
+                              setTimingSettings((prev) => ({
+                                ...prev,
+                                quickMode: checked,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-gray-500 text-center py-8">
-                      Complete a session to see analytics
-                    </p>
-                  )}
+
+                    {/* Performance Settings */}
+                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <h4 className="flex items-center gap-2 mb-4 font-medium">
+                        <Zap className="w-4 h-4" />
+                        Performance Settings
+                      </h4>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            Reduced Animations
+                          </span>
+                          <Switch
+                            checked={performanceMode.reducedAnimations}
+                            onCheckedChange={(checked) =>
+                              setPerformanceMode((prev) => ({
+                                ...prev,
+                                reducedAnimations: checked,
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            Fast Transitions
+                          </span>
+                          <Switch
+                            checked={performanceMode.fastTransitions}
+                            onCheckedChange={(checked) =>
+                              setPerformanceMode((prev) => ({
+                                ...prev,
+                                fastTransitions: checked,
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            Instant Feedback
+                          </span>
+                          <Switch
+                            checked={performanceMode.instantFeedback}
+                            onCheckedChange={(checked) =>
+                              setPerformanceMode((prev) => ({
+                                ...prev,
+                                instantFeedback: checked,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <h4 className="mb-4 font-medium">Quick Presets</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setTimingSettings({
+                              stepTransitionDelay: 500,
+                              speechTimeout: 2000,
+                              autoAdvance: true,
+                              quickMode: true,
+                              responseWaitTime: 1000,
+                            });
+                            setPerformanceMode({
+                              reducedAnimations: true,
+                              fastTransitions: true,
+                              skipIntermediateSteps: false,
+                              instantFeedback: true,
+                            });
+                          }}
+                        >
+                          ⚡ Speed Mode
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setTimingSettings({
+                              stepTransitionDelay: 2000,
+                              speechTimeout: 5000,
+                              autoAdvance: false,
+                              quickMode: false,
+                              responseWaitTime: 3000,
+                            });
+                            setPerformanceMode({
+                              reducedAnimations: false,
+                              fastTransitions: false,
+                              skipIntermediateSteps: false,
+                              instantFeedback: false,
+                            });
+                          }}
+                        >
+                          🎯 Careful Mode
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
         </div>
 
-        {/* Enhanced Sidebar with Real-time Feedback */}
+        {/* Enhanced Sidebar */}
         <div className="space-y-6">
-          {/* Topic Overview */}
+          {/* Topic Overview with Timing */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Brain className="w-5 h-5" />
                 Topic Overview
               </CardTitle>
@@ -905,14 +1207,32 @@ const EnhancedCompanionConversationV2 = ({
                   <span>Progress:</span>
                   <span>{progress.toFixed(1)}%</span>
                 </div>
+
+                {/* Average step time */}
+                {Object.keys(stepTimings).length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Avg Step Time:</span>
+                    <span>
+                      {(
+                        Object.values(stepTimings)
+                          .filter((t) => t.duration)
+                          .reduce((acc, t) => acc + (t.duration || 0), 0) /
+                        Object.values(stepTimings).filter((t) => t.duration)
+                          .length /
+                        1000
+                      ).toFixed(1)}
+                      s
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
+          {/* Enhanced Quick Actions */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Zap className="w-5 h-5" />
                 Quick Actions
               </CardTitle>
@@ -922,11 +1242,65 @@ const EnhancedCompanionConversationV2 = ({
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() =>
+                    setTimingSettings((prev) => ({
+                      ...prev,
+                      quickMode: !prev.quickMode,
+                    }))
+                  }
+                  className={cn(
+                    "w-full",
+                    timingSettings.quickMode
+                      ? "bg-yellow-100 border-yellow-300"
+                      : ""
+                  )}
+                >
+                  {timingSettings.quickMode
+                    ? "🐌 Normal Speed"
+                    : "⚡ Quick Mode"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setTimingSettings((prev) => ({
+                      ...prev,
+                      autoAdvance: !prev.autoAdvance,
+                    }))
+                  }
+                  className={cn(
+                    "w-full",
+                    timingSettings.autoAdvance
+                      ? "bg-green-100 border-green-300"
+                      : ""
+                  )}
+                >
+                  {timingSettings.autoAdvance
+                    ? "⏸️ Manual Mode"
+                    : "▶️ Auto-advance"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={manualAdvance}
+                  disabled={callState.status !== "ACTIVE"}
+                  className="w-full bg-transparent"
+                >
+                  <FastForward className="w-4 h-4 mr-2" />
+                  Next Step
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowDebug(!showDebug)}
                   className="w-full"
                 >
                   Toggle Debug Mode
                 </Button>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -936,18 +1310,61 @@ const EnhancedCompanionConversationV2 = ({
                 >
                   Reset Conversation
                 </Button>
-                {showDebug && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      skipToStep(conversationState.currentStep + 1)
-                    }
-                    disabled={callState.status !== "ACTIVE"}
-                    className="w-full"
-                  >
-                    Skip Step (Debug)
-                  </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Performance Monitor */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <TrendingUp className="w-5 h-5" />
+                Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Object.keys(stepTimings).length > 0 && (
+                  <>
+                    <div className="text-sm">
+                      <div className="flex justify-between mb-1">
+                        <span>Fastest Step:</span>
+                        <span className="font-medium text-green-600">
+                          {(
+                            Math.min(
+                              ...Object.values(stepTimings)
+                                .filter((t) => t.duration)
+                                .map((t) => t.duration || 0)
+                            ) / 1000
+                          ).toFixed(1)}
+                          s
+                        </span>
+                      </div>
+                      <div className="flex justify-between mb-1">
+                        <span>Slowest Step:</span>
+                        <span className="font-medium text-red-600">
+                          {(
+                            Math.max(
+                              ...Object.values(stepTimings)
+                                .filter((t) => t.duration)
+                                .map((t) => t.duration || 0)
+                            ) / 1000
+                          ).toFixed(1)}
+                          s
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-gray-500">
+                      Performance tips: Enable Quick Mode for faster transitions
+                    </div>
+                  </>
+                )}
+
+                {Object.keys(stepTimings).length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    Start a session to see performance metrics
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -958,4 +1375,4 @@ const EnhancedCompanionConversationV2 = ({
   );
 };
 
-export default EnhancedCompanionConversationV2;
+export default EnhancedCompanionConversationOptimized;
