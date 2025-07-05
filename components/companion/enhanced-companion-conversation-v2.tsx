@@ -30,13 +30,13 @@ import {
   MicOff,
   RotateCcw,
   SkipForward,
-  TrendingUp,
   Target,
   Brain,
   Zap,
   Clock,
   FastForward,
   AlertCircle,
+  MessageSquare,
 } from "lucide-react";
 import type { PodcastTopics, TopicTitles } from "@/types";
 
@@ -150,6 +150,8 @@ const EnhancedCompanionConversationOptimized = ({
     isSpeaking,
     isMuted,
     currentLine,
+    partialTranscript,
+    speechBuffer,
     startCall,
     endCall,
     toggleMute,
@@ -169,26 +171,6 @@ const EnhancedCompanionConversationOptimized = ({
     onSessionComplete: () => {
       handleSessionComplete();
       onTopicComplete?.(currentTopic);
-    },
-    onStepChange: (stepNumber: number) => {
-      const now = Date.now();
-      setStepTimings((prev) => ({
-        ...prev,
-        [stepNumber - 1]: {
-          ...prev[stepNumber - 1],
-          endTime: now,
-          duration: prev[stepNumber - 1]
-            ? now - prev[stepNumber - 1].startTime
-            : 0,
-        },
-        [stepNumber]: {
-          startTime: now,
-        },
-      }));
-
-      if (timingSettings.autoAdvance && !conversationState.isWaitingForUser) {
-        startAutoAdvanceTimer();
-      }
     },
   });
 
@@ -419,7 +401,8 @@ const EnhancedCompanionConversationOptimized = ({
                 {topicTitles[currentTopic]}
               </CardTitle>
               <p className="text-gray-600">
-                Optimized AI Conversation Practice - Fast & Responsive
+                Enhanced AI Conversation Practice - Smart Long Sentence
+                Processing
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -497,6 +480,21 @@ const EnhancedCompanionConversationOptimized = ({
                   </Badge>
                 </div>
               </div>
+
+              {/* ✨ NEW: Partial transcript display */}
+              {partialTranscript && (
+                <div className="p-2 mt-2 border border-yellow-200 rounded bg-yellow-50">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageSquare className="w-3 h-3 text-yellow-600" />
+                    <span className="text-xs font-medium text-yellow-800">
+                      Live Speech
+                    </span>
+                  </div>
+                  <div className="text-xs text-yellow-700">
+                    "{partialTranscript}..."
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -840,6 +838,16 @@ const EnhancedCompanionConversationOptimized = ({
                             >
                               ⚡ CURRENT
                             </Badge>
+
+                            {/* ✨ NEW: Long sentence indicator with processing delay info */}
+                            {currentLine.text.split(/\s+/).length > 10 && (
+                              <Badge
+                                variant="outline"
+                                className="text-blue-700 border-blue-300 bg-blue-50"
+                              >
+                                📏 Long sentence (2s delay)
+                              </Badge>
+                            )}
                           </div>
 
                           {/* Countdown and manual advance */}
@@ -867,7 +875,61 @@ const EnhancedCompanionConversationOptimized = ({
                         <p className="text-lg font-semibold leading-relaxed text-purple-900">
                           {currentLine.text}
                         </p>
+
+                        {/* ✨ NEW: Enhanced word count and processing info for long sentences */}
+                        {currentLine.text.split(/\s+/).length > 10 && (
+                          <div className="mt-2 text-xs text-purple-600">
+                            {currentLine.text.split(/\s+/).length} words •
+                            System waits 2 seconds after you finish speaking •
+                            Minimum 50% completion required
+                          </div>
+                        )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* ✨ NEW: Enhanced live partial transcript display */}
+                  {partialTranscript && conversationState.isWaitingForUser && (
+                    <div className="p-3 border border-blue-200 rounded-lg bg-blue-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-blue-600 animate-pulse" />
+                        <span className="text-sm font-medium text-blue-800">
+                          You're speaking...
+                        </span>
+                        {currentLine &&
+                          currentLine.text.split(/\s+/).length > 10 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-blue-700 bg-blue-100"
+                            >
+                              Processing delay active
+                            </Badge>
+                          )}
+                      </div>
+                      <div className="text-sm text-blue-700">
+                        "{partialTranscript}..."
+                      </div>
+                      <div className="mt-1 text-xs text-blue-600">
+                        {currentLine &&
+                        currentLine.text.split(/\s+/).length > 10
+                          ? "Continue speaking - system will wait 2 seconds after you finish"
+                          : "Continue speaking to complete the sentence"}
+                      </div>
+                      {/* ✨ NEW: Word count progress for long sentences */}
+                      {currentLine &&
+                        currentLine.text.split(/\s+/).length > 10 && (
+                          <div className="mt-1 text-xs text-blue-600">
+                            Progress:{" "}
+                            {partialTranscript.trim().split(/\s+/).length} /{" "}
+                            {currentLine.text.split(/\s+/).length} words (
+                            {Math.round(
+                              (partialTranscript.trim().split(/\s+/).length /
+                                currentLine.text.split(/\s+/).length) *
+                                100
+                            )}
+                            %)
+                          </div>
+                        )}
                     </div>
                   )}
 
@@ -907,13 +969,28 @@ const EnhancedCompanionConversationOptimized = ({
                               {group.messages.some(
                                 (msg: any) => msg.similarity
                               ) && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-xs",
+                                    group.messages.find(
+                                      (msg: any) => msg.similarity
+                                    )?.similarity?.score >= 0.7
+                                      ? "text-green-700 border-green-300 bg-green-50"
+                                      : "text-red-700 border-red-300 bg-red-50"
+                                  )}
+                                >
                                   {Math.round(
                                     group.messages.find(
                                       (msg: any) => msg.similarity
                                     )?.similarity?.score * 100 || 0
                                   )}
-                                  % match
+                                  % match{" "}
+                                  {group.messages.find(
+                                    (msg: any) => msg.similarity
+                                  )?.similarity?.score >= 0.7
+                                    ? "✅"
+                                    : "❌"}
                                 </Badge>
                               )}
                             </div>
@@ -933,10 +1010,21 @@ const EnhancedCompanionConversationOptimized = ({
                                   {message.similarity && (
                                     <div className="mt-1 text-xs text-gray-500">
                                       Similarity:{" "}
-                                      {Math.round(
-                                        message.similarity.score * 100
-                                      )}
-                                      %
+                                      <span
+                                        className={cn(
+                                          "font-medium",
+                                          message.similarity.score >= 0.7
+                                            ? "text-green-600"
+                                            : "text-red-600"
+                                        )}
+                                      >
+                                        {Math.round(
+                                          message.similarity.score * 100
+                                        )}
+                                        %
+                                      </span>
+                                      {message.similarity.score < 0.7 &&
+                                        " (Needs retry)"}
                                     </div>
                                   )}
                                 </div>
@@ -1204,6 +1292,15 @@ const EnhancedCompanionConversationOptimized = ({
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span>Long Sentences:</span>
+                  <span>
+                    {
+                      steps.filter((s) => s.text.split(/\s+/).length > 10)
+                        .length
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span>Progress:</span>
                   <span>{progress.toFixed(1)}%</span>
                 </div>
@@ -1310,62 +1407,6 @@ const EnhancedCompanionConversationOptimized = ({
                 >
                   Reset Conversation
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Performance Monitor */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className="w-5 h-5" />
-                Performance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {Object.keys(stepTimings).length > 0 && (
-                  <>
-                    <div className="text-sm">
-                      <div className="flex justify-between mb-1">
-                        <span>Fastest Step:</span>
-                        <span className="font-medium text-green-600">
-                          {(
-                            Math.min(
-                              ...Object.values(stepTimings)
-                                .filter((t) => t.duration)
-                                .map((t) => t.duration || 0)
-                            ) / 1000
-                          ).toFixed(1)}
-                          s
-                        </span>
-                      </div>
-                      <div className="flex justify-between mb-1">
-                        <span>Slowest Step:</span>
-                        <span className="font-medium text-red-600">
-                          {(
-                            Math.max(
-                              ...Object.values(stepTimings)
-                                .filter((t) => t.duration)
-                                .map((t) => t.duration || 0)
-                            ) / 1000
-                          ).toFixed(1)}
-                          s
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-xs text-gray-500">
-                      Performance tips: Enable Quick Mode for faster transitions
-                    </div>
-                  </>
-                )}
-
-                {Object.keys(stepTimings).length === 0 && (
-                  <p className="text-sm text-gray-500">
-                    Start a session to see performance metrics
-                  </p>
-                )}
               </div>
             </CardContent>
           </Card>
