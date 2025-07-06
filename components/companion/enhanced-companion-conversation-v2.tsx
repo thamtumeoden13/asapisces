@@ -23,6 +23,7 @@ import {
   type TopicKey,
   type CompanionComponentProps,
   CallStatus,
+  TranscriptLine,
 } from "@/types/podcast";
 import soundwaves from "@/constants/soundwaves.json";
 import {
@@ -873,7 +874,17 @@ const EnhancedCompanionConversationOptimized = ({
                           </div>
                         </div>
                         <p className="text-lg font-semibold leading-relaxed text-purple-900">
-                          {currentLine.text}
+                          {/* THAY THẾ DÒNG NÀY */}
+                          {/* {currentLine.text} */}
+                          {/* BẰNG ĐOẠN CODE NÀY ĐỂ XUỐNG DÒNG */}
+                          {currentLine.text
+                            .split(". ")
+                            .map((sentence, index, array) => (
+                              <span key={index} className="block mb-2">
+                                {sentence}
+                                {index < array.length - 1 ? "." : ""}
+                              </span>
+                            ))}
                         </p>
 
                         {/* ✨ NEW: Enhanced word count and processing info for long sentences */}

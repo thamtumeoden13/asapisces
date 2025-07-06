@@ -1,5 +1,5 @@
 export interface TranscriptLine {
-  speaker: string;
+  speaker: string | null;
   text: string;
 }
 

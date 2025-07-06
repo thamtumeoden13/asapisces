@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { vapi } from "@/lib/vapi.sdk";
 import { configureAssistant } from "@/lib/vapi-config";
 import {
@@ -74,6 +74,10 @@ export const useVapiConversation = ({
   const speechBufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastPartialUpdateRef = useRef<number>(0);
   const speechEndDelayRef = useRef<NodeJS.Timeout | null>(null);
+
+  // From Gemini
+  const accumulatedTranscriptRef = useRef<string>("");
+  const finalTranscriptGracePeriodRef = useRef<NodeJS.Timeout | null>(null);
 
   // ✨ ENHANCED: Speech timing and completion tracking with new thresholds
   const speechCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -171,6 +175,35 @@ export const useVapiConversation = ({
     [calculateSpeakingTime]
   );
 
+  // From Gemini
+  const getConversationBlock = (
+    steps: TranscriptLine[],
+    startIndex: number
+  ) => {
+    if (!steps[startIndex]) {
+      return { speaker: null, text: "", endIndex: startIndex };
+    }
+
+    const speaker = steps[startIndex].speaker;
+    let combinedText = "";
+    let endIndex = startIndex;
+
+    for (let i = startIndex; i < steps.length; i++) {
+      if (steps[i].speaker === speaker) {
+        combinedText += steps[i].text + " ";
+        endIndex = i;
+      } else {
+        break;
+      }
+    }
+
+    return {
+      speaker,
+      text: combinedText.trim(), // Toàn bộ kịch bản của khối
+      endIndex, // Chỉ số của dòng cuối cùng trong khối
+    };
+  };
+
   // Update refs when values change
   useEffect(() => {
     currentStepRef.current = conversationState.currentStep;
@@ -187,7 +220,13 @@ export const useVapiConversation = ({
   }, [messages]);
 
   const currentStep = conversationState.currentStep;
-  const currentLine = steps[currentStep] || null;
+  // From Gemini
+  // const currentLine = steps[currentStep] || null;
+  const currentBlock = useMemo(() => {
+    return getConversationBlock(steps, currentStep);
+  }, [steps, currentStep]);
+
+  const currentLine = { speaker: currentBlock.speaker, text: currentBlock.text };
 
   // Update current speaker ref
   useEffect(() => {
@@ -265,11 +304,17 @@ export const useVapiConversation = ({
       }));
 
       if (shouldAdvance) {
+        // From Gemini
         // ✨ ADVANCE: Move to next step
-        console.log("✅ Good score! Moving to next step");
+        console.log("✅ Good score! Moving to the end of the current block.");
+        // TÍNH TOÁN BƯỚC TIẾP THEO
+        const blockInfo = getConversationBlock(steps, stepIndex);
+        const nextStep = blockInfo.endIndex + 1; // Nhảy đến bước sau khi khối kết thúc
+
         setConversationState((prev) => ({
           ...prev,
-          currentStep: prev.currentStep + 1,
+          // currentStep: prev.currentStep + 1,
+          currentStep: nextStep,
           isWaitingForUser: false,
         }));
         resetSimilarityContext(`${companionId}-step-${stepIndex}`);
@@ -512,6 +557,7 @@ export const useVapiConversation = ({
       // ✨ ENHANCED: Handle final transcripts with completeness check
       if (message.transcriptType === "final") {
         // Enhanced guards for user messages
+        // From Gemini
         if (message.role === "user") {
           if (!analysis.shouldProcess) {
             console.log(
@@ -521,8 +567,61 @@ export const useVapiConversation = ({
             return;
           }
 
-          console.log("👤 Processing VALID user transcript:", messageContent);
-          processUserTranscript(message, messageContent);
+          const isLongSentence =
+            currentLine && currentLine.text.split(/\s+/).length > 10;
+
+          // XỬ LÝ NGAY LẬP TỨC VỚI CÂU NGẮN
+          if (!isLongSentence) {
+            console.log("🏃 Short sentence detected, processing immediately.");
+            processTranscriptImmediate(message, messageContent);
+            return;
+          }
+
+          // LOGIC ĐỆM CHO CÂU DÀI
+          console.log("🧠 Long sentence detected, using buffering logic.");
+
+          // 1. Nối bản ghi mới vào bộ đệm
+          accumulatedTranscriptRef.current = (
+            accumulatedTranscriptRef.current +
+            " " +
+            messageContent
+          ).trim();
+          console.log(
+            `📝 Transcript buffer updated: "${accumulatedTranscriptRef.current}"`
+          );
+
+          // Cập nhật giao diện với transcript đang được tích lũy
+          setPartialTranscript(accumulatedTranscriptRef.current);
+
+          // 2. Xóa bộ đếm thời gian cũ nếu có (vì người dùng đã nói tiếp)
+          if (finalTranscriptGracePeriodRef.current) {
+            clearTimeout(finalTranscriptGracePeriodRef.current);
+          }
+
+          // 3. Đặt một bộ đếm thời gian mới
+          const GRACE_PERIOD_MS = 5000; // 2.5 giây. Bạn có thể điều chỉnh con số này.
+          console.log(`⏳ Setting a ${GRACE_PERIOD_MS}ms grace period...`);
+
+          finalTranscriptGracePeriodRef.current = setTimeout(() => {
+            console.log(
+              "⏰ Grace period ended. Evaluating buffered transcript."
+            );
+            const fullTranscript = accumulatedTranscriptRef.current.trim();
+
+            if (fullTranscript) {
+              // Tạo một đối tượng message giả để truyền đi, chứa toàn bộ transcript
+              const combinedMessage = {
+                ...message,
+                transcript: fullTranscript,
+              };
+              processTranscriptImmediate(combinedMessage, fullTranscript);
+            }
+
+            // 4. Dọn dẹp sau khi xử lý
+            accumulatedTranscriptRef.current = "";
+            finalTranscriptGracePeriodRef.current = null;
+            console.log("🧹 Buffer cleared.");
+          }, GRACE_PERIOD_MS);
         }
 
         // Enhanced guards for assistant messages
@@ -909,6 +1008,13 @@ export const useVapiConversation = ({
       speechCompletionTimeoutRef.current = null;
     }
 
+    // From Gemini
+    if (finalTranscriptGracePeriodRef.current) {
+      clearTimeout(finalTranscriptGracePeriodRef.current);
+      finalTranscriptGracePeriodRef.current = null;
+    }
+    accumulatedTranscriptRef.current = ""; // Dọn dẹp buffer
+
     // ✨ NEW: Clear wait timeout
     if (speechWaitTimeoutRef.current) {
       clearTimeout(speechWaitTimeoutRef.current);
@@ -978,29 +1084,33 @@ export const useVapiConversation = ({
       currentTimeoutRef.current = null;
     }
 
+    // From Gemini
     if (
-      currentLine?.speaker === "Leo" &&
+      currentBlock?.speaker === "Leo" &&
       callState.status === CallStatus.ACTIVE
     ) {
-      console.log(`🗣️ Leo speaking (step ${currentStep}):`, currentLine.text);
+      console.log(`🗣️ Leo speaking (step ${currentStep}):`, currentBlock.text);
 
       const speakingTime = sendLeoMessage(currentLine, currentStep);
 
       currentTimeoutRef.current = setTimeout(() => {
         if (!conversationCompletedRef.current) {
+          // TÍNH TOÁN BƯỚC TIẾP THEO
+          const nextStep = currentBlock.endIndex + 1;
           setConversationState((prev) => ({
             ...prev,
-            currentStep: prev.currentStep + 1,
+            // currentStep: prev.currentStep + 1,
+            currentStep: nextStep,
           }));
         }
       }, speakingTime);
     } else if (
-      currentLine?.speaker === "Gwen" &&
+      currentBlock?.speaker === "Gwen" &&
       callState.status === CallStatus.ACTIVE
     ) {
       console.log(
         `👤 Waiting for user (step ${currentStep}):`,
-        currentLine.text
+        currentBlock.text
       );
 
       setIsSpeaking(false);
@@ -1021,14 +1131,14 @@ export const useVapiConversation = ({
       setConversationState((prev) => ({
         ...prev,
         isWaitingForUser: true,
-        feedback: `🎯 Your turn: "${currentLine.text}"`,
+        feedback: `🎯 Your turn: "${currentBlock.text}"`,
       }));
 
       setTimeout(() => {
         console.log("✅ Ready for user input - State updated");
       }, 100);
     }
-  }, [currentStep, currentLine, callState.status, sendLeoMessage]);
+  }, [currentStep, currentBlock, callState.status, sendLeoMessage]);
 
   // Check for conversation completion
   useEffect(() => {
@@ -1132,6 +1242,13 @@ export const useVapiConversation = ({
       speechCompletionTimeoutRef.current = null;
     }
 
+    // From Gemini
+    if (finalTranscriptGracePeriodRef.current) {
+      clearTimeout(finalTranscriptGracePeriodRef.current);
+      finalTranscriptGracePeriodRef.current = null;
+    }
+    accumulatedTranscriptRef.current = ""; // Dọn dẹp buffer
+
     // ✨ NEW: Clear wait timeout
     if (speechWaitTimeoutRef.current) {
       clearTimeout(speechWaitTimeoutRef.current);
@@ -1177,6 +1294,13 @@ export const useVapiConversation = ({
       clearTimeout(speechCompletionTimeoutRef.current);
       speechCompletionTimeoutRef.current = null;
     }
+
+    // From Gemini
+    if (finalTranscriptGracePeriodRef.current) {
+      clearTimeout(finalTranscriptGracePeriodRef.current);
+      finalTranscriptGracePeriodRef.current = null;
+    }
+    accumulatedTranscriptRef.current = ""; // Dọn dẹp buffer
 
     // ✨ NEW: Clear wait timeout
     if (speechWaitTimeoutRef.current) {
@@ -1244,6 +1368,13 @@ export const useVapiConversation = ({
           speechCompletionTimeoutRef.current = null;
         }
 
+        // From Gemini
+        if (finalTranscriptGracePeriodRef.current) {
+          clearTimeout(finalTranscriptGracePeriodRef.current);
+          finalTranscriptGracePeriodRef.current = null;
+        }
+        accumulatedTranscriptRef.current = ""; // Dọn dẹp buffer
+
         // ✨ NEW: Clear wait timeout
         if (speechWaitTimeoutRef.current) {
           clearTimeout(speechWaitTimeoutRef.current);
@@ -1298,6 +1429,13 @@ export const useVapiConversation = ({
       clearTimeout(speechCompletionTimeoutRef.current);
       speechCompletionTimeoutRef.current = null;
     }
+
+    // From Gemini
+    if (finalTranscriptGracePeriodRef.current) {
+      clearTimeout(finalTranscriptGracePeriodRef.current);
+      finalTranscriptGracePeriodRef.current = null;
+    }
+    accumulatedTranscriptRef.current = ""; // Dọn dẹp buffer
 
     // ✨ NEW: Clear wait timeout
     if (speechWaitTimeoutRef.current) {
