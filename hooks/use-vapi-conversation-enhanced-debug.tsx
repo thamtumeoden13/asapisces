@@ -16,6 +16,7 @@ import type {
   TranscriptLine,
 } from "@/types/podcast";
 import { CallStatus } from "@/types/podcast";
+import { TimingSettings } from "@/types";
 
 interface UseVapiConversationProps {
   steps: TranscriptLine[];
@@ -25,6 +26,7 @@ interface UseVapiConversationProps {
   style: string;
   voice: string;
   onSessionComplete?: () => void;
+  timingSettings?: Partial<TimingSettings>;
 }
 
 export const useVapiConversation = ({
@@ -35,7 +37,18 @@ export const useVapiConversation = ({
   style,
   voice,
   onSessionComplete,
+  timingSettings = {},
 }: UseVapiConversationProps) => {
+  // THIẾT LẬP GIÁ TRỊ MẶC ĐỊNH
+  const resolvedTimingSettings: TimingSettings = {
+    stepTransitionDelay: 1000,
+    speechTimeout: 3000,
+    autoAdvance: true,
+    quickMode: false,
+    responseWaitTime: 2500, // Giá trị mặc định cho grace period
+    ...timingSettings, // Ghi đè bằng các giá trị được truyền vào
+  };
+
   const [callState, setCallState] = useState<VapiCallState>({
     status: CallStatus.INACTIVE,
   });
@@ -108,6 +121,7 @@ export const useVapiConversation = ({
   const sessionCompleteCalledRef = useRef(false);
   const currentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingUserInputRef = useRef(false);
+  const isAwaitingAIRef = useRef(false); // THÊM DÒNG NÀY
   const lastSimilarityResultRef = useRef<any>(null);
   const currentUserSpeechRef = useRef<string>("");
   const speechEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -176,33 +190,62 @@ export const useVapiConversation = ({
   );
 
   // From Gemini
-  const getConversationBlock = (
-    steps: TranscriptLine[],
-    startIndex: number
-  ) => {
-    if (!steps[startIndex]) {
-      return { speaker: null, text: "", endIndex: startIndex };
-    }
-
-    const speaker = steps[startIndex].speaker;
-    let combinedText = "";
-    let endIndex = startIndex;
-
-    for (let i = startIndex; i < steps.length; i++) {
-      if (steps[i].speaker === speaker) {
-        combinedText += steps[i].text + " ";
-        endIndex = i;
-      } else {
-        break;
+  const getConversationBlock = useCallback(
+    (
+      steps: TranscriptLine[],
+      startIndex: number,
+      options: { maxWords?: number } = {}
+    ) => {
+      if (!steps[startIndex]) {
+        return { speaker: null, text: "", endIndex: startIndex, wordCount: 0 };
       }
-    }
 
-    return {
-      speaker,
-      text: combinedText.trim(), // Toàn bộ kịch bản của khối
-      endIndex, // Chỉ số của dòng cuối cùng trong khối
-    };
-  };
+      const speaker = steps[startIndex].speaker;
+      let combinedText = "";
+      let wordCount = 0;
+      let endIndex = startIndex - 1; // Bắt đầu từ -1 so với startIndex
+
+      for (let i = startIndex; i < steps.length; i++) {
+        // Dừng lại nếu người nói thay đổi
+        if (steps[i].speaker !== speaker) {
+          break;
+        }
+
+        const currentLineText = steps[i].text;
+        const currentLineWordCount = currentLineText.split(/\s+/).length;
+
+        // KIỂM TRA GIỚI HẠN TỪ (chỉ áp dụng nếu có options.maxWords)
+        if (
+          options.maxWords &&
+          wordCount + currentLineWordCount > options.maxWords &&
+          wordCount > 0
+        ) {
+          // Dừng lại TRƯỚC khi thêm dòng này nếu nó làm tràn bộ đệm
+          // và bộ đệm đã có nội dung.
+          break;
+        }
+
+        // Nếu không bị giới hạn, thêm dòng hiện tại vào khối
+        combinedText += currentLineText + " ";
+        wordCount += currentLineWordCount;
+        endIndex = i;
+
+        // Dừng lại NẾU chỉ cần xử lý một dòng mà dòng đó đã vượt quá giới hạn
+        // (trường hợp một câu đơn lẻ đã rất dài)
+        if (options.maxWords && wordCount > options.maxWords) {
+          break;
+        }
+      }
+
+      return {
+        speaker,
+        text: combinedText.trim(),
+        endIndex, // Chỉ số của dòng cuối cùng trong khối đã được xử lý
+        wordCount,
+      };
+    },
+    []
+  );
 
   // Update refs when values change
   useEffect(() => {
@@ -222,11 +265,27 @@ export const useVapiConversation = ({
   const currentStep = conversationState.currentStep;
   // From Gemini
   // const currentLine = steps[currentStep] || null;
-  const currentBlock = useMemo(() => {
-    return getConversationBlock(steps, currentStep);
-  }, [steps, currentStep]);
 
-  const currentLine = { speaker: currentBlock.speaker, text: currentBlock.text };
+  // SỬA ĐỔI LOGIC TÍNH TOÁN currentBlock
+  const currentBlock = useMemo(() => {
+    const speaker = steps[currentStep]?.speaker;
+
+    if (speaker === "Gwen") {
+      // Áp dụng giới hạn 20 từ cho người dùng
+      return getConversationBlock(steps, currentStep, { maxWords: 20 });
+    }
+
+    // Không áp dụng giới hạn cho AI (Leo)
+    return getConversationBlock(steps, currentStep);
+  }, [steps, currentStep, getConversationBlock]);
+
+  const currentLine = useMemo(
+    () => ({
+      speaker: currentBlock.speaker,
+      text: currentBlock.text,
+    }),
+    [currentBlock.speaker, currentBlock.text]
+  );
 
   // Update current speaker ref
   useEffect(() => {
@@ -291,7 +350,7 @@ export const useVapiConversation = ({
 
       // ✨ CHANGED: Use 0.7 threshold instead of 0.5
       const shouldAdvance = similarityResult.score >= 0.7;
-      const currentStepLine = steps[stepIndex];
+      // const currentStepLine = steps[stepIndex];
 
       console.log(
         `📊 Final evaluation for step ${stepIndex}: ${similarityResult.score.toFixed(2)} (${shouldAdvance ? "ADVANCE" : "RETRY"})`
@@ -307,6 +366,8 @@ export const useVapiConversation = ({
         // From Gemini
         // ✨ ADVANCE: Move to next step
         console.log("✅ Good score! Moving to the end of the current block.");
+        isAwaitingAIRef.current = true; // 🚩🚩🚩 ĐẶT CỜ Ở ĐÂY 🚩🚩🚩
+        console.log("🚫 User input is now locked until AI finishes.");
         // TÍNH TOÁN BƯỚC TIẾP THEO
         const blockInfo = getConversationBlock(steps, stepIndex);
         const nextStep = blockInfo.endIndex + 1; // Nhảy đến bước sau khi khối kết thúc
@@ -328,7 +389,7 @@ export const useVapiConversation = ({
 
         // Create Leo's retry message with context about partial speech
         const randomRetryMessage = generateRetryMessage(
-          currentStepLine?.text || "",
+          currentLine?.text || "",
           similarityResult.score,
           partialTranscript
         );
@@ -344,11 +405,21 @@ export const useVapiConversation = ({
           sendLeoMessage(leoRetryLine, stepIndex);
 
           // After Leo speaks, set waiting for user again
+
+          // ================================================================
+          // ✨✨✨ ĐÂY LÀ CHỖ CẦN THÊM CODE ✨✨✨
+          console.log(
+            `🔄 Resetting similarity context for retry on step ${stepIndex}`
+          );
+          const contextId = `${companionId}-step-${stepIndex}`;
+          resetSimilarityContext(contextId);
+          // ================================================================
+
           setTimeout(() => {
             setConversationState((prev) => ({
               ...prev,
               isWaitingForUser: true,
-              feedback: `🎯 Try the complete sentence: "${currentStepLine?.text}"`,
+              feedback: `🎯 Try the complete sentence: "${currentLine?.text}"`,
             }));
 
             // Clear the evaluation key so user can try again
@@ -559,6 +630,16 @@ export const useVapiConversation = ({
         // Enhanced guards for user messages
         // From Gemini
         if (message.role === "user") {
+          // 🚩🚩🚩 THÊM LỚP BẢO VỆ NÀY 🚩🚩🚩
+          if (isAwaitingAIRef.current) {
+            console.log(
+              "🚫 Ignoring user transcript - System is awaiting AI response.",
+              messageContent
+            );
+            return;
+          }
+          // 🚩🚩🚩 KẾT THÚC LỚP BẢO VỆ 🚩🚩🚩
+
           if (!analysis.shouldProcess) {
             console.log(
               `🚫 Ignoring user transcript - ${analysis.reason}:`,
@@ -599,8 +680,11 @@ export const useVapiConversation = ({
           }
 
           // 3. Đặt một bộ đếm thời gian mới
-          const GRACE_PERIOD_MS = 5000; // 2.5 giây. Bạn có thể điều chỉnh con số này.
-          console.log(`⏳ Setting a ${GRACE_PERIOD_MS}ms grace period...`);
+          // const GRACE_PERIOD_MS = 5000; // 2.5 giây. Bạn có thể điều chỉnh con số này.
+          const GRACE_PERIOD_MS = resolvedTimingSettings.responseWaitTime;
+          console.log(
+            `⏳ Setting a ${GRACE_PERIOD_MS}ms grace period (user setting)...`
+          );
 
           finalTranscriptGracePeriodRef.current = setTimeout(() => {
             console.log(
@@ -1092,6 +1176,12 @@ export const useVapiConversation = ({
       console.log(`🗣️ Leo speaking (step ${currentStep}):`, currentBlock.text);
 
       const speakingTime = sendLeoMessage(currentLine, currentStep);
+      // Tổng thời gian chờ = thời gian nói + độ trễ chuyển bước
+      const totalWaitTime =
+        speakingTime + resolvedTimingSettings.stepTransitionDelay;
+      console.log(
+        `🎤 Leo speaking (${speakingTime}ms) + delay (${resolvedTimingSettings.stepTransitionDelay}ms) = total wait ${totalWaitTime}ms`
+      );
 
       currentTimeoutRef.current = setTimeout(() => {
         if (!conversationCompletedRef.current) {
@@ -1103,7 +1193,7 @@ export const useVapiConversation = ({
             currentStep: nextStep,
           }));
         }
-      }, speakingTime);
+      }, totalWaitTime);
     } else if (
       currentBlock?.speaker === "Gwen" &&
       callState.status === CallStatus.ACTIVE
@@ -1127,6 +1217,10 @@ export const useVapiConversation = ({
         clearTimeout(speechWaitTimeoutRef.current);
         speechWaitTimeoutRef.current = null;
       }
+
+      // 🚩🚩🚩 HẠ CỜ Ở ĐÂY KHI CHUẨN BỊ LẮNG NGHE LẠI 🚩🚩🚩
+      isAwaitingAIRef.current = false;
+      console.log("✅ User input is now unlocked. Ready to listen.");
 
       setConversationState((prev) => ({
         ...prev,

@@ -40,6 +40,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import type { PodcastTopics, TopicTitles } from "@/types";
+import { createLanguageFeedback } from "@/lib/actions/general.action";
 
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -85,7 +86,7 @@ const EnhancedCompanionConversationOptimized = ({
     speechTimeout: 3000,
     autoAdvance: true,
     quickMode: false,
-    responseWaitTime: 2000,
+    responseWaitTime: 5000,
   });
 
   // Performance State
@@ -111,6 +112,10 @@ const EnhancedCompanionConversationOptimized = ({
     confidenceLevel: 0,
     speechClarity: 0,
   });
+
+  // THÊM CÁC STATE NÀY
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null); // Kiểu 'any' để đơn giản, bạn có thể dùng kiểu từ schema
 
   const [activeTab, setActiveTab] = useState<
     "conversation" | "feedback" | "analytics" | "settings"
@@ -170,9 +175,10 @@ const EnhancedCompanionConversationOptimized = ({
     style,
     voice,
     onSessionComplete: () => {
-      handleSessionComplete();
+      handleSessionComplete(messages, steps);
       onTopicComplete?.(currentTopic);
     },
+    timingSettings, // Pass timing settings to the hook
   });
 
   // ✨ NEW: Debug state tracking
@@ -296,18 +302,42 @@ const EnhancedCompanionConversationOptimized = ({
   ]);
 
   // Handle session completion
-  const handleSessionComplete = useCallback(() => {
-    if (currentSessionId) {
-      const insights = analytics.current.endSession(currentSessionId);
-      setSessionInsights(insights);
-      setCurrentSessionId(null);
-    }
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
-      setCountdown(null);
-    }
-  }, [currentSessionId]);
 
+  const handleSessionComplete = useCallback(
+    async (
+      finalMessages: Array<{ role: "user" | "assistant"; content: string }>,
+      script: Array<{ speaker: string; text: string }>
+    ) => {
+      console.log("🎉 Session complete! Generating feedback...");
+      setIsGeneratingFeedback(true);
+      setSessionFeedback(null);
+      setActiveTab("feedback"); // Tự động chuyển đến tab feedback
+
+      // Chuẩn bị dữ liệu cho hàm feedback
+      const feedbackParams = {
+        sessionId: `${companionId}-${currentTopic}`,
+        userId: "current-user-id", // Thay thế bằng ID người dùng thực tế
+        transcript: finalMessages.filter((msg) => msg.content.trim() !== ""), // Lọc tin nhắn rỗng
+        script: script,
+      };
+
+      const result = await createLanguageFeedback(feedbackParams);
+
+      if (result.success && result.feedback) {
+        console.log("✅ Feedback received:", result.feedback);
+        setSessionFeedback(result.feedback);
+      } else {
+        console.error("❌ Failed to generate feedback.");
+        // Có thể hiển thị thông báo lỗi cho người dùng
+        setSessionFeedback({
+          error: "Could not generate feedback at this time.",
+        });
+      }
+
+      setIsGeneratingFeedback(false);
+    },
+    [companionId, currentTopic]
+  ); // Thêm dependencies
   // Throttled message handling to reduce re-renders
   useEffect(() => {
     const latestMessage = messages[0];
@@ -389,6 +419,12 @@ const EnhancedCompanionConversationOptimized = ({
     if (value >= 60) return "text-yellow-600";
     return "text-red-600";
   };
+
+  console.log(
+    `[UI RENDER] Step: ${conversationState.currentStep}`,
+    `Speaker: ${currentLine?.speaker}`,
+    `Line: "${currentLine?.text.substring(0, 30)}..."`
+  );
 
   return (
     <div className="max-w-6xl p-6 mx-auto space-y-6">
@@ -1049,10 +1085,92 @@ const EnhancedCompanionConversationOptimized = ({
                 </TabsContent>
 
                 {/* Other tabs remain the same... */}
-                <TabsContent value="feedback" className="space-y-4">
-                  <p className="py-8 text-center text-gray-500">
-                    Feedback content...
-                  </p>
+                <TabsContent
+                  value="feedback"
+                  className="p-4 space-y-4 border rounded-md bg-gray-50"
+                >
+                  {isGeneratingFeedback && (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <div className="w-8 h-8 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+                      <p className="mt-4 text-gray-600">
+                        AI is analyzing your conversation...
+                      </p>
+                    </div>
+                  )}
+
+                  {!isGeneratingFeedback && !sessionFeedback && (
+                    <p className="py-8 text-center text-gray-500">
+                      Complete a session to receive your feedback.
+                    </p>
+                  )}
+
+                  {sessionFeedback && !sessionFeedback.error && (
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-800">
+                          Conversation Feedback
+                        </h3>
+                        <p className="text-gray-600">
+                          {sessionFeedback.finalAssessment}
+                        </p>
+                      </div>
+
+                      {/* Scores */}
+                      <div className="p-4 bg-white border rounded-lg">
+                        <h4 className="mb-2 font-semibold">
+                          Overall Score: {sessionFeedback.totalScore}/100
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3 lg:grid-cols-5">
+                          {Object.entries(sessionFeedback.categoryScores).map(
+                            ([key, value]) => (
+                              <div key={key} className="text-center">
+                                <p className="text-lg font-bold text-blue-600">
+                                  {value as number}
+                                </p>
+                                <p className="text-xs font-medium text-gray-500 capitalize">
+                                  {key}
+                                </p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Strengths and Improvements */}
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <div className="p-4 border-l-4 border-green-500 rounded-r-lg bg-green-50">
+                          <h4 className="mb-2 font-semibold text-green-800">
+                            👍 Strengths
+                          </h4>
+                          <ul className="space-y-1 text-green-700 list-disc list-inside">
+                            {sessionFeedback.strengths.map(
+                              (item: string, index: number) => (
+                                <li key={index} className="text-green-950">{item}</li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                        <div className="p-4 border-l-4 border-yellow-500 rounded-r-lg bg-yellow-50">
+                          <h4 className="mb-2 font-semibold text-yellow-800">
+                            🎯 Areas for Improvement
+                          </h4>
+                          <ul className="space-y-1 text-yellow-700 list-disc list-inside">
+                            {sessionFeedback.areasForImprovement.map(
+                              (item: string, index: number) => (
+                                <li key={index} className="text-yellow-950">{item}</li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {sessionFeedback?.error && (
+                    <p className="py-8 text-center text-red-500">
+                      {sessionFeedback.error}
+                    </p>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-4">

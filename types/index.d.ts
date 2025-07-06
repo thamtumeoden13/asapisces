@@ -375,3 +375,11 @@ export interface ProcessorOptions {
   caseSensitive?: boolean;
   enableScoring?: boolean;
 }
+
+export interface TimingSettings {
+  stepTransitionDelay: number;
+  speechTimeout: number; // Có thể dùng cho tương lai
+  autoAdvance: boolean; // Có thể dùng cho tương lai
+  quickMode: boolean; // Có thể dùng cho tương lai
+  responseWaitTime: number; // Đây là giá trị quan trọng nhất: GRACE_PERIOD_MS
+}

@@ -1533,3 +1533,45 @@ export const recentSessions = [
     color: "#C8FFDF",
   },
 ];
+
+
+// 1. ĐỊNH NGHĨA SCHEMA MỚI CHO FEEDBACK HỌC NGÔN NGỮ
+export const languageFeedbackSchema = z.object({
+  totalScore: z
+    .number()
+    .describe(
+      "Overall score from 0 to 100, calculated as the average of category scores."
+    ),
+  categoryScores: z.object({
+    pronunciation: z
+      .number()
+      .describe("Pronunciation and clarity score from 0 to 100."),
+    fluency: z
+      .number()
+      .describe(
+        "Fluency and rhythm score from 0 to 100. How natural the speech sounds."
+      ),
+    grammar: z.number().describe("Grammar accuracy score from 0 to 100."),
+    vocabulary: z
+      .number()
+      .describe(
+        "Vocabulary usage score, including the use of appropriate words, from 0 to 100."
+      ),
+    completion: z
+      .number()
+      .describe(
+        "Task completion score, how well the user followed the script, from 0 to 100."
+      ),
+  }),
+  strengths: z
+    .array(z.string())
+    .describe("List of 2-3 key strengths observed during the conversation."),
+  areasForImprovement: z
+    .array(z.string())
+    .describe(
+      "List of 2-3 specific areas for improvement with examples from the transcript."
+    ),
+  finalAssessment: z
+    .string()
+    .describe("A concise, encouraging final summary for the learner."),
+});

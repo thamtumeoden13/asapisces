@@ -1,6 +1,6 @@
 "use server";
 
-import { feedbackSchema } from "@/constants";
+import { feedbackSchema, languageFeedbackSchema } from "@/constants";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { supabase } from "../supabase/server";
@@ -187,4 +187,106 @@ export async function getFeedbackByInterviewId(
     finalAssessment: data?.final_assessment,
     createdAt: data?.created_at,
   } as Feedback;
+}
+
+// Định nghĩa kiểu cho params
+interface CreateLanguageFeedbackParams {
+  sessionId: string; // Có thể là companionId + topic
+  userId: string; // ID của người dùng
+  transcript: Array<{ role: "user" | "assistant"; content: string }>; // Lịch sử tin nhắn
+  script: Array<{ speaker: string; text: string }>; // Kịch bản gốc để so sánh
+}
+
+// 2. SỬA ĐỔI HÀM createFeedback
+export async function createLanguageFeedback(
+  params: CreateLanguageFeedbackParams
+) {
+  const { sessionId, userId, transcript, script } = params;
+
+  try {
+    // Định dạng transcript và kịch bản để gửi cho AI
+    const formattedTranscript = transcript
+      .map(
+        (msg: { role: string; content: string }) =>
+          `- ${msg.role === "user" ? "Learner" : "AI Companion"}: ${msg.content}`
+      )
+      .join("\n");
+
+    const formattedScript = script
+      .map(
+        (line: { speaker: string; text: string }) =>
+          `- ${line.speaker === "Gwen" ? "Learner (Expected)" : "AI Companion"}: ${line.text}`
+      )
+      .join("\n");
+
+    const { object: feedbackData } = await generateObject({
+      model: google("gemini-1.5-flash-latest"), // Sử dụng model mới hơn nếu có thể
+      schema: languageFeedbackSchema,
+      prompt: `
+        You are an expert AI English tutor. Your task is to provide constructive and encouraging feedback to a student who has just completed a conversation practice session.
+
+        Here is the original script they were supposed to follow:
+        --- SCRIPT ---
+        ${formattedScript}
+        --- END SCRIPT ---
+
+        Here is the actual conversation transcript:
+        --- TRANSCRIPT ---
+        ${formattedTranscript}
+        --- END TRANSCRIPT ---
+
+        Please evaluate the learner's performance based on the provided script and transcript.
+        Analyze their speech for the following categories and provide a score from 0 to 100 for each.
+        - **Pronunciation**: How clear and accurate was their pronunciation?
+        - **Fluency**: Did their speech flow naturally, or was it hesitant and choppy?
+        - **Grammar**: Were there any grammatical mistakes? (e.g., subject-verb agreement, tenses).
+        - **Vocabulary**: Did they use appropriate words?
+        - **Completion**: How well did they stick to the provided script? (A low score here isn't necessarily bad if they were creative, but note it).
+
+        For 'strengths' and 'areasForImprovement', be specific and use examples from their speech. Keep the tone positive and motivational.
+      `,
+      system:
+        "You are an AI English language tutor providing feedback on a practice conversation.",
+    });
+
+    console.log("✅ AI Feedback Generated:", feedbackData);
+
+    // Lưu vào Supabase (logic này bạn có thể giữ nguyên hoặc điều chỉnh)
+    /*
+    const { data, error } = await supabase
+      .from("language_feedbacks") // Có thể là một bảng mới
+      .insert([
+        {
+          session_id: sessionId,
+          user_id: userId,
+          total_score: feedbackData.totalScore,
+          category_scores: feedbackData.categoryScores,
+          strengths: feedbackData.strengths,
+          areas_for_improvement: feedbackData.areasForImprovement,
+          final_assessment: feedbackData.finalAssessment,
+        },
+      ])
+      .select("id");
+
+    if (error) {
+      console.error("Supabase error:", error);
+      return { success: false, feedback: null };
+    }
+
+    return {
+      success: true,
+      feedback: feedbackData, // Trả về cả dữ liệu feedback
+      feedbackId: data?.[0]?.id,
+    };
+    */
+
+    // Tạm thời trả về dữ liệu mà không lưu DB để test
+    return {
+      success: true,
+      feedback: feedbackData,
+    };
+  } catch (error) {
+    console.error("Error generating feedback:", error);
+    return { success: false, feedback: null };
+  }
 }
