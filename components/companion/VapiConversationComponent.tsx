@@ -11,13 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import EnhancedCompanionConversationV2 from "@/components/companion/enhanced-companion-conversation-v3";
+import EnhancedCompanionConversationV2 from "@/components/companion/enhanced-companion-conversation-v2";
 // import { podcastTopics, topicTitles } from "@/data/podcast-topics";
 import type { TopicKey } from "@/types/podcast";
 import { BookOpen, Users, Target, TrendingUp } from "lucide-react";
 import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
 
-const ConversationComponent = ({
+const VapiConversationComponent = ({
   companionId,
   subject,
   topic,
@@ -321,4 +321,4 @@ const ConversationComponent = ({
   );
 };
 
-export default ConversationComponent;
+export default VapiConversationComponent;

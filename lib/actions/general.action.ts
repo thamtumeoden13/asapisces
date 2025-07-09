@@ -220,7 +220,7 @@ export async function createLanguageFeedback(
       .join("\n");
 
     const { object: feedbackData } = await generateObject({
-      model: google("gemini-1.5-flash-latest"), // Sử dụng model mới hơn nếu có thể
+      model: google("gemini-2.5-pro"), // Sử dụng model mới hơn nếu có thể
       schema: languageFeedbackSchema,
       prompt: `
         You are an expert AI English tutor. Your task is to provide constructive and encouraging feedback to a student who has just completed a conversation practice session.

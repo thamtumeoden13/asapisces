@@ -19,6 +19,7 @@
   "dependencies": {
     "@ai-sdk/google": "^1.2.19",
     "@auth/supabase-adapter": "^1.9.1",
+    "@deepgram/sdk": "^4.7.0",
     "@emailjs/browser": "^4.4.1",
     "@fullcalendar/core": "^6.1.17",
     "@fullcalendar/daygrid": "^6.1.17",
@@ -60,6 +61,7 @@
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.44.2",
     "easymde": "^2.18.0",
+    "elevenlabs": "^1.59.0",
     "embla-carousel-autoplay": "^8.5.1",
     "embla-carousel-react": "^8.5.1",
     "firebase-admin": "^13.4.0",
