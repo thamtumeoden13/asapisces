@@ -170,7 +170,6 @@ const EnhancedCompanionConversationOptimized = ({
     audioPlayerRef,
   } = useConversation({
     steps,
-    voiceId: "21m00Tcm4TlvDq8ikWAM",
     companionId,
     onSessionComplete: () => {
       handleSessionComplete(messages, steps);
@@ -1434,7 +1433,7 @@ const EnhancedCompanionConversationOptimized = ({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Progress:</span>
-                  <span>{progress.toFixed(1)}%</span>
+                  {/* <span>{progress.toFixed(1)}%</span> */}
                 </div>
 
                 {/* Average step time */}
