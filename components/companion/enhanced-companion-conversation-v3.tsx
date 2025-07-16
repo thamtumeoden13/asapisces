@@ -134,7 +134,7 @@ const EnhancedCompanionConversationOptimized = ({
   const voiceRecognition = useRef(
     new EnhancedVoiceRecognition({
       language: "en-US",
-      sensitivity: 0.7,
+      sensitivity: 6,
       noiseReduction: true,
       adaptiveThreshold: true,
       contextAware: true,
@@ -346,10 +346,10 @@ const EnhancedCompanionConversationOptimized = ({
     ) {
       requestAnimationFrame(() => {
         const mockMetrics: SpeechQualityMetrics = {
-          clarity: Math.random() * 0.3 + 0.7,
+          clarity: Math.random() * 0.3 + 0.6,
           pace: Math.random() * 0.4 + 0.6,
           volume: Math.random() * 0.2 + 0.8,
-          pronunciation: Math.random() * 0.3 + 0.7,
+          pronunciation: Math.random() * 0.3 + 0.6,
           fluency: Math.random() * 0.4 + 0.6,
         };
 
@@ -1020,7 +1020,7 @@ const EnhancedCompanionConversationOptimized = ({
                                     "text-xs",
                                     group.messages.find(
                                       (msg: any) => msg.similarity
-                                    )?.similarity?.score >= 0.7
+                                    )?.similarity?.score >= 0.6
                                       ? "text-green-700 border-green-300 bg-green-50"
                                       : "text-red-700 border-red-300 bg-red-50"
                                   )}
@@ -1033,7 +1033,7 @@ const EnhancedCompanionConversationOptimized = ({
                                   % match{" "}
                                   {group.messages.find(
                                     (msg: any) => msg.similarity
-                                  )?.similarity?.score >= 0.7
+                                  )?.similarity?.score >= 0.6
                                     ? "✅"
                                     : "❌"}
                                 </Badge>
@@ -1058,7 +1058,7 @@ const EnhancedCompanionConversationOptimized = ({
                                       <span
                                         className={cn(
                                           "font-medium",
-                                          message.similarity.score >= 0.7
+                                          message.similarity.score >= 0.6
                                             ? "text-green-600"
                                             : "text-red-600"
                                         )}
@@ -1068,7 +1068,7 @@ const EnhancedCompanionConversationOptimized = ({
                                         )}
                                         %
                                       </span>
-                                      {message.similarity.score < 0.7 &&
+                                      {message.similarity.score < 0.6 &&
                                         " (Needs retry)"}
                                     </div>
                                   )}
