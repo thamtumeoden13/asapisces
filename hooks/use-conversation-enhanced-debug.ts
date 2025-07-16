@@ -23,6 +23,10 @@ interface UseConversationProps {
   onSessionComplete?: () => void;
 }
 
+const LONG_SENTENCE_WORD_THRESHOLD = 8; // <-- GIẢM từ 15 xuống 8 từ
+const SHORT_SENTENCE_GRACE_PERIOD_MS = 1200; // <-- 1.2 giây cho câu ngắn
+const LONG_SENTENCE_GRACE_PERIOD_MS = 3500; // <-- TĂNG lên 3.5 giây cho câu dài
+
 export const useConversation = ({
   steps,
   onSessionComplete,
@@ -115,29 +119,54 @@ export const useConversation = ({
 
   const handleUserSpeech = useCallback(
     async (transcript: string) => {
-      // 1. Hàm nội bộ để xử lý sau khi đã có bản ghi cuối cùng
-      const process = async (finalTranscript: string) => {
-        if (processingUserInputRef.current) return;
+      const messageContent = transcript.trim();
+      if (!messageContent) return;
+
+      // Lấy stepIndex ngay từ đầu từ ref để có giá trị mới nhất
+      const stepIndex = currentStepRef.current;
+      const expectedLine = steps[stepIndex];
+      if (!expectedLine || expectedLine.speaker !== "Gwen") return;
+
+      // --- LOGIC GOM CÂU DÀI ---
+      const isLongSentence =
+        expectedLine.text.split(/\s+/).length > LONG_SENTENCE_WORD_THRESHOLD;
+
+      // Gom transcript vào bộ đệm
+      accumulatedTranscriptRef.current = (
+        accumulatedTranscriptRef.current +
+        " " +
+        messageContent
+      ).trim();
+      setPartialTranscript(accumulatedTranscriptRef.current);
+
+      // Xóa timer cũ
+      if (finalTranscriptGracePeriodRef.current)
+        clearTimeout(finalTranscriptGracePeriodRef.current);
+
+      // Nếu là câu ngắn, chúng ta vẫn cần một grace period nhỏ để xử lý các final transcript đến nhanh
+      const gracePeriod = isLongSentence
+        ? LONG_SENTENCE_GRACE_PERIOD_MS
+        : SHORT_SENTENCE_GRACE_PERIOD_MS;
+
+      finalTranscriptGracePeriodRef.current = setTimeout(async () => {
+        const fullTranscript = accumulatedTranscriptRef.current.trim();
+        accumulatedTranscriptRef.current = ""; // Dọn dẹp ngay lập tức
+
+        if (!fullTranscript || processingUserInputRef.current) return;
+
+        console.log("before update processing is true");
         processingUserInputRef.current = true;
 
-        // Dọn dẹp bộ đệm ngay lập tức để không bị ảnh hưởng bởi các lần gọi sau
-        accumulatedTranscriptRef.current = "";
-        if (finalTranscriptGracePeriodRef.current)
-          clearTimeout(finalTranscriptGracePeriodRef.current);
-
-        const stepIndex = currentStepRef.current;
-        const expectedLine = steps[stepIndex];
-
-        // Tính toán độ tương đồng
+        // --- Bắt đầu logic xử lý (trước đây nằm trong `process`) ---
         const similarityResult = calculateAdvancedSimilarity(
-          finalTranscript,
+          fullTranscript,
           expectedLine.text,
           `step-${stepIndex}`
         );
         setMessages((prev) => [
           {
             role: "user",
-            content: finalTranscript,
+            content: fullTranscript,
             timestamp: Date.now(),
             similarity: similarityResult,
           },
@@ -147,6 +176,7 @@ export const useConversation = ({
 
         const shouldAdvance = similarityResult.score >= 0.6;
         isAwaitingAIRef.current = true; // Khóa input cho lượt nói tiếp theo của AI
+        isWaitingForUserRef.current = false; // Đặt lại trạng thái chờ người dùng
 
         if (shouldAdvance) {
           console.log(`✅ Good score on step ${stepIndex}. Advancing.`);
@@ -164,58 +194,35 @@ export const useConversation = ({
             ...prev,
           ]);
 
-          await speakAI(retryMsg); // Chờ AI nói xong
+          await speakAI(retryMsg);
 
-          resetSimilarityContext(`step-${stepIndex}`);
-          // Trigger useEffect để chuẩn bị lại lượt của Gwen
-          setConversationState((prev) => ({
-            ...prev,
-            similarity: similarityResult,
-            isWaitingForUser: true,
-            retryCounter: prev.retryCounter + 1,
-          }));
-        }
-
-        processingUserInputRef.current = false;
-      };
-
-      // 2. Logic chính của handleUserSpeech: quyết định có gom câu hay không
-      const messageContent = transcript.trim();
-      if (!messageContent) return;
-
-      const stepIndex = currentStepRef.current;
-      const expectedLine = steps[stepIndex];
-      if (!expectedLine || expectedLine.speaker !== "Gwen") return;
-
-      const isLongSentence = expectedLine.text.split(/\s+/).length > 15;
-
-      if (isLongSentence) {
-        // Gom các mảnh của câu dài
-        accumulatedTranscriptRef.current = (
-          accumulatedTranscriptRef.current +
-          " " +
-          messageContent
-        ).trim();
-        setPartialTranscript(accumulatedTranscriptRef.current);
-
-        if (finalTranscriptGracePeriodRef.current)
-          clearTimeout(finalTranscriptGracePeriodRef.current);
-
-        finalTranscriptGracePeriodRef.current = setTimeout(() => {
-          const fullTranscript = accumulatedTranscriptRef.current.trim();
-          if (fullTranscript) {
-            process(fullTranscript); // Gọi hàm nội bộ để xử lý
+          if (turnTimeoutRef.current) {
+            clearTimeout(turnTimeoutRef.current);
           }
-          accumulatedTranscriptRef.current = "";
-        }, 1500); // Thời gian chờ 1.5 giây
-      } else {
-        // Xử lý ngay lập tức với câu ngắn
-        process(messageContent); // Gọi hàm nội bộ để xử lý
-      }
+          turnTimeoutRef.current = setTimeout(() => {
+            console.log(
+              `👤 Gwen's turn (step ${stepIndex}). Listener is now active.`
+            );
+
+            isAwaitingAIRef.current = false;
+            resetSimilarityContext(`step-${stepIndex}`);
+            setConversationState((prev) => ({
+              ...prev,
+              similarity: similarityResult,
+              isWaitingForUser: true,
+              retryCounter: prev.retryCounter + 1,
+            }));
+          }, 750);
+        }
+        console.log("after update processing is false");
+        processingUserInputRef.current = false;
+
+        // --- Kết thúc logic xử lý ---
+      }, gracePeriod);
+
       return () => {
-        if (finalTranscriptGracePeriodRef.current) {
-          clearTimeout(finalTranscriptGracePeriodRef.current);
-          finalTranscriptGracePeriodRef.current = null;
+        if (turnTimeoutRef.current) {
+          clearTimeout(turnTimeoutRef.current);
         }
       };
     },
@@ -295,23 +302,23 @@ export const useConversation = ({
 
       client.on(LiveTranscriptionEvents.Transcript, (data) => {
         const transcript = data.channel.alternatives[0].transcript;
-        console.log(
-          "Transcript received:",
-          transcript,
-          isAwaitingAIRef.current,
-          isWaitingForUserRef.current
-        );
+        console.log("Transcript received:", transcript);
+
+        console.log("isWaitingForUserRef:", isWaitingForUserRef.current);
+        console.log("isAwaitingAIRef:", isAwaitingAIRef.current);
+        console.log("processingUserInputRef:", processingUserInputRef.current);
 
         if (
           !transcript ||
-          isAwaitingAIRef.current ||
-          !isWaitingForUserRef.current
+          !isWaitingForUserRef.current ||
+          isAwaitingAIRef.current
         )
           return;
         resetInactivityTimer();
-        console.log("Processing user input:", processingUserInputRef.current);
-        if (data.is_final && !processingUserInputRef.current) {
-          handleUserSpeech(transcript);
+        if (data.is_final) {
+          if (!processingUserInputRef.current) {
+            handleUserSpeech(transcript);
+          }
         } else {
           setPartialTranscript(transcript);
         }
@@ -414,10 +421,23 @@ export const useConversation = ({
         }
       } else if (line.speaker === "Gwen") {
         // Chỉ cần hạ cờ và đặt trạng thái chờ
-        isAwaitingAIRef.current = false;
-        resetInactivityTimer();
-        if (!conversationState.isWaitingForUser) {
-          setConversationState((prev) => ({ ...prev, isWaitingForUser: true }));
+        if (!isWaitingForUserRef.current) {
+          if (turnTimeoutRef.current) {
+            clearTimeout(turnTimeoutRef.current);
+          }
+          turnTimeoutRef.current = setTimeout(() => {
+            if (isCancelled) return;
+            console.log(
+              `👤 Gwen's turn (step ${conversationState.currentStep}). Listener is now active.`
+            );
+
+            isAwaitingAIRef.current = false;
+            resetInactivityTimer();
+            setConversationState((prev) => ({
+              ...prev,
+              isWaitingForUser: true,
+            }));
+          }, 750);
         }
       }
     };
@@ -426,6 +446,10 @@ export const useConversation = ({
     return () => {
       isCancelled = true;
       clearTimeout(timeoutId);
+
+      if (turnTimeoutRef.current) {
+        clearTimeout(turnTimeoutRef.current);
+      }
       if (keepAliveInterval) clearInterval(keepAliveInterval);
     };
   }, [
