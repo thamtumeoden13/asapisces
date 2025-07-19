@@ -27,7 +27,7 @@ const getSubjectColor = (subject: string) => {
     math: "#EF4444",
     science: "#10B981",
     history: "#F59E0B",
-    default: "#6B7280",
+    default: "#3B82F6",
   };
   return colors[subject] || colors.default;
 };

@@ -21,6 +21,11 @@ const Page = async () => {
             key={companion.id}
             {...companion}
             color={getSubjectColor(companion.subject)}
+            href={
+              companion.transcript_data
+                ? "/companion/conversation"
+                : "/companion/companions"
+            }
           />
         ))}
       </section>

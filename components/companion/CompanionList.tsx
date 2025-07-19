@@ -92,12 +92,12 @@ const CompanionList = ({
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
+        {/* <TableFooter>
           <TableRow>
             <TableCell className="text-lg text-black-100" colSpan={3}>Total</TableCell>
-            <TableCell className="text-right text-black-200">$2,500.00</TableCell>
+            <TableCell className="text-right text-black-200">2,500</TableCell>
           </TableRow>
-        </TableFooter>
+        </TableFooter> */}
       </Table>
     </article>
   );

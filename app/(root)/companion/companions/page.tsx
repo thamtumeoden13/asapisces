@@ -3,6 +3,7 @@ import CompanionCard from "@/components/companion/CompanionCard";
 import { getSubjectColor } from "@/lib/utils";
 import SearchInput from "@/components/companion/SearchInput";
 import SubjectFilter from "@/components/companion/SubjectFilter";
+import { SearchParams } from "@/types";
 
 const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
   const filters = await searchParams;
@@ -26,6 +27,7 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
             key={companion.id}
             {...companion}
             color={getSubjectColor(companion.subject)}
+            href={companion.transcript_data ? `/companion/conversation` : `/companion/companions`}
           />
         ))}
       </div>

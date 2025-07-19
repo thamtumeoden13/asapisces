@@ -19,6 +19,7 @@ import type {
 import { CallStatus } from "@/types/podcast";
 import { TimingSettings } from "@/types";
 import { Message } from "postcss";
+import { recordSessionStartAction } from "@/lib/actions/session.action";
 
 type TTSProvider = "webspeech" | "elevenlabs";
 
@@ -38,6 +39,7 @@ const LONG_SENTENCE_GRACE_PERIOD_MS_BONUS = 2000; // Thêm 2 giây cho câu dài
 export const useConversation = ({
   steps,
   voiceId,
+  companionId,
   ttsProvider,
   timingSettings = {},
   onSessionComplete,
@@ -271,7 +273,10 @@ export const useConversation = ({
           `step-${stepIndex}`
         );
 
-        console.log(`Similarity score for step ${stepIndex}:`, similarityResult);
+        console.log(
+          `Similarity score for step ${stepIndex}:`,
+          similarityResult
+        );
 
         const shouldAdvance = similarityResult.score >= 0.6;
         isAwaitingAIRef.current = true; // Khóa input cho lượt nói tiếp theo của AI
@@ -407,6 +412,7 @@ export const useConversation = ({
     resetConversation();
     setCallState({ status: CallStatus.CONNECTING });
     try {
+      recordSessionStartAction(companionId);
       const response = await fetch("/api/deepgram");
       const data = await response.json();
       if (!data.deepgramToken) throw new Error("Failed to get Deepgram token.");

@@ -14,14 +14,8 @@ import {
   EnhancedVoiceRecognition,
   type SpeechQualityMetrics,
 } from "@/lib/enhanced-voice-recognition";
-import {
-  ConversationAnalytics,
-} from "@/lib/conversation-analytics";
-import {
-  type TopicKey,
-  type CompanionComponentProps,
-  CallStatus,
-} from "@/types/podcast";
+import { ConversationAnalytics } from "@/lib/conversation-analytics";
+import { type TopicKey, CallStatus } from "@/types/podcast";
 import soundwaves from "@/constants/soundwaves.json";
 import {
   Mic,
@@ -36,8 +30,14 @@ import {
   AlertCircle,
   MessageSquare,
 } from "lucide-react";
-import type { MessageGroup, PodcastTopics, TopicTitles } from "@/types";
+import type {
+  CompanionComponentProps,
+  MessageGroup,
+  PodcastTopics,
+  TopicTitles,
+} from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
+import { saveConversationFeedbackAction } from "@/lib/actions/feedback.action";
 
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -48,7 +48,7 @@ const getSubjectColor = (subject: string) => {
     math: "#EF4444",
     science: "#10B981",
     history: "#F59E0B",
-    default: "#6B7280",
+    default: "#3B82F6",
   };
   return colors[subject] || colors.default;
 };
@@ -69,6 +69,7 @@ const EnhancedCompanionConversationOptimized = ({
   podcastTopics,
   name = "Leo & Gwen",
   userName = "Student",
+  userId, // Example UUID
   voiceId,
   selectedTopic,
   onTopicComplete,
@@ -110,6 +111,9 @@ const EnhancedCompanionConversationOptimized = ({
   // THÊM CÁC STATE NÀY
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [sessionFeedback, setSessionFeedback] = useState<any | null>(null); // Kiểu 'any' để đơn giản, bạn có thể dùng kiểu từ schema
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"success" | "error" | "">("");
 
   const [activeTab, setActiveTab] = useState<
     "conversation" | "feedback" | "analytics" | "settings"
@@ -290,7 +294,7 @@ const EnhancedCompanionConversationOptimized = ({
       // Chuẩn bị dữ liệu cho hàm feedback
       const feedbackParams = {
         sessionId: `${companionId}-${currentTopic}`,
-        userId: "current-user-id", // Thay thế bằng ID người dùng thực tế
+        userId, // Thay thế bằng ID người dùng thực tế
         transcript: finalMessages.filter((msg) => msg.content.trim() !== ""), // Lọc tin nhắn rỗng
         script: script,
       };
@@ -300,6 +304,30 @@ const EnhancedCompanionConversationOptimized = ({
       if (result.success && result.feedback) {
         console.log("✅ Feedback received:", result.feedback);
         setSessionFeedback(result.feedback);
+
+        console.log("💾 Attempting to save feedback to DB...");
+        setIsSaving(true);
+        setSaveStatus("");
+
+        const saveResult = await saveConversationFeedbackAction({
+          userId,
+          topicId: currentTopic,
+          companionId: companionId,
+          totalScore: result.feedback.totalScore,
+          categoryScores: result.feedback.categoryScores,
+          strengths: result.feedback.strengths,
+          areasForImprovement: result.feedback.areasForImprovement,
+          finalAssessment: result.feedback.finalAssessment,
+        });
+
+        if (saveResult.success) {
+          console.log("✅ Feedback saved successfully!");
+          setSaveStatus("success");
+        } else {
+          console.error("❌ Failed to save feedback:", saveResult.error);
+          setSaveStatus("error");
+        }
+        setIsSaving(false);
       } else {
         console.error("❌ Failed to generate feedback.");
         // Có thể hiển thị thông báo lỗi cho người dùng
@@ -310,7 +338,7 @@ const EnhancedCompanionConversationOptimized = ({
 
       setIsGeneratingFeedback(false);
     },
-    [companionId, currentTopic]
+    [userId, companionId, currentTopic]
   ); // Thêm dependencies
   // Throttled message handling to reduce re-renders
   useEffect(() => {
@@ -752,7 +780,12 @@ const EnhancedCompanionConversationOptimized = ({
                 value={activeTab}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList
+                  className={cn(
+                    "grid w-full",
+                    showDebug ? "grid-cols-4" : "grid-cols-3"
+                  )}
+                >
                   <TabsTrigger
                     className={`${activeTab == "conversation" && "text-white-100"}`}
                     style={{
@@ -786,17 +819,19 @@ const EnhancedCompanionConversationOptimized = ({
                   >
                     Analytics
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="settings"
-                    className={`${activeTab == "settings" && "text-white-100"}`}
-                    style={{
-                      backgroundColor:
-                        activeTab == "settings" ? "#313c72" : "transparent",
-                    }}
-                    onClick={() => setActiveTab("settings")}
-                  >
-                    Settings
-                  </TabsTrigger>
+                  {showDebug && (
+                    <TabsTrigger
+                      value="settings"
+                      className={`${activeTab == "settings" && "text-white-100"}`}
+                      style={{
+                        backgroundColor:
+                          activeTab == "settings" ? "#313c72" : "transparent",
+                      }}
+                      onClick={() => setActiveTab("settings")}
+                    >
+                      Settings
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="conversation" className="space-y-4">
@@ -1140,6 +1175,27 @@ const EnhancedCompanionConversationOptimized = ({
                       {sessionFeedback.error}
                     </p>
                   )}
+
+                  {/* THÊM PHẦN HIỂN THỊ TRẠNG THÁI LƯU */}
+                  {sessionFeedback && !sessionFeedback.error && (
+                    <div className="mt-4 text-sm text-center">
+                      {isSaving && (
+                        <p className="text-blue-600 animate-pulse">
+                          Saving your feedback...
+                        </p>
+                      )}
+                      {saveStatus === "success" && (
+                        <p className="text-green-600">
+                          ✓ Feedback saved successfully!
+                        </p>
+                      )}
+                      {saveStatus === "error" && (
+                        <p className="text-red-600">
+                          Could not save your feedback. Please try again later.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-4">
@@ -1148,224 +1204,228 @@ const EnhancedCompanionConversationOptimized = ({
                   </p>
                 </TabsContent>
 
-                <TabsContent value="settings" className="space-y-6">
-                  <div className="space-y-6">
-                    {/* Timing Settings */}
-                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <h4 className="flex items-center gap-2 mb-4 font-medium">
-                        <Clock className="w-4 h-4" />
-                        Timing Settings
-                      </h4>
+                {showDebug && (
+                  <TabsContent value="settings" className="space-y-6">
+                    <div className="space-y-6">
+                      {/* Timing Settings */}
+                      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <h4 className="flex items-center gap-2 mb-4 font-medium">
+                          <Clock className="w-4 h-4" />
+                          Timing Settings
+                        </h4>
 
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block mb-2 text-sm font-medium">
-                            Step Transition Delay:{" "}
-                            {timingSettings.stepTransitionDelay}ms
-                          </label>
-                          <Slider
-                            value={[timingSettings.stepTransitionDelay]}
-                            onValueChange={([value]) =>
-                              setTimingSettings((prev) => ({
-                                ...prev,
-                                stepTransitionDelay: value,
-                              }))
-                            }
-                            max={5000}
-                            min={500}
-                            step={500}
-                            className="w-full"
-                          />
-                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block mb-2 text-sm font-medium">
+                              Step Transition Delay:{" "}
+                              {timingSettings.stepTransitionDelay}ms
+                            </label>
+                            <Slider
+                              value={[timingSettings.stepTransitionDelay]}
+                              onValueChange={([value]) =>
+                                setTimingSettings((prev) => ({
+                                  ...prev,
+                                  stepTransitionDelay: value,
+                                }))
+                              }
+                              max={5000}
+                              min={500}
+                              step={500}
+                              className="w-full"
+                            />
+                          </div>
 
-                        <div>
-                          <label className="block mb-2 text-sm font-medium">
-                            Speech Timeout: {timingSettings.speechTimeout}ms
-                          </label>
-                          <Slider
-                            value={[timingSettings.speechTimeout]}
-                            onValueChange={([value]) =>
-                              setTimingSettings((prev) => ({
-                                ...prev,
-                                speechTimeout: value,
-                              }))
-                            }
-                            max={60000}
-                            min={20000}
-                            step={5000}
-                            className="w-full"
-                          />
-                        </div>
+                          <div>
+                            <label className="block mb-2 text-sm font-medium">
+                              Speech Timeout: {timingSettings.speechTimeout}ms
+                            </label>
+                            <Slider
+                              value={[timingSettings.speechTimeout]}
+                              onValueChange={([value]) =>
+                                setTimingSettings((prev) => ({
+                                  ...prev,
+                                  speechTimeout: value,
+                                }))
+                              }
+                              max={60000}
+                              min={20000}
+                              step={5000}
+                              className="w-full"
+                            />
+                          </div>
 
-                        <div>
-                          <label className="block mb-2 text-sm font-medium">
-                            Response Wait Time:{" "}
-                            {timingSettings.responseWaitTime}ms
-                          </label>
-                          <Slider
-                            value={[timingSettings.responseWaitTime]}
-                            onValueChange={([value]) =>
-                              setTimingSettings((prev) => ({
-                                ...prev,
-                                responseWaitTime: value,
-                              }))
-                            }
-                            max={8000}
-                            min={500}
-                            step={250}
-                            className="w-full"
-                          />
-                        </div>
+                          <div>
+                            <label className="block mb-2 text-sm font-medium">
+                              Response Wait Time:{" "}
+                              {timingSettings.responseWaitTime}ms
+                            </label>
+                            <Slider
+                              value={[timingSettings.responseWaitTime]}
+                              onValueChange={([value]) =>
+                                setTimingSettings((prev) => ({
+                                  ...prev,
+                                  responseWaitTime: value,
+                                }))
+                              }
+                              max={8000}
+                              min={500}
+                              step={250}
+                              className="w-full"
+                            />
+                          </div>
 
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            Auto-advance Steps
-                          </span>
-                          <Switch
-                            checked={timingSettings.autoAdvance}
-                            onCheckedChange={(checked) =>
-                              setTimingSettings((prev) => ({
-                                ...prev,
-                                autoAdvance: checked,
-                              }))
-                            }
-                          />
-                        </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              Auto-advance Steps
+                            </span>
+                            <Switch
+                              checked={timingSettings.autoAdvance}
+                              onCheckedChange={(checked) =>
+                                setTimingSettings((prev) => ({
+                                  ...prev,
+                                  autoAdvance: checked,
+                                }))
+                              }
+                            />
+                          </div>
 
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            Quick Mode
-                          </span>
-                          <Switch
-                            checked={timingSettings.quickMode}
-                            onCheckedChange={(checked) =>
-                              setTimingSettings((prev) => ({
-                                ...prev,
-                                quickMode: checked,
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Performance Settings */}
-                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <h4 className="flex items-center gap-2 mb-4 font-medium">
-                        <Zap className="w-4 h-4" />
-                        Performance Settings
-                      </h4>
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            Reduced Animations
-                          </span>
-                          <Switch
-                            checked={performanceMode.reducedAnimations}
-                            onCheckedChange={(checked) =>
-                              setPerformanceMode((prev) => ({
-                                ...prev,
-                                reducedAnimations: checked,
-                              }))
-                            }
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            Fast Transitions
-                          </span>
-                          <Switch
-                            checked={performanceMode.fastTransitions}
-                            onCheckedChange={(checked) =>
-                              setPerformanceMode((prev) => ({
-                                ...prev,
-                                fastTransitions: checked,
-                              }))
-                            }
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            Instant Feedback
-                          </span>
-                          <Switch
-                            checked={performanceMode.instantFeedback}
-                            onCheckedChange={(checked) =>
-                              setPerformanceMode((prev) => ({
-                                ...prev,
-                                instantFeedback: checked,
-                              }))
-                            }
-                          />
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              Quick Mode
+                            </span>
+                            <Switch
+                              checked={timingSettings.quickMode}
+                              onCheckedChange={(checked) =>
+                                setTimingSettings((prev) => ({
+                                  ...prev,
+                                  quickMode: checked,
+                                }))
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Quick Presets */}
-                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <h4 className="mb-4 font-medium">Quick Presets</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setTimingSettings({
-                              stepTransitionDelay: 1000,
-                              responseWaitTime: 2500,
-                              speechTimeout: 30000,
-                              autoAdvance: true,
-                              quickMode: true,
-                            });
-                            setPerformanceMode({
-                              reducedAnimations: true,
-                              fastTransitions: true,
-                              skipIntermediateSteps: false,
-                              instantFeedback: true,
-                            });
+                      {/* Performance Settings */}
+                      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <h4 className="flex items-center gap-2 mb-4 font-medium">
+                          <Zap className="w-4 h-4" />
+                          Performance Settings
+                        </h4>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              Reduced Animations
+                            </span>
+                            <Switch
+                              checked={performanceMode.reducedAnimations}
+                              onCheckedChange={(checked) =>
+                                setPerformanceMode((prev) => ({
+                                  ...prev,
+                                  reducedAnimations: checked,
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              Fast Transitions
+                            </span>
+                            <Switch
+                              checked={performanceMode.fastTransitions}
+                              onCheckedChange={(checked) =>
+                                setPerformanceMode((prev) => ({
+                                  ...prev,
+                                  fastTransitions: checked,
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              Instant Feedback
+                            </span>
+                            <Switch
+                              checked={performanceMode.instantFeedback}
+                              onCheckedChange={(checked) =>
+                                setPerformanceMode((prev) => ({
+                                  ...prev,
+                                  instantFeedback: checked,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Presets */}
+                      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <h4 className="mb-4 font-medium">Quick Presets</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setTimingSettings({
+                                stepTransitionDelay: 1000,
+                                responseWaitTime: 2500,
+                                speechTimeout: 30000,
+                                autoAdvance: true,
+                                quickMode: true,
+                              });
+                              setPerformanceMode({
+                                reducedAnimations: true,
+                                fastTransitions: true,
+                                skipIntermediateSteps: false,
+                                instantFeedback: true,
+                              });
+                            }}
+                          >
+                            ⚡ Speed Mode
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setTimingSettings({
+                                stepTransitionDelay: 2000,
+                                responseWaitTime: 3500,
+                                speechTimeout: 40000,
+                                autoAdvance: false,
+                                quickMode: false,
+                              });
+                              setPerformanceMode({
+                                reducedAnimations: false,
+                                fastTransitions: false,
+                                skipIntermediateSteps: false,
+                                instantFeedback: false,
+                              });
+                            }}
+                          >
+                            🎯 Careful Mode
+                          </Button>
+                        </div>
+                      </div>
+                      {/* TTS Provider Settings */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          Use High-Quality Voice (ElevenLabs)
+                        </span>
+                        <Switch
+                          checked={ttsProvider === "elevenlabs"}
+                          onCheckedChange={(checked) => {
+                            setTtsProvider(
+                              checked ? "elevenlabs" : "webspeech"
+                            );
                           }}
-                        >
-                          ⚡ Speed Mode
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setTimingSettings({
-                              stepTransitionDelay: 2000,
-                              responseWaitTime: 3500,
-                              speechTimeout: 40000,
-                              autoAdvance: false,
-                              quickMode: false,
-                            });
-                            setPerformanceMode({
-                              reducedAnimations: false,
-                              fastTransitions: false,
-                              skipIntermediateSteps: false,
-                              instantFeedback: false,
-                            });
-                          }}
-                        >
-                          🎯 Careful Mode
-                        </Button>
+                        />
                       </div>
                     </div>
-                    {/* TTS Provider Settings */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        Use High-Quality Voice (ElevenLabs)
-                      </span>
-                      <Switch
-                        checked={ttsProvider === "elevenlabs"}
-                        onCheckedChange={(checked) => {
-                          setTtsProvider(checked ? "elevenlabs" : "webspeech");
-                        }}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
+                  </TabsContent>
+                )}
               </Tabs>
             </CardContent>
           </Card>

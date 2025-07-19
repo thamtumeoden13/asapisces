@@ -1456,7 +1456,6 @@ export const dummyInterviews: Interview[] = [
   },
 ];
 
-
 export const subjects = [
   "maths",
   "language",
@@ -1534,7 +1533,6 @@ export const recentSessions = [
   },
 ];
 
-
 // 1. ĐỊNH NGHĨA SCHEMA MỚI CHO FEEDBACK HỌC NGÔN NGỮ
 export const languageFeedbackSchema = z.object({
   totalScore: z
@@ -1574,4 +1572,15 @@ export const languageFeedbackSchema = z.object({
   finalAssessment: z
     .string()
     .describe("A concise, encouraging final summary for the learner."),
+});
+
+export const conversationFeedbackSchema = z.object({
+  userId: z.string().uuid(),
+  topicId: z.string(),
+  companionId: z.string().uuid(), // <-- THÊM DÒNG NÀY
+  totalScore: z.number().min(0).max(100),
+  categoryScores: z.any(),
+  strengths: z.array(z.string()),
+  areasForImprovement: z.array(z.string()),
+  finalAssessment: z.string(),
 });

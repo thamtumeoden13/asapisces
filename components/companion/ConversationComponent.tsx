@@ -31,6 +31,7 @@ const ConversationComponent = ({
   name,
   userName,
   userImage,
+  userId,
   style,
   voice,
   transcriptData,
@@ -276,6 +277,7 @@ const ConversationComponent = ({
             name={name}
             userName={userName}
             userImage={userImage}
+            userId={userId}
             voiceId={selectedVoiceId}
             selectedTopic={selectedTopic}
             onTopicComplete={handleTopicComplete}

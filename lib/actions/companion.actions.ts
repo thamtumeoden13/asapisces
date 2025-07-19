@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase/server";
+import { CreateCompanion, GetAllCompanions } from "@/types";
 
 // Create
 export const createCompanion = async (formData: CreateCompanion) => {
