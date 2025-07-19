@@ -37,35 +37,40 @@ Leo: Bingo!`
 // Default topic configuration
 const DEFAULT_TOPIC_CONFIG: TopicConfig[] = [
   {
-    key: "intro",
-    keyword: "Let's go!",
-    title: "Introduction & Welcome",
+    "key": "intro",
+    "keyword": "Hey everyone!",
+    "title": "Introduction & Welcome"
   },
   {
-    key: "problem",
-    keyword: "Let's begin with this: Why can you understand English, but not speak it?",
-    title: "The Core Problem",
+    "key": "problem",
+    "keyword": "Gwen, let's start with the basics.",
+    "title": "The Core Problem"
   },
   {
-    key: "barriers",
-    keyword: "It's like being stuck in a loop.",
-    title: "Speaking Barriers",
+    "key": "barriers",
+    "keyword": "Now, Leo, let's talk about how someone can develop a positive mindset. ",
+    "title": "Speaking Barriers"
   },
   {
-    key: "techniques",
-    keyword: "Just a brave voice.",
-    title: "Practical Techniques",
+    "key": "vocabulary",
+    "keyword": "Now let's learn some vocabulary below, so you can understand the topic better before continuing to listen.",
+    "title": "Key Vocabulary"
   },
   {
-    key: "mindset",
-    keyword: "Let's set it free.",
-    title: "Mindset Transformation",
+    "key": "techniques",
+    "keyword": "Sometimes we're too hard on ourselves, right? ",
+    "title": "Practical Techniques"
   },
   {
-    key: "vocabulary",
-    keyword: "Bingo!",
-    title: "Key Vocabulary",
+    "key": "mindset",
+    "keyword": "Hmm, what's next?",
+    "title": "Mindset Transformation"
   },
+  {
+    "key": "pratice",
+    "keyword": "Last but not least, Gwen, how can we stay positive when things go wrong?",
+    "title": "Stay positive"
+  }
 ]
 
 export default function EnhancedTranscriptProcessor() {

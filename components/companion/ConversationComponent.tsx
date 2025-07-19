@@ -11,11 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import EnhancedCompanionConversationV2 from "@/components/companion/enhanced-companion-conversation-v3";
+import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation-v3";
 // import { podcastTopics, topicTitles } from "@/data/podcast-topics";
 import type { TopicKey } from "@/types/podcast";
 import { BookOpen, Users, Target, TrendingUp } from "lucide-react";
 import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
+
+const voiceStyles = {
+  friendly: "pNInz6obpgDQGcFmaJgB", // Adam
+  professional: "GBv7mTt0atIp3Br8iCZE", // Thomas
+  casual: "2EiwWnXFnvU5JabPnv8n", // Clyde
+  encouraging: "21m00Tcm4TlvDq8ikWAM", // Rachel
+};
 
 const ConversationComponent = ({
   companionId,
@@ -29,7 +36,7 @@ const ConversationComponent = ({
   transcriptData,
 }: CompanionComponentProps) => {
   const [topicTitles, setTopicTitles] = useState<TopicTitles>({});
-  const [podcastTopics, setPodcastTopics] = useState<PodcastTopics[]>([]);
+  const [podcastTopics, setPodcastTopics] = useState<PodcastTopics>({});
 
   const [selectedTopic, setSelectedTopic] = useState<TopicKey>("intro");
   const [completedTopics, setCompletedTopics] = useState<Set<TopicKey>>(
@@ -41,6 +48,9 @@ const ConversationComponent = ({
   const [voiceStyle, setVoiceStyle] = useState<
     "friendly" | "professional" | "casual" | "encouraging"
   >("friendly");
+
+  // Lấy voiceId dựa trên lựa chọn
+  const selectedVoiceId = voiceStyles[voiceStyle];
 
   const handleTopicComplete = (topic: TopicKey) => {
     setCompletedTopics((prev) => new Set([...prev, topic]));
@@ -257,7 +267,7 @@ const ConversationComponent = ({
 
         {/* Main Conversation Area */}
         <div className="lg:col-span-3">
-          <EnhancedCompanionConversationV2
+          <EnhancedCompanionConversationV3
             companionId={companionId}
             subject={subject}
             topic={selectedTopic}
@@ -266,8 +276,7 @@ const ConversationComponent = ({
             name={name}
             userName={userName}
             userImage={userImage}
-            style={voiceStyle}
-            voice={voice}
+            voiceId={selectedVoiceId}
             selectedTopic={selectedTopic}
             onTopicComplete={handleTopicComplete}
           />

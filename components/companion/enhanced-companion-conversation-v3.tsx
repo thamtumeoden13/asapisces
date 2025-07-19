@@ -5,7 +5,6 @@ import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
@@ -17,13 +16,11 @@ import {
 } from "@/lib/enhanced-voice-recognition";
 import {
   ConversationAnalytics,
-  type ConversationInsights,
 } from "@/lib/conversation-analytics";
 import {
   type TopicKey,
   type CompanionComponentProps,
   CallStatus,
-  TranscriptLine,
 } from "@/types/podcast";
 import soundwaves from "@/constants/soundwaves.json";
 import {
@@ -39,7 +36,7 @@ import {
   AlertCircle,
   MessageSquare,
 } from "lucide-react";
-import type { PodcastTopics, TopicTitles } from "@/types";
+import type { MessageGroup, PodcastTopics, TopicTitles } from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -72,9 +69,7 @@ const EnhancedCompanionConversationOptimized = ({
   podcastTopics,
   name = "Leo & Gwen",
   userName = "Student",
-  userImage = "/placeholder.svg?height=130&width=130",
-  style = "casual",
-  voice = "male",
+  voiceId,
   selectedTopic,
   onTopicComplete,
 }: EnhancedCompanionConversationOptimizedProps) => {
@@ -83,10 +78,10 @@ const EnhancedCompanionConversationOptimized = ({
   // Timing Configuration State
   const [timingSettings, setTimingSettings] = useState({
     stepTransitionDelay: 1000,
-    speechTimeout: 3000,
+    responseWaitTime: 1500,
+    speechTimeout: 40000,
     autoAdvance: true,
     quickMode: false,
-    responseWaitTime: 5000,
   });
 
   // Performance State
@@ -103,10 +98,9 @@ const EnhancedCompanionConversationOptimized = ({
   );
   const [speechMetrics, setSpeechMetrics] =
     useState<SpeechQualityMetrics | null>(null);
-  const [sessionInsights, setSessionInsights] =
-    useState<ConversationInsights | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [pronunciationFeedback, setPronunciationFeedback] = useState<any>(null);
+  const [pronunciationFeedback, setPronunciationFeedback] =
+    useState<unknown>(null);
   const [realTimeMetrics, setRealTimeMetrics] = useState({
     responseTime: 0,
     confidenceLevel: 0,
@@ -121,10 +115,9 @@ const EnhancedCompanionConversationOptimized = ({
     "conversation" | "feedback" | "analytics" | "settings"
   >("conversation");
 
-  // Step timing tracking
-  const [stepTimings, setStepTimings] = useState<{
-    [key: number]: { startTime: number; endTime?: number; duration?: number };
-  }>({});
+  const [ttsProvider, setTtsProvider] = useState<"webspeech" | "elevenlabs">(
+    "webspeech"
+  );
 
   // Auto-advance timer
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -138,7 +131,6 @@ const EnhancedCompanionConversationOptimized = ({
       noiseReduction: true,
       adaptiveThreshold: true,
       contextAware: true,
-      quickResponse: true,
     })
   );
 
@@ -157,22 +149,28 @@ const EnhancedCompanionConversationOptimized = ({
     isMuted,
     currentLine,
     partialTranscript,
-    speechBuffer,
     startCall,
     endCall,
     toggleMute,
     resetConversation,
     skipToStep,
     retryCurrentStep,
-    progress,
-    hasPartialInput,
-    currentSimilarity,
     audioPlayerRef,
   } = useConversation({
     steps,
+    voiceId,
+    ttsProvider: ttsProvider,
     companionId,
     onSessionComplete: () => {
-      handleSessionComplete(messages, steps);
+      handleSessionComplete(
+        messages
+          .filter((msg) => msg.role === "user" || msg.role === "assistant")
+          .map((msg) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+          })),
+        steps
+      );
       onTopicComplete?.(currentTopic);
     },
     timingSettings, // Pass timing settings to the hook
@@ -193,39 +191,6 @@ const EnhancedCompanionConversationOptimized = ({
     showDebug,
   ]);
 
-  // Auto-advance timer function
-  const startAutoAdvanceTimer = useCallback(() => {
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
-    }
-
-    if (!timingSettings.autoAdvance) return;
-
-    const delay = timingSettings.quickMode
-      ? 500
-      : timingSettings.stepTransitionDelay;
-    setCountdown(Math.ceil(delay / 1000));
-
-    const countdownInterval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev && prev > 1) {
-          return prev - 1;
-        } else {
-          clearInterval(countdownInterval);
-          return null;
-        }
-      });
-    }, 1000);
-
-    autoAdvanceTimer.current = setTimeout(() => {
-      if (conversationState.currentStep < steps.length) {
-        skipToStep(conversationState.currentStep + 1);
-      }
-      setCountdown(null);
-      clearInterval(countdownInterval);
-    }, delay);
-  }, [timingSettings, conversationState.currentStep, steps.length, skipToStep]);
-
   // Manual advance function
   const manualAdvance = useCallback(() => {
     if (autoAdvanceTimer.current) {
@@ -244,20 +209,32 @@ const EnhancedCompanionConversationOptimized = ({
     const sortedMessages = [...messages].sort(
       (a, b) => a.timestamp - b.timestamp
     );
-    const groups: any[] = [];
-    let currentGroup: any = null;
+    const groups: MessageGroup[] = [];
+    let currentGroup: MessageGroup | null = null;
 
     for (const message of sortedMessages) {
       if (!currentGroup || currentGroup.role !== message.role) {
         currentGroup = {
           role: message.role,
           speaker: message.role === "assistant" ? name.split(" ")[0] : userName,
-          messages: [message],
+          messages: [
+            {
+              role: message.role,
+              content: message.content,
+              timestamp: message.timestamp,
+              similarity: message.similarity || null,
+            },
+          ],
           timestamp: message.timestamp,
         };
-        groups.push(currentGroup);
+        groups.push(currentGroup as MessageGroup);
       } else {
-        currentGroup.messages.push(message);
+        currentGroup.messages.push({
+          role: message.role,
+          content: message.content,
+          timestamp: message.timestamp,
+          similarity: message.similarity || null,
+        });
         currentGroup.timestamp = message.timestamp;
       }
     }
@@ -351,6 +328,7 @@ const EnhancedCompanionConversationOptimized = ({
           volume: Math.random() * 0.2 + 0.8,
           pronunciation: Math.random() * 0.3 + 0.6,
           fluency: Math.random() * 0.4 + 0.6,
+          confidence: Math.random() * 0.3 + 0.6,
         };
 
         setSpeechMetrics(mockMetrics);
@@ -525,7 +503,7 @@ const EnhancedCompanionConversationOptimized = ({
                     </span>
                   </div>
                   <div className="text-xs text-yellow-700">
-                    "{partialTranscript}..."
+                    &quot;{partialTranscript}...&quot;
                   </div>
                 </div>
               )}
@@ -548,17 +526,6 @@ const EnhancedCompanionConversationOptimized = ({
                   </Badge>
                 )}
 
-                {/* Step timing display */}
-                {stepTimings[conversationState.currentStep]?.duration && (
-                  <Badge variant="outline" className="text-xs">
-                    Last step:{" "}
-                    {(
-                      stepTimings[conversationState.currentStep].duration / 1000
-                    ).toFixed(1)}
-                    s
-                  </Badge>
-                )}
-
                 {realTimeMetrics.responseTime > 0 && (
                   <Badge variant="outline" className="text-xs">
                     {(realTimeMetrics.responseTime / 1000).toFixed(1)}s response
@@ -566,7 +533,7 @@ const EnhancedCompanionConversationOptimized = ({
                 )}
               </div>
             </div>
-            <Progress value={progress} className="h-2" />
+            {/* <Progress value={progress} className="h-2" /> */}
 
             {/* Real-time Speech Metrics */}
             {speechMetrics && (
@@ -939,7 +906,7 @@ const EnhancedCompanionConversationOptimized = ({
                       <div className="flex items-center gap-2 mb-2">
                         <MessageSquare className="w-4 h-4 text-blue-600 animate-pulse" />
                         <span className="text-sm font-medium text-blue-800">
-                          You're speaking...
+                          You&apos;re speaking...
                         </span>
                         {currentLine &&
                           currentLine.text.split(/\s+/).length > 10 && (
@@ -952,7 +919,7 @@ const EnhancedCompanionConversationOptimized = ({
                           )}
                       </div>
                       <div className="text-sm text-blue-700">
-                        "{partialTranscript}..."
+                        &quot;{partialTranscript}...&quot;
                       </div>
                       <div className="mt-1 text-xs text-blue-600">
                         {currentLine &&
@@ -1205,8 +1172,8 @@ const EnhancedCompanionConversationOptimized = ({
                               }))
                             }
                             max={5000}
-                            min={100}
-                            step={100}
+                            min={500}
+                            step={500}
                             className="w-full"
                           />
                         </div>
@@ -1223,9 +1190,9 @@ const EnhancedCompanionConversationOptimized = ({
                                 speechTimeout: value,
                               }))
                             }
-                            max={10000}
-                            min={1000}
-                            step={500}
+                            max={60000}
+                            min={20000}
+                            step={5000}
                             className="w-full"
                           />
                         </div>
@@ -1346,11 +1313,11 @@ const EnhancedCompanionConversationOptimized = ({
                           size="sm"
                           onClick={() => {
                             setTimingSettings({
-                              stepTransitionDelay: 500,
-                              speechTimeout: 2000,
+                              stepTransitionDelay: 1000,
+                              responseWaitTime: 2500,
+                              speechTimeout: 30000,
                               autoAdvance: true,
                               quickMode: true,
-                              responseWaitTime: 1000,
                             });
                             setPerformanceMode({
                               reducedAnimations: true,
@@ -1368,10 +1335,10 @@ const EnhancedCompanionConversationOptimized = ({
                           onClick={() => {
                             setTimingSettings({
                               stepTransitionDelay: 2000,
-                              speechTimeout: 5000,
+                              responseWaitTime: 3500,
+                              speechTimeout: 40000,
                               autoAdvance: false,
                               quickMode: false,
-                              responseWaitTime: 3000,
                             });
                             setPerformanceMode({
                               reducedAnimations: false,
@@ -1384,6 +1351,18 @@ const EnhancedCompanionConversationOptimized = ({
                           🎯 Careful Mode
                         </Button>
                       </div>
+                    </div>
+                    {/* TTS Provider Settings */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        Use High-Quality Voice (ElevenLabs)
+                      </span>
+                      <Switch
+                        checked={ttsProvider === "elevenlabs"}
+                        onCheckedChange={(checked) => {
+                          setTtsProvider(checked ? "elevenlabs" : "webspeech");
+                        }}
+                      />
                     </div>
                   </div>
                 </TabsContent>
@@ -1431,28 +1410,6 @@ const EnhancedCompanionConversationOptimized = ({
                     }
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Progress:</span>
-                  {/* <span>{progress.toFixed(1)}%</span> */}
-                </div>
-
-                {/* Average step time */}
-                {Object.keys(stepTimings).length > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Avg Step Time:</span>
-                    <span>
-                      {(
-                        Object.values(stepTimings)
-                          .filter((t) => t.duration)
-                          .reduce((acc, t) => acc + (t.duration || 0), 0) /
-                        Object.values(stepTimings).filter((t) => t.duration)
-                          .length /
-                        1000
-                      ).toFixed(1)}
-                      s
-                    </span>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

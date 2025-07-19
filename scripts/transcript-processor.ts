@@ -1,3 +1,4 @@
+import { PodcastEntry, PodcastTopics, ProcessorOptions, ProcessorResult, TopicConfig, TopicTitles } from "@/types";
 
 /**
  * Main transcript processor function
@@ -41,7 +42,7 @@ export function processTranscript(
   // Topic detection function - exact match with keyword
   function updateTopicFromLine(line: string): void {
     for (const topic of topics) {
-      if (line.toLowerCase().includes(topic.keyword.toLowerCase())) {
+      if (line.toLowerCase().trimEnd().includes(topic.keyword.toLowerCase().trimEnd())) {
         currentTopic = topic.key;
         if (!podcastTopics[currentTopic]) podcastTopics[currentTopic] = [];
         return;

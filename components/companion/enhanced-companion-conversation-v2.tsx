@@ -941,7 +941,7 @@ const EnhancedCompanionConversationOptimized = ({
                       <div className="flex items-center gap-2 mb-2">
                         <MessageSquare className="w-4 h-4 text-blue-600 animate-pulse" />
                         <span className="text-sm font-medium text-blue-800">
-                          You're speaking...
+                          You&apos;re speaking...
                         </span>
                         {currentLine &&
                           currentLine.text.split(/\s+/).length > 10 && (
@@ -954,7 +954,7 @@ const EnhancedCompanionConversationOptimized = ({
                           )}
                       </div>
                       <div className="text-sm text-blue-700">
-                        "{partialTranscript}..."
+                        &quot;{partialTranscript}...&quot;
                       </div>
                       <div className="mt-1 text-xs text-blue-600">
                         {currentLine &&

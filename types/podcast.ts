@@ -26,7 +26,7 @@ export interface CompanionComponentProps {
   userName: string;
   userImage: string;
   style: string;
-  voice: string;
+  voiceId: string;
 }
 
 export interface SavedMessage {

@@ -256,7 +256,6 @@ declare interface TechIconProps {
   techStack: string[];
 }
 
-
 // type User = {
 //   name: string;
 //   email: string;
@@ -324,7 +323,6 @@ interface Avatar {
   className?: string;
 }
 
-
 interface SavedMessage {
   role: "user" | "system" | "assistant";
   content: string;
@@ -383,3 +381,28 @@ export interface TimingSettings {
   quickMode: boolean; // Có thể dùng cho tương lai
   responseWaitTime: number; // Đây là giá trị quan trọng nhất: GRACE_PERIOD_MS
 }
+
+interface SimilarityResult {
+  score: number
+  confidence: number
+  matchedPhrases: string[]
+  missingPhrases: string[]
+  feedback: string
+  isPartialMatch: boolean
+  completenessRatio: number
+  shouldWaitForMore: boolean
+}
+
+type Message = {
+  role: string;
+  content: string;
+  timestamp: number;
+  similarity?: SimilarityResult | null;
+};
+
+type MessageGroup = {
+  role: string;
+  speaker: string;
+  messages: Message[];
+  timestamp: number;
+};
