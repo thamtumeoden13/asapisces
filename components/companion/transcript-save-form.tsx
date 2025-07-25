@@ -5,8 +5,7 @@ import type React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +35,9 @@ import {
 } from "@/components/ui/dialog";
 import { subjects } from "@/constants";
 import {
-  createTranscriptCompanion,
+  UpsertCompanionData,
+  upsertTranscriptCompanion,
+  upsertTranscriptCompanion2,
 } from "@/lib/actions/transcript.actions";
 import { ProcessorResult, TopicConfig } from "@/types";
 
@@ -76,9 +77,13 @@ export const transcriptCompanionSchema = z.object({
   }),
 });
 
-export type CreateTranscriptCompanion = z.infer<typeof transcriptCompanionSchema>;
+export type CreateTranscriptCompanion = z.infer<
+  typeof transcriptCompanionSchema
+>;
 
-const saveFormSchema = z.object({
+// Form schema for the save form
+const formSchema = z.object({
+  id: z.string().uuid().optional().nullable(),
   name: z.string().min(1, { message: "Name is required." }),
   subject: z.string().min(1, { message: "Subject is required." }),
   topic: z.string().min(1, { message: "Topic is required." }),
@@ -87,42 +92,50 @@ const saveFormSchema = z.object({
   duration: z.coerce.number().min(1, { message: "Duration is required." }),
 });
 
+type FormValues = z.infer<typeof formSchema>;
+
 interface TranscriptSaveFormProps {
+  children: React.ReactNode;
   rawTranscript: string;
   topicConfig: TopicConfig[];
   processedData: ProcessorResult;
-  children: React.ReactNode;
+  // Thêm companion để truyền dữ liệu mặc định khi edit
+  companion?: FormValues & { id: string };
 }
-
 export function TranscriptSaveForm({
+  children,
   rawTranscript,
   topicConfig,
   processedData,
-  children,
+  companion,
 }: TranscriptSaveFormProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+
+  const isEditMode = !!companion;
 
   const form = useForm({
-    resolver: zodResolver(saveFormSchema),
-    defaultValues: {
-      name: "",
-      subject: "",
-      topic: "",
-      voice: "female",
-      style: "casual",
-      duration: 15,
-    },
+    resolver: zodResolver(formSchema),
+    defaultValues: isEditMode
+      ? companion
+      : {
+          name: "",
+          subject: "",
+          topic: "",
+          voice: "female",
+          style: "casual",
+          duration: 15,
+        },
   });
 
-  const onSubmit = async (values: z.infer<typeof saveFormSchema>) => {
+  const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
 
     try {
-      const transcriptCompanionData: CreateTranscriptCompanion = {
+      const companionData: UpsertCompanionData = {
         ...values,
-        transcript_data: {
+        id: isEditMode ? companion.id : undefined, // Truyền ID nếu là edit
+        transcriptData: {
           rawTranscript,
           topicConfig,
           podcastTopics: processedData.podcastTopics,
@@ -131,13 +144,11 @@ export function TranscriptSaveForm({
         },
       };
 
-      const companion = await createTranscriptCompanion(
-        transcriptCompanionData
-      );
+      const savedCompanion = await upsertTranscriptCompanion2(companionData);
 
-      if (companion) {
+      if (savedCompanion.success) {
         setOpen(false);
-        router.push(`/companions/${companion.id}`);
+        // router.push(`/companions/${savedCompanion.id}`);
       }
     } catch (error) {
       console.error("Failed to save transcript companion:", error);
@@ -147,14 +158,24 @@ export function TranscriptSaveForm({
     }
   };
 
+  useEffect(() => {
+    if (isEditMode && companion) {
+      form.reset(companion);
+    }
+  }, [companion, isEditMode, form]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-md bg-white">
         <DialogHeader>
-          <DialogTitle className="text-black-200">Save Transcript Companion</DialogTitle>
+          <DialogTitle className="text-black-200">
+            {isEditMode ? "Update Companion" : "Save Transcript Companion"}
+          </DialogTitle>
           <DialogDescription>
-            Create a companion based on your processed transcript data.
+            {isEditMode
+              ? "Edit the details for this companion."
+              : "Create a companion based on your processed transcript data."}
           </DialogDescription>
         </DialogHeader>
 
@@ -303,7 +324,13 @@ export function TranscriptSaveForm({
             />
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating..." : "Create Companion"}
+              {isLoading
+                ? isEditMode
+                  ? "Updating..."
+                  : "Creating..."
+                : isEditMode
+                  ? "Update Companion"
+                  : "Create Companion"}
             </Button>
           </form>
         </Form>

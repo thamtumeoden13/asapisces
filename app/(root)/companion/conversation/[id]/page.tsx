@@ -38,7 +38,7 @@ const ConversationPage = async ({ params }: ConversationSessionProps) => {
           transcriptData={companion.transcript_data}
           userName={user.name!}
           userImage={user.image!}
-          userId={user.id}
+          userId={user.id!}
         />
       </div>
     </div>

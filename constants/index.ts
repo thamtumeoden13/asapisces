@@ -936,6 +936,7 @@ import {
   shadcn,
   cloudinary,
 } from "@/assets/icons";
+import { Interview } from "@/types";
 
 export const skills = [
   {
@@ -1583,4 +1584,25 @@ export const conversationFeedbackSchema = z.object({
   strengths: z.array(z.string()),
   areasForImprovement: z.array(z.string()),
   finalAssessment: z.string(),
+});
+
+
+// --- ZOD SCHEMAS (giữ nguyên như bạn đã định nghĩa) ---
+const transcriptDataSchema = z.object({
+  rawTranscript: z.string(),
+  topicConfig: z.array(z.any()),
+  podcastTopics: z.record(z.array(z.any())),
+  topicTitles: z.record(z.string()),
+  metadata: z.any(),
+});
+
+export const upsertCompanionSchema = z.object({
+  id: z.string().uuid().optional().nullable(),
+  name: z.string().min(1, { message: "Name is required." }),
+  subject: z.string().min(1, { message: "Subject is required." }),
+  topic: z.string().min(1, { message: "Topic is required." }),
+  voice: z.string().min(1, { message: "Voice is required." }),
+  style: z.string().min(1, { message: "Style is required." }),
+  duration: z.coerce.number().min(1, { message: "Duration is required." }),
+  transcriptData: transcriptDataSchema,
 });

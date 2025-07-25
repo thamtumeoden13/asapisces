@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
   pgTable,
   serial,
@@ -65,42 +66,31 @@ export const feedbackCategoryScores = pgTable("feedback_category_scores", {
 export const companions = pgTable(
   "companions",
   {
-    // id uuid not null default gen_random_uuid ()
-    // constraint companions_pkey primary key (id)
     id: uuid("id").primaryKey().defaultRandom(),
 
-    // created_at timestamp with time zone not null default now()
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
 
-    // name character varying null
     name: varchar("name"),
 
-    // subject character varying null
     subject: varchar("subject"),
 
-    // topic character varying null
     topic: varchar("topic"),
 
-    // style character varying null
     style: varchar("style"),
 
-    // voice character varying null
     voice: varchar("voice"),
 
-    // duration bigint null
-    // Chú ý: bigint trong JS được biểu diễn bằng string, nên ta dùng { mode: "string" }
     duration: bigint("duration", { mode: "string" }),
 
-    // author character varying null
-    author: varchar("author"),
+    author: uuid("author").references(() => users.id, { onDelete: "set null" }),
 
-    // type character varying(50) null default 'general'::character varying
     type: varchar("type", { length: 50 }).default("general"),
 
-    // transcript_data jsonb null
-    transcriptData: jsonb("transcript_data"),
+    transcriptId: uuid("transcript_id").references(() => transcripts.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => {
     // Định nghĩa các index bên trong một callback function
@@ -157,3 +147,29 @@ export const sessionHistory = pgTable("session_history", {
     .notNull()
     .defaultNow(),
 });
+
+export const transcripts = pgTable("transcripts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Dùng jsonb để lưu toàn bộ object transcript_data
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const companionsRelations = relations(companions, ({ one }) => ({
+  // Một companion có MỘT transcript
+  transcript: one(transcripts, {
+    fields: [companions.transcriptId], // Cột khóa ngoại trong bảng `companions`
+    references: [transcripts.id], // Cột khóa chính trong bảng `transcripts`
+  }),
+}));
+
+// (Tùy chọn) Định nghĩa quan hệ ngược lại từ `transcripts` đến `companions`
+export const transcriptsRelations = relations(transcripts, ({ one }) => ({
+  // Một transcript thuộc về MỘT companion
+  companion: one(companions, {
+    fields: [transcripts.id],
+    references: [companions.transcriptId],
+  }),
+}));

@@ -252,3 +252,4 @@ export function createTopicConfig(
 ): TopicConfig[] {
   return topics.map((topic) => ({ ...topic, keyword: topic.key }));
 }
+

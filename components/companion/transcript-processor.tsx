@@ -76,7 +76,13 @@ const DEFAULT_TOPIC_CONFIG: TopicConfig[] = [
   },
 ];
 
-export default function TranscriptProcessorComponent() {
+export default function TranscriptProcessorComponent({
+  editMode = false,
+  companionData = null,
+}: {
+  editMode?: boolean;
+  companionData?: any;
+}) {
   const [rawTranscript, setRawTranscript] = useState(SAMPLE_TRANSCRIPT);
   const [topicConfig, setTopicConfig] =
     useState<TopicConfig[]>(DEFAULT_TOPIC_CONFIG);
@@ -359,23 +365,36 @@ export default function TranscriptProcessorComponent() {
             rawTranscript={rawTranscript}
             topicConfig={topicConfig}
             processedData={processedData}
+            companion={companionData}
           >
             <Button className="bg-pink-500 hover:bg-pink-600">
               <Save className="w-4 h-4 mr-2" />
-              Save Companion
+              {editMode ? "Update Companion" : "Save Companion"}
             </Button>
           </TranscriptSaveForm>
 
           {/* Download Buttons */}
-          <Button onClick={() => handleDownload("json")} variant="outline" className="text-black-300">
+          <Button
+            onClick={() => handleDownload("json")}
+            variant="outline"
+            className="text-black-300"
+          >
             <Download className="w-4 h-4 mr-2" />
             JSON
           </Button>
-          <Button onClick={() => handleDownload("csv")} variant="outline" className="text-black-300">
+          <Button
+            onClick={() => handleDownload("csv")}
+            variant="outline"
+            className="text-black-300"
+          >
             <Download className="w-4 h-4 mr-2" />
             CSV
           </Button>
-          <Button onClick={() => handleDownload("markdown")} variant="outline" className="text-black-300">
+          <Button
+            onClick={() => handleDownload("markdown")}
+            variant="outline"
+            className="text-black-300"
+          >
             <Download className="w-4 h-4 mr-2" />
             MD
           </Button>

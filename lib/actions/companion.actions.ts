@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase/server";
 import { CreateCompanion, GetAllCompanions } from "@/types";
+import { companions, db } from "../supabase";
+import { eq } from "drizzle-orm";
 
 // Create
 export const createCompanion = async (formData: CreateCompanion) => {
@@ -68,6 +70,56 @@ export const getCompanion = async (id: string) => {
   return data?.[0];
 };
 
+export async function getCompanionById(id: string) {
+  try {
+    // Sử dụng Drizzle query với "with" để lấy dữ liệu liên quan
+    // const companion = await db.query.companions.findFirst({
+    //   where: eq(companions.id, id),
+    //   // "with" sẽ tự động JOIN và lồng dữ liệu từ bảng 'transcripts'
+    //   with: {
+    //     transcript: true, // Lấy toàn bộ dữ liệu từ transcript liên quan
+    //   },
+    // });
+
+    const companion = await supabase.from("companions")
+      // .select(`*, transcript:data(transcripts)`)
+      // .select(`companions:companion_id (*)`)
+      .select()
+      .eq("id", id)
+      .single();
+
+    if (companion.error) {
+      console.error("Error fetching companion by ID:", companion.error);
+      return null;
+    }
+    if (!companion.data) {
+      console.warn("No companion found with ID:", id);
+      return null;
+    }
+    console.log("Fetched companion:", companion.data);
+    // Trả về companion với transcript_data được gộp vào
+    
+    // --- Biến đổi dữ liệu để khớp với cấu trúc frontend mong đợi ---
+    // Gộp dữ liệu từ hai bảng lại thành một object duy nhất
+    const result = {
+      ...companion.data, // Lấy các trường name, subject, topic, ...
+      // Gộp transcript_data vào cấp cao nhất
+      transcript_data: companion.data.transcript_data,
+      // Xóa các thuộc tính không cần thiết để tránh nhầm lẫn
+      transcript: undefined,
+      transcriptId: undefined,
+    };
+
+    // Xóa các thuộc tính không cần thiết khỏi object cuối cùng
+    delete result.transcript;
+    delete result.transcriptId;
+
+    return result;
+  } catch (error) {
+    console.error("Error fetching companion by ID:", error);
+    return null;
+  }
+}
 // Session History
 export const addToSessionHistory = async (companionId: string) => {
   const session = await auth();

@@ -13,13 +13,12 @@ interface CompanionSessionProps {
 }
 
 const CompanionSession = async ({ params }: CompanionSessionProps) => {
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
+
   const { id } = await params;
   const companion = await getCompanion(id);
-  const user = await getCurrentUser();
-
   const { name, subject, topic, duration } = companion;
-
-  if (!user) redirect("/sign-in");
   if (!name) redirect("/companions");
   // if (companion.author !== user.id) redirect("/companions");
   // if(companion.id !== id) redirect('/companions');
