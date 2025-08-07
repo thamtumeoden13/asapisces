@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const audioStream = await client.generate({
       voice: voiceId,
       text: text,
-      model_id: "eleven_multilingual_v2", // Chọn model phù hợp
+      model_id: "eleven_flash_v2_5", // Chọn model phù hợp
     });
 
     // Tạo một ReadableStream để trả về cho client

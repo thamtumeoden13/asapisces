@@ -54,7 +54,7 @@ const getSubjectColor = (subject: string) => {
 };
 
 interface EnhancedCompanionConversationOptimizedProps
-  extends CompanionComponentProps {
+  extends Partial<CompanionComponentProps> {
   topicTitles: TopicTitles;
   podcastTopics: PodcastTopics;
   selectedTopic?: TopicKey;

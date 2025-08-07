@@ -253,3 +253,5 @@ export function createTopicConfig(
   return topics.map((topic) => ({ ...topic, keyword: topic.key }));
 }
 
+export type { TopicConfig };
+

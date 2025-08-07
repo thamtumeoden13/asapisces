@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   processTranscript,
   PodcastDataUtils,
@@ -174,6 +174,15 @@ export default function TranscriptProcessorComponent({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  useEffect(() => {
+    if (companionData && companionData.transcript_data) {
+      setRawTranscript(companionData.transcript_data.rawTranscript || "");
+      setTopicConfig(
+        companionData.transcript_data.topicConfig || DEFAULT_TOPIC_CONFIG
+      );
+    }
+  }, [companionData]);
 
   if (!processedData || !utils) {
     return (

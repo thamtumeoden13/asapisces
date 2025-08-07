@@ -1,6 +1,6 @@
 import React from "react";
 import { getCurrentUser } from "@/lib/actions/auth.action";
-import { getCompanion } from "@/lib/actions/companion.actions";
+import { getCompanionById } from "@/lib/actions/companion.actions";
 import { redirect } from "next/navigation";
 import VapiConversationComponent from "@/components/companion/VapiConversationComponent";
 
@@ -12,7 +12,7 @@ interface ConversationSessionProps {
 
 const ConversationPage = async ({ params }: ConversationSessionProps) => {
   const { id } = await params;
-  const companion = await getCompanion(id);
+  const companion = await getCompanionById(id);
   const user = await getCurrentUser();
 
   const { name, subject, topic, duration } = companion;

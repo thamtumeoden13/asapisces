@@ -1,6 +1,6 @@
 import CompanionComponent from "@/components/companion/CompanionComponent";
 import { getCurrentUser } from "@/lib/actions/auth.action";
-import { getCompanion } from "@/lib/actions/companion.actions";
+import { getCompanionById } from "@/lib/actions/companion.actions";
 import { getSubjectColor } from "@/lib/utils";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -17,7 +17,7 @@ const CompanionSession = async ({ params }: CompanionSessionProps) => {
   if (!user) redirect("/sign-in");
 
   const { id } = await params;
-  const companion = await getCompanion(id);
+  const companion = await getCompanionById(id);
   const { name, subject, topic, duration } = companion;
   if (!name) redirect("/companions");
   // if (companion.author !== user.id) redirect("/companions");

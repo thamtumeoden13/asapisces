@@ -31,11 +31,21 @@ export const getAllCompanions = async ({
   topic,
   userId,
 }: GetAllCompanions & { userId?: string }) => {
+  // Bắt đầu xây dựng query với Supabase client
   let query = supabase
     .from("companions")
-    .select("*, bookmarks:bookmarks(id)")
+    // --- SỬA ĐỔI CHUỖI SELECT Ở ĐÂY ---
+    .select(
+      `
+      *, 
+      bookmarks(id), 
+      transcript:transcripts(data)
+    `
+    )
+    // --- KẾT THÚC SỬA ĐỔI ---
     .range((page - 1) * limit, page * limit - 1);
 
+  // Các điều kiện lọc giữ nguyên
   if (subject && topic) {
     query = query
       .ilike("subject", `%${subject}%`)
@@ -46,80 +56,75 @@ export const getAllCompanions = async ({
     query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
   }
 
-  if (userId) {
-    query = query.eq("bookmarks.user_id", userId);
+  // Lưu ý: Lọc bookmark như thế này có thể không hoạt động như mong đợi
+  // Cách tốt hơn là kiểm tra sau khi lấy dữ liệu hoặc dùng một query phức tạp hơn.
+  // if (userId) {
+  //   query = query.eq("bookmarks.user_id", userId);
+  // }
+
+  // Thực thi query
+  const { data, error } = await query;
+  if (error) {
+    console.error("Supabase error fetching all companions:", error);
+    throw new Error(error.message);
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
+  // Biến đổi dữ liệu trả về
   return data.map((companion) => ({
     ...companion,
+    // Gộp transcript_data vào
+    transcript_data: (companion.transcript as any)?.data || null,
+    // Xóa thuộc tính `transcript` lồng nhau
+    transcript: undefined,
+    // Tính toán `bookmarked`
     bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
   }));
 };
 
-// Get One
-export const getCompanion = async (id: string) => {
-  const { data, error } = await supabase
-    .from("companions")
-    .select()
-    .eq("id", id);
-
-  if (error) throw new Error(error.message);
-  return data?.[0];
-};
-
 export async function getCompanionById(id: string) {
   try {
-    // Sử dụng Drizzle query với "with" để lấy dữ liệu liên quan
-    // const companion = await db.query.companions.findFirst({
-    //   where: eq(companions.id, id),
-    //   // "with" sẽ tự động JOIN và lồng dữ liệu từ bảng 'transcripts'
-    //   with: {
-    //     transcript: true, // Lấy toàn bộ dữ liệu từ transcript liên quan
-    //   },
-    // });
-
-    const companion = await supabase.from("companions")
-      // .select(`*, transcript:data(transcripts)`)
-      // .select(`companions:companion_id (*)`)
-      .select()
+    const { data: companion, error } = await supabase
+      .from("companions")
+      // --- SỬA ĐỔI CHUỖI SELECT Ở ĐÂY ---
+      // Cú pháp: *, tên_bảng_liên_quan(các_cột_cần_lấy)
+      .select(
+        `
+        *, 
+        transcript:transcripts(data) 
+      `
+      )
+      // --- KẾT THÚC SỬA ĐỔI ---
       .eq("id", id)
-      .single();
+      .single(); // Dùng .single() để Supabase trả về một object thay vì một mảng
 
-    if (companion.error) {
-      console.error("Error fetching companion by ID:", companion.error);
+    if (error) {
+      console.error("Supabase error fetching companion by ID:", error);
       return null;
     }
-    if (!companion.data) {
-      console.warn("No companion found with ID:", id);
+
+    if (!companion) {
       return null;
     }
-    console.log("Fetched companion:", companion.data);
-    // Trả về companion với transcript_data được gộp vào
-    
+
     // --- Biến đổi dữ liệu để khớp với cấu trúc frontend mong đợi ---
-    // Gộp dữ liệu từ hai bảng lại thành một object duy nhất
+    // `companion` giờ sẽ có dạng: { ..., transcript: { data: { ... } } }
+
     const result = {
-      ...companion.data, // Lấy các trường name, subject, topic, ...
-      // Gộp transcript_data vào cấp cao nhất
-      transcript_data: companion.data.transcript_data,
-      // Xóa các thuộc tính không cần thiết để tránh nhầm lẫn
-      transcript: undefined,
-      transcriptId: undefined,
+      ...companion,
+      // Gộp transcript.data vào cấp cao nhất dưới tên `transcript_data`
+      transcript_data: (companion.transcript as any)?.data || null,
     };
 
-    // Xóa các thuộc tính không cần thiết khỏi object cuối cùng
-    delete result.transcript;
-    delete result.transcriptId;
+    // Xóa thuộc tính `transcript` lồng nhau để làm sạch object
+    delete (result as any).transcript;
 
     return result;
   } catch (error) {
-    console.error("Error fetching companion by ID:", error);
+    console.error("Error in getCompanionById:", error);
     return null;
   }
 }
+
 // Session History
 export const addToSessionHistory = async (companionId: string) => {
   const session = await auth();

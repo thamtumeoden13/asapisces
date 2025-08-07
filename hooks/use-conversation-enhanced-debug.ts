@@ -177,6 +177,8 @@ export const useConversation = ({
 
   const speakAI = useCallback(
     (text: string) => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      
       if (ttsProvider === "elevenlabs") {
         return speakAIByElevenLabs(text);
       }
