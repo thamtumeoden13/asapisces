@@ -15,9 +15,6 @@ const nextConfig: NextConfig = {
       hostname: "*"
     }]
   },
-  experimental: {
-    ppr: "incremental",
-  },
   devIndicators: {
   },
   transpilePackages: ['three'],
