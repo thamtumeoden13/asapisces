@@ -178,7 +178,7 @@ export const useConversation = ({
   const speakAI = useCallback(
     (text: string) => {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      
+
       if (ttsProvider === "elevenlabs") {
         return speakAIByElevenLabs(text);
       }
@@ -248,6 +248,15 @@ export const useConversation = ({
         messageContent
       ).trim();
       setPartialTranscript(accumulatedTranscriptRef.current);
+
+      if (
+        expectedLine.text.split(/\s+/).length > 10 &&
+        accumulatedTranscriptRef.current.split(/\s+/).length <
+          expectedLine.text.split(/\s+/).length / 2
+      ) {
+        // Nếu số từ hiện tại trong bộ đệm còn ít hơn một nửa số từ của câu mục tiêu, không cần thiết phải xử lý ngay
+        return;
+      }
 
       // Xóa timer cũ
       if (finalTranscriptGracePeriodRef.current)

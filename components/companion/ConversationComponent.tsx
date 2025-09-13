@@ -4,17 +4,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation-v3";
-// import { podcastTopics, topicTitles } from "@/data/podcast-topics";
 import type { TopicKey } from "@/types/podcast";
-import { BookOpen, Users, Target, TrendingUp } from "lucide-react";
+import { BookOpen, Target } from "lucide-react";
 import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
 
 const voiceStyles = {
@@ -24,6 +16,13 @@ const voiceStyles = {
   encouraging: "21m00Tcm4TlvDq8ikWAM", // Rachel
 };
 
+interface TopicConfig {
+  key: string;
+  keyword: string;
+  title?: string;
+  description?: string;
+  priority?: number;
+}
 const ConversationComponent = ({
   companionId,
   subject,
@@ -37,6 +36,7 @@ const ConversationComponent = ({
   transcriptData,
 }: CompanionComponentProps) => {
   const [topicTitles, setTopicTitles] = useState<TopicTitles>({});
+  const [topicConfig, setTopicConfig] = useState<TopicConfig[]>([]);
   const [podcastTopics, setPodcastTopics] = useState<PodcastTopics>({});
 
   const [selectedTopic, setSelectedTopic] = useState<TopicKey>("intro");
@@ -80,17 +80,18 @@ const ConversationComponent = ({
   useEffect(() => {
     console.log({ transcriptData });
     if (transcriptData) {
-      const { topicTitles, podcastTopics } = transcriptData;
+      const { topicTitles, podcastTopics, topicConfig } = transcriptData;
 
       setTopicTitles(topicTitles);
       setPodcastTopics(podcastTopics);
+      setTopicConfig(topicConfig as TopicConfig[]);
     }
   }, [transcriptData]);
 
   return (
     <>
       {/* Progress Overview */}
-      <Card className="mb-8">
+      {/* <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
@@ -125,12 +126,11 @@ const ConversationComponent = ({
             </div>
           </div>
         </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
+      </Card> */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-4 min-h-screen ">
         {/* Topic Selection Sidebar */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-4">
+          <Card className="">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
@@ -138,62 +138,13 @@ const ConversationComponent = ({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Level Selection */}
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Your Level
-                </label>
-                <Select
-                  value={userLevel}
-                  onValueChange={(
-                    value: "beginner" | "intermediate" | "advanced"
-                  ) => setUserLevel(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Voice Style Selection */}
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Voice Style
-                </label>
-                <Select
-                  value={voiceStyle}
-                  onValueChange={(
-                    value:
-                      | "friendly"
-                      | "professional"
-                      | "casual"
-                      | "encouraging"
-                  ) => setVoiceStyle(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="friendly">Friendly</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="casual">Casual</SelectItem>
-                    <SelectItem value="encouraging">Encouraging</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Topic Selection */}
               <div>
                 <label className="block mb-3 text-sm font-medium">
                   Choose Topic
                 </label>
                 <div className="space-y-2 overflow-y-auto max-h-96">
-                  {Object.entries(topicTitles).map(([key, title]) => {
+                  {topicConfig?.map(({ key, title }) => {
                     const topicKey = key as TopicKey;
                     const isCompleted = completedTopics.has(topicKey);
                     const isSelected = selectedTopic === topicKey;
@@ -284,50 +235,6 @@ const ConversationComponent = ({
           />
         </div>
       </div>
-
-      {/* Help Section */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            How It Works
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="text-center">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full">
-                <span className="text-2xl">🎯</span>
-              </div>
-              <h3 className="mb-2 font-medium">Choose Your Topic</h3>
-              <p className="text-sm text-gray-600">
-                Select from various conversation topics based on your learning
-                goals and interests.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-green-100 rounded-full">
-                <span className="text-2xl">🎤</span>
-              </div>
-              <h3 className="mb-2 font-medium">Practice Speaking</h3>
-              <p className="text-sm text-gray-600">
-                Engage in natural conversation with AI companions using advanced
-                voice recognition.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-purple-100 rounded-full">
-                <span className="text-2xl">📊</span>
-              </div>
-              <h3 className="mb-2 font-medium">Get Real-time Feedback</h3>
-              <p className="text-sm text-gray-600">
-                Receive instant feedback on pronunciation, fluency, and
-                conversation skills.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </>
   );
 };

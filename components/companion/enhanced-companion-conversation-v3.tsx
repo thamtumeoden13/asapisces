@@ -65,7 +65,6 @@ const EnhancedCompanionConversationOptimized = ({
   companionId = "demo",
   subject = "english",
   topic = "intro",
-  topicTitles,
   podcastTopics,
   name = "Leo & Gwen",
   userName = "Student",
@@ -430,263 +429,84 @@ const EnhancedCompanionConversationOptimized = ({
   );
 
   return (
-    <div className="max-w-6xl p-6 mx-auto space-y-6">
-      {/* Enhanced Header with Timing Controls */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-2xl">
-                <Target className="w-6 h-6" />
-                {topicTitles[currentTopic]}
-              </CardTitle>
-              <p className="text-gray-600">
-                Enhanced AI Conversation Practice - Smart Long Sentence
-                Processing
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Quick Mode Toggle */}
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={timingSettings.quickMode}
-                  onCheckedChange={(checked) =>
-                    setTimingSettings((prev) => ({
-                      ...prev,
-                      quickMode: checked,
-                    }))
-                  }
-                />
-                <span className="text-sm">Quick Mode</span>
-              </div>
+    <div
+      className={cn("max-w-6xl mx-auto", showDebug ? "space-y-6" : "space-y-0")}
+    >
 
-              {/* Auto-advance Toggle */}
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={timingSettings.autoAdvance}
-                  onCheckedChange={(checked) =>
-                    setTimingSettings((prev) => ({
-                      ...prev,
-                      autoAdvance: checked,
-                    }))
-                  }
-                />
-                <span className="text-sm">Auto-advance</span>
-              </div>
-
-              <div
-                className={`w-3 h-3 rounded-full ${getStatusColor(callState.status)}`}
-              />
-              <Badge variant="outline">{getStatusText(callState.status)}</Badge>
-            </div>
-          </div>
-
-          {/* ✨ NEW: State Debug Display */}
-          {showDebug && (
-            <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-blue-50">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">
-                  Debug State
-                </span>
-              </div>
-              <div className="grid grid-cols-4 gap-2 text-xs">
-                <div>
-                  <span className="font-medium">Step:</span>{" "}
-                  {conversationState.currentStep}/{conversationState.totalSteps}
-                </div>
-                <div>
-                  <span className="font-medium">Waiting:</span>{" "}
-                  <Badge
-                    variant={
-                      conversationState.isWaitingForUser ? "default" : "outline"
-                    }
-                    className="text-xs"
-                  >
-                    {conversationState.isWaitingForUser ? "YES" : "NO"}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="font-medium">Speaker:</span>{" "}
-                  {currentLine?.speaker || "None"}
-                </div>
-                <div>
-                  <span className="font-medium">Speaking:</span>{" "}
-                  <Badge
-                    variant={isSpeaking ? "default" : "outline"}
-                    className="text-xs"
-                  >
-                    {isSpeaking ? "YES" : "NO"}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* ✨ NEW: Partial transcript display */}
-              {partialTranscript && (
-                <div className="p-2 mt-2 border border-yellow-200 rounded bg-yellow-50">
-                  <div className="flex items-center gap-2 mb-1">
-                    <MessageSquare className="w-3 h-3 text-yellow-600" />
-                    <span className="text-xs font-medium text-yellow-800">
-                      Live Speech
-                    </span>
-                  </div>
-                  <div className="text-xs text-yellow-700">
-                    &quot;{partialTranscript}...&quot;
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Enhanced Progress with Timing Info */}
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span>Progress</span>
-              <div className="flex items-center space-x-4">
-                <span>
-                  {conversationState.currentStep}/{conversationState.totalSteps}
-                </span>
-
-                {/* Countdown display */}
-                {countdown && timingSettings.autoAdvance && (
-                  <Badge variant="outline" className="text-xs animate-pulse">
-                    Auto-advance in {countdown}s
-                  </Badge>
-                )}
-
-                {realTimeMetrics.responseTime > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {(realTimeMetrics.responseTime / 1000).toFixed(1)}s response
-                  </Badge>
-                )}
-              </div>
-            </div>
-            {/* <Progress value={progress} className="h-2" /> */}
-
-            {/* Real-time Speech Metrics */}
-            {speechMetrics && (
-              <div className="grid grid-cols-5 gap-2 text-xs">
-                <div className="text-center">
-                  <div
-                    className={`font-medium ${getMetricColor(speechMetrics.clarity * 100)}`}
-                  >
-                    {(speechMetrics.clarity * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-gray-500">Clarity</div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className={`font-medium ${getMetricColor(speechMetrics.pace * 100)}`}
-                  >
-                    {(speechMetrics.pace * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-gray-500">Pace</div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className={`font-medium ${getMetricColor(speechMetrics.volume * 100)}`}
-                  >
-                    {(speechMetrics.volume * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-gray-500">Volume</div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className={`font-medium ${getMetricColor(speechMetrics.pronunciation * 100)}`}
-                  >
-                    {(speechMetrics.pronunciation * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-gray-500">Pronunciation</div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className={`font-medium ${getMetricColor(speechMetrics.fluency * 100)}`}
-                  >
-                    {(speechMetrics.fluency * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-gray-500">Fluency</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-
-        {/* Error Display */}
-        {callState.status === "ERROR" && (
-          <CardContent>
-            <Alert variant="destructive">
-              <AlertDescription>Error: {callState.error}</AlertDescription>
-            </Alert>
-          </CardContent>
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-6",
+          showDebug ? "lg:grid-cols-3 gap-6" : "lg:grid-cols-1 gap-0"
         )}
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      >
         {/* Main Conversation Area */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6 col-span-3">
           {/* Enhanced Avatar and Controls */}
           <Card>
             <CardContent className="p-6">
-              <div className="flex flex-col items-center space-y-6">
+              <div className="flex flex-col md:flex-row items-center space-y-6">
                 {/* Enhanced Companion Avatar */}
-                <div
-                  className="relative flex items-center justify-center w-40 h-40 rounded-full"
-                  style={{ backgroundColor: getSubjectColor(subject) }}
-                >
+                <div className="flex flex-1 flex-col items-center justify-items-center space-y-4">
                   <div
-                    className={cn(
-                      "absolute transition-opacity duration-300",
-                      callState.status === CallStatus.FINISHED ||
-                        callState.status === CallStatus.INACTIVE
-                        ? "opacity-100"
-                        : "opacity-0",
-                      callState.status === CallStatus.CONNECTING
-                        ? "opacity-100 animate-pulse"
-                        : undefined
-                    )}
+                    className="relative flex items-center justify-center w-40 h-40 rounded-full"
+                    style={{ backgroundColor: getSubjectColor(subject) }}
                   >
-                    <div className="flex items-center justify-center w-24 h-24 bg-white rounded-full">
-                      <span className="text-4xl">🎙️</span>
+                    <div
+                      className={cn(
+                        "absolute transition-opacity duration-300",
+                        callState.status === CallStatus.FINISHED ||
+                          callState.status === CallStatus.INACTIVE
+                          ? "opacity-100"
+                          : "opacity-0",
+                        callState.status === CallStatus.CONNECTING
+                          ? "opacity-100 animate-pulse"
+                          : undefined
+                      )}
+                    >
+                      <div className="flex items-center justify-center w-24 h-24 bg-white rounded-full">
+                        <span className="text-4xl">🎙️</span>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "absolute transition-opacity duration-100",
+                        callState.status === CallStatus.ACTIVE
+                          ? "opacity-100"
+                          : "opacity-0"
+                      )}
+                    >
+                      {!performanceMode.reducedAnimations && (
+                        <Lottie
+                          lottieRef={lottieRef}
+                          animationData={soundwaves}
+                          autoplay={false}
+                          className="w-32 h-32"
+                        />
+                      )}
+                      {performanceMode.reducedAnimations && (
+                        <div className="flex items-center justify-center w-32 h-32">
+                          <div
+                            className={cn(
+                              "w-16 h-16 bg-white rounded-full flex items-center justify-center",
+                              isSpeaking ? "animate-pulse" : ""
+                            )}
+                          >
+                            <Mic className="w-8 h-8" />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div
-                    className={cn(
-                      "absolute transition-opacity duration-100",
-                      callState.status === CallStatus.ACTIVE
-                        ? "opacity-100"
-                        : "opacity-0"
-                    )}
-                  >
-                    {!performanceMode.reducedAnimations && (
-                      <Lottie
-                        lottieRef={lottieRef}
-                        animationData={soundwaves}
-                        autoplay={false}
-                        className="w-32 h-32"
-                      />
-                    )}
-                    {performanceMode.reducedAnimations && (
-                      <div className="flex items-center justify-center w-32 h-32">
-                        <div
-                          className={cn(
-                            "w-16 h-16 bg-white rounded-full flex items-center justify-center",
-                            isSpeaking ? "animate-pulse" : ""
-                          )}
-                        >
-                          <Mic className="w-8 h-8" />
-                        </div>
-                      </div>
-                    )}
+
+                  <div className="text-center">
+                    <h2 className="text-xl font-bold">{name}</h2>
+                    <p className="text-gray-600">
+                      Your AI Conversation Partner
+                    </p>
                   </div>
                 </div>
-
-                <div className="text-center">
-                  <h2 className="text-xl font-bold">{name}</h2>
-                  <p className="text-gray-600">Your AI Conversation Partner</p>
-                </div>
-
                 {/* Enhanced Control Buttons */}
-                <div className="w-full space-y-3">
+                <div className="flex flex-1 flex-col items-center justify-items-center space-y-4">
                   <audio ref={audioPlayerRef} className="hidden" />{" "}
                   {/* THÊM DÒNG NÀY */}
                   <Button
@@ -758,7 +578,7 @@ const EnhancedCompanionConversationOptimized = ({
                       onClick={() =>
                         skipToStep(conversationState.currentStep + 1)
                       }
-                      disabled={callState.status !== "ACTIVE" || !showDebug}
+                      disabled={callState.status !== "ACTIVE"}
                       className="text-xs"
                     >
                       <SkipForward className="w-4 h-4" />
@@ -1431,134 +1251,6 @@ const EnhancedCompanionConversationOptimized = ({
           </Card>
         </div>
 
-        {/* Enhanced Sidebar */}
-        <div className="space-y-6">
-          {/* Topic Overview with Timing */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Brain className="w-5 h-5" />
-                Topic Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Total Steps:</span>
-                  <span>{steps.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Completed:</span>
-                  <span>{conversationState.currentStep}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Leo Lines:</span>
-                  <span>{steps.filter((s) => s.speaker === "Leo").length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Gwen Lines:</span>
-                  <span>
-                    {steps.filter((s) => s.speaker === "Gwen").length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Long Sentences:</span>
-                  <span>
-                    {
-                      steps.filter((s) => s.text.split(/\s+/).length > 10)
-                        .length
-                    }
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Enhanced Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Zap className="w-5 h-5" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setTimingSettings((prev) => ({
-                      ...prev,
-                      quickMode: !prev.quickMode,
-                    }))
-                  }
-                  className={cn(
-                    "w-full",
-                    timingSettings.quickMode
-                      ? "bg-yellow-100 border-yellow-300"
-                      : ""
-                  )}
-                >
-                  {timingSettings.quickMode
-                    ? "🐌 Normal Speed"
-                    : "⚡ Quick Mode"}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setTimingSettings((prev) => ({
-                      ...prev,
-                      autoAdvance: !prev.autoAdvance,
-                    }))
-                  }
-                  className={cn(
-                    "w-full",
-                    timingSettings.autoAdvance
-                      ? "bg-green-100 border-green-300"
-                      : ""
-                  )}
-                >
-                  {timingSettings.autoAdvance
-                    ? "⏸️ Manual Mode"
-                    : "▶️ Auto-advance"}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={manualAdvance}
-                  disabled={callState.status !== "ACTIVE"}
-                  className="w-full bg-transparent"
-                >
-                  <FastForward className="w-4 h-4 mr-2" />
-                  Next Step
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDebug(!showDebug)}
-                  className="w-full"
-                >
-                  Toggle Debug Mode
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={resetConversation}
-                  disabled={callState.status === "ACTIVE"}
-                  className="w-full bg-transparent"
-                >
-                  Reset Conversation
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );
