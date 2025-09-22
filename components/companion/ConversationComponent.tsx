@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation-v3";
 import type { TopicKey } from "@/types/podcast";
-import { BookOpen, Target } from "lucide-react";
+import { BookOpen, Target, TrendingUp } from "lucide-react";
 import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
 
 const voiceStyles = {
@@ -91,7 +91,7 @@ const ConversationComponent = ({
   return (
     <>
       {/* Progress Overview */}
-      {/* <Card className="mb-8">
+      <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
@@ -126,7 +126,7 @@ const ConversationComponent = ({
             </div>
           </div>
         </CardContent>
-      </Card> */}
+      </Card>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-4 min-h-screen ">
         {/* Topic Selection Sidebar */}
         <div className="lg:col-span-1">

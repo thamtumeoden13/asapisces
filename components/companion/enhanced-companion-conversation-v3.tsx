@@ -38,6 +38,7 @@ import type {
 } from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
 import { saveConversationFeedbackAction } from "@/lib/actions/feedback.action";
+// import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -432,7 +433,6 @@ const EnhancedCompanionConversationOptimized = ({
     <div
       className={cn("max-w-6xl mx-auto", showDebug ? "space-y-6" : "space-y-0")}
     >
-
       <div
         className={cn(
           "grid grid-cols-1 gap-6",
@@ -1250,8 +1250,18 @@ const EnhancedCompanionConversationOptimized = ({
             </CardContent>
           </Card>
         </div>
-
       </div>
+      {/* <div>
+        <PodcastPlayer
+          callState={callState}
+          conversationState={conversationState}
+          partialTranscript={partialTranscript}
+          currentLine={currentLine}
+          isSpeaking={isSpeaking}
+          startCall={startCall}
+          endCall={endCall}
+        />
+      </div> */}
     </div>
   );
 };

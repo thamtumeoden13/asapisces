@@ -1,21 +1,27 @@
-import React from "react";
+import { getAllCompanions } from "@/lib/actions/companion.actions";
 import CompanionCard from "@/components/companion/CompanionCard";
-import CompanionList from "@/components/companion/CompanionList";
-import CTA from "@/components/companion/CTA";
-import {
-  getAllCompanions,
-  getRecentSessions,
-} from "@/lib/actions/companion.actions";
 import { getSubjectColor } from "@/lib/utils";
+import SearchInput from "@/components/companion/SearchInput";
+import SubjectFilter from "@/components/companion/SubjectFilter";
+import { SearchParams } from "@/types";
 
-const Page = async () => {
-  const companions = await getAllCompanions({ limit: 3 });
-  const recentSessionsCompanions = await getRecentSessions(10);
+const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
+  const filters = await searchParams;
+  const subject = filters.subject ? filters.subject : "";
+  const topic = filters.topic ? filters.topic : "";
+
+  const companions = await getAllCompanions({ subject, topic, limit: 100 });
+
   return (
-    <div className="mx-auto px-14 flex flex-col gap-8 bg-background h-full max-w-[1400px] py-10 max-sm:px-2">
-      <h1 className="text-3xl underline text-black-400">Popular Companions</h1>
-
-      <section className="home-section">
+    <section className="mx-auto px-14 flex flex-col gap-8 bg-background h-full w-full max-w-[1440px] pt-10 pb-10 max-sm:px-2">
+      <div className="flex items-center justify-between gap-4 max-sm:flex-col w-full">
+        <h1 className="text-3xl font-bold text-black-200">Companion Library</h1>
+        <div className="flex items-center gap-4">
+          <SearchInput />
+          <SubjectFilter />
+        </div>
+      </div>
+      <div className="companions-grid">
         {companions.map((companion) => (
           <CompanionCard
             key={companion.id}
@@ -23,23 +29,14 @@ const Page = async () => {
             color={getSubjectColor(companion.subject)}
             href={
               companion.transcript_data
-                ? "/companion/conversation"
-                : "/companion/companions"
+                ? `/companion/conversation`
+                : `/companion/companions`
             }
           />
         ))}
-      </section>
-
-      <section className="home-section !items-start">
-        <CompanionList
-          title="Recently completed sessions"
-          companions={recentSessionsCompanions}
-          className="w-2/3 max-lg:w-full"
-        />
-        <CTA />
-      </section>
-    </div>
+      </div>
+    </section>
   );
 };
 
-export default Page;
+export default CompanionsLibrary;
