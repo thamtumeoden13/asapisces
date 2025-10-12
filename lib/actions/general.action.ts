@@ -4,6 +4,7 @@ import { feedbackSchema, languageFeedbackSchema } from "@/constants";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { supabase } from "../supabase/server";
+import { Feedback } from "@/types";
 
 export async function getInterviewByUserId(
   userId: string
@@ -195,13 +196,14 @@ interface CreateLanguageFeedbackParams {
   userId: string; // ID của người dùng
   transcript: Array<{ role: "user" | "assistant"; content: string }>; // Lịch sử tin nhắn
   script: Array<{ speaker: string; text: string }>; // Kịch bản gốc để so sánh
+  userRole: "Leo" | "Gwen"; // Vai trò của người dùng trong kịch bản
 }
 
 // 2. SỬA ĐỔI HÀM createFeedback
 export async function createLanguageFeedback(
   params: CreateLanguageFeedbackParams
 ) {
-  const { sessionId, userId, transcript, script } = params;
+  const { sessionId, userId, transcript, script, userRole } = params;
 
   try {
     // Định dạng transcript và kịch bản để gửi cho AI
@@ -219,34 +221,46 @@ export async function createLanguageFeedback(
       )
       .join("\n");
 
+    // Lọc ra chỉ những câu thoại mà người dùng phải nói
+    const userScriptLines = script
+      .filter((line) => line.speaker === userRole)
+      .map((line) => `- ${line.text}`)
+      .join("\n");
+
+    // Lấy tên của AI Companion
+    const aiCompanionRole = userRole === "Leo" ? "Gwen" : "Leo";
+
     const { object: feedbackData } = await generateObject({
       model: google("gemini-2.5-pro"), // Sử dụng model mới hơn nếu có thể
       schema: languageFeedbackSchema,
       prompt: `
         You are an expert AI English tutor. Your task is to provide constructive and encouraging feedback to a student who has just completed a conversation practice session.
 
-        Here is the original script they were supposed to follow:
-        --- SCRIPT ---
-        ${formattedScript}
-        --- END SCRIPT ---
+        **Crucial Context:**
+        - The learner was playing the role of: **${userRole}**.
+        - The AI companion was playing the role of: **${aiCompanionRole}**.
+        - You should ONLY evaluate the learner's performance based on their assigned role's lines.
 
-        Here is the actual conversation transcript:
-        --- TRANSCRIPT ---
+        Here are the lines the learner was **supposed to say** (their script for the role of ${userRole}):
+        --- LEARNER'S SCRIPT (${userRole}) ---
+        ${userScriptLines}
+        --- END LEARNER'S SCRIPT ---
+
+        Here is the actual conversation transcript, which includes both the learner's speech and the AI's responses:
+        --- FULL TRANSCRIPT ---
         ${formattedTranscript}
-        --- END TRANSCRIPT ---
+        --- END FULL TRANSCRIPT ---
 
-        Please evaluate the learner's performance based on the provided script and transcript.
-        Analyze their speech for the following categories and provide a score from 0 to 100 for each.
-        - **Pronunciation**: How clear and accurate was their pronunciation?
-        - **Fluency**: Did their speech flow naturally, or was it hesitant and choppy?
-        - **Grammar**: Were there any grammatical mistakes? (e.g., subject-verb agreement, tenses).
-        - **Vocabulary**: Did they use appropriate words?
-        - **Completion**: How well did they stick to the provided script? (A low score here isn't necessarily bad if they were creative, but note it).
+        Please evaluate the **learner's (${userRole})** performance based on the provided scripts and transcript.
+        Analyze their speech (labeled as "Learner" in the full transcript) for the following categories and provide a score from 0 to 100 for each.
+        - **Pronunciation**: How clear and accurate was their pronunciation? (Infer from the text if needed).
+        - **Fluency**: Did their speech flow naturally? (Infer from how close they were to the script).
+        - **Grammar & Vocabulary**: Did they follow the script's grammar and vocabulary?
+        - **Role Adherence**: How well did they stick to their assigned lines as ${userRole}? A low score here is acceptable if they were creative, but you should note any major deviations.
 
-        For 'strengths' and 'areasForImprovement', be specific and use examples from their speech. Keep the tone positive and motivational.
+        For 'strengths' and 'areasForImprovement', be specific. Use examples from the "Learner" parts of the full transcript and compare them to the "Learner's Script". Keep the tone positive and motivational.
       `,
-      system:
-        "You are an AI English language tutor providing feedback on a practice conversation.",
+      system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}.`,
     });
 
     console.log("✅ AI Feedback Generated:", feedbackData);
