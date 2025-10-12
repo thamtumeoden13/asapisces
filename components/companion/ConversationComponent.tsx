@@ -1,13 +1,8 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation-v3";
-import type { TopicKey } from "@/types/podcast";
-import { BookOpen, Target, TrendingUp } from "lucide-react";
-import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
+import { TrendingUp } from "lucide-react";
+import { CompanionComponentProps, } from "@/types";
+import { getFeedbackHistoryForTopic } from "@/lib/actions/feedback.action"; // Hàm lấy lịch sử điểm số
+import { ConversationPlayer } from "./ConversationPlayer";
 
 const voiceStyles = {
   friendly: "pNInz6obpgDQGcFmaJgB", // Adam
@@ -23,7 +18,7 @@ interface TopicConfig {
   description?: string;
   priority?: number;
 }
-const ConversationComponent = ({
+const ConversationComponent = async ({
   companionId,
   subject,
   topic,
@@ -35,206 +30,32 @@ const ConversationComponent = ({
   voice,
   transcriptData,
 }: CompanionComponentProps) => {
-  const [topicTitles, setTopicTitles] = useState<TopicTitles>({});
-  const [topicConfig, setTopicConfig] = useState<TopicConfig[]>([]);
-  const [podcastTopics, setPodcastTopics] = useState<PodcastTopics>({});
+  // Lấy dữ liệu biểu đồ ban đầu cho topic đầu tiên
+  const initialTopicKey = transcriptData?.topicConfig?.[0]?.key || "intro";
+  const initialFeedbackHistory =
+    await getFeedbackHistoryForTopic(initialTopicKey);
 
-  const [selectedTopic, setSelectedTopic] = useState<TopicKey>("intro");
-  const [completedTopics, setCompletedTopics] = useState<Set<TopicKey>>(
-    new Set()
-  );
-  const [userLevel, setUserLevel] = useState<
-    "beginner" | "intermediate" | "advanced"
-  >("intermediate");
-  const [voiceStyle, setVoiceStyle] = useState<
-    "friendly" | "professional" | "casual" | "encouraging"
-  >("friendly");
-
-  // Lấy voiceId dựa trên lựa chọn
-  const selectedVoiceId = voiceStyles[voiceStyle];
-
-  const handleTopicComplete = (topic: TopicKey) => {
-    setCompletedTopics((prev) => new Set([...prev, topic]));
-
-    // Auto-suggest next topic
-    const topicKeys = Object.keys(podcastTopics) as TopicKey[];
-    const currentIndex = topicKeys.indexOf(topic);
-    if (currentIndex < topicKeys.length - 1) {
-      const nextTopic = topicKeys[currentIndex + 1];
-      setSelectedTopic(nextTopic);
-    }
-  };
-
-  const getTopicProgress = () => {
-    const totalTopics = Object.keys(podcastTopics).length;
-    const completed = completedTopics.size;
-    return (completed / totalTopics) * 100;
-  };
-
-  const getTopicBadgeVariant = (topic: TopicKey) => {
-    if (completedTopics.has(topic)) return "default";
-    if (topic === selectedTopic) return "secondary";
-    return "outline";
-  };
-
-  useEffect(() => {
-    console.log({ transcriptData });
-    if (transcriptData) {
-      const { topicTitles, podcastTopics, topicConfig } = transcriptData;
-
-      setTopicTitles(topicTitles);
-      setPodcastTopics(podcastTopics);
-      setTopicConfig(topicConfig as TopicConfig[]);
-    }
-  }, [transcriptData]);
+  // Dữ liệu tổng quan có thể được tính toán ở đây nếu cần
+  const totalTopics = transcriptData?.topicConfig?.length || 0;
+  // (completedTopics và userLevel sẽ được quản lý ở client)
 
   return (
     <>
-      {/* Progress Overview */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Learning Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600">
-                {completedTopics.size}
-              </div>
-              <div className="text-sm text-gray-600">Topics Completed</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">
-                {getTopicProgress().toFixed(0)}%
-              </div>
-              <div className="text-sm text-gray-600">Overall Progress</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600">
-                {Object.keys(podcastTopics).length}
-              </div>
-              <div className="text-sm text-gray-600">Total Topics</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-orange-600">
-                {userLevel}
-              </div>
-              <div className="text-sm text-gray-600">Current Level</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-4 min-h-screen ">
-        {/* Topic Selection Sidebar */}
-        <div className="lg:col-span-1">
-          <Card className="">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                Practice Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Topic Selection */}
-              <div>
-                <label className="block mb-3 text-sm font-medium">
-                  Choose Topic
-                </label>
-                <div className="space-y-2 overflow-y-auto max-h-96">
-                  {topicConfig?.map(({ key, title }) => {
-                    const topicKey = key as TopicKey;
-                    const isCompleted = completedTopics.has(topicKey);
-                    const isSelected = selectedTopic === topicKey;
-
-                    return (
-                      <Button
-                        key={key}
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        className={`w-full justify-start text-left h-full p-3 whitespace-normal ${
-                          isCompleted ? "bg-green-50 border-green-200" : ""
-                        }`}
-                        onClick={() => setSelectedTopic(topicKey)}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex flex-col flex-wrap">
-                            <div className="text-sm font-medium">{title}</div>
-                            <div className="mt-1 text-xs text-gray-500">
-                              {podcastTopics[topicKey]?.length || 0} steps
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {isCompleted && (
-                              <span className="text-green-600">✓</span>
-                            )}
-                            <Badge
-                              variant={getTopicBadgeVariant(topicKey)}
-                              className="text-xs"
-                            >
-                              {isCompleted
-                                ? "Done"
-                                : isSelected
-                                  ? "Active"
-                                  : "New"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="pt-4 border-t">
-                <h4 className="flex items-center gap-2 mb-2 font-medium">
-                  <Target className="w-4 h-4" />
-                  Quick Stats
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Completed:</span>
-                    <span className="font-medium">{completedTopics.size}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Remaining:</span>
-                    <span className="font-medium">
-                      {Object.keys(podcastTopics).length - completedTopics.size}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Progress:</span>
-                    <span className="font-medium">
-                      {getTopicProgress().toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Conversation Area */}
-        <div className="lg:col-span-3">
-          <EnhancedCompanionConversationV3
-            companionId={companionId}
-            subject={subject}
-            topic={selectedTopic}
-            topicTitles={topicTitles}
-            podcastTopics={podcastTopics}
-            name={name}
-            userName={userName}
-            userImage={userImage}
-            userId={userId}
-            voiceId={selectedVoiceId}
-            selectedTopic={selectedTopic}
-            onTopicComplete={handleTopicComplete}
-          />
-        </div>
-      </div>
+      {/* Render Client Component và truyền dữ liệu đã fetch vào */}
+      <ConversationPlayer
+        companionId={companionId}
+        subject={subject}
+        topic={topic}
+        name={name}
+        userName={userName}
+        userImage={userImage}
+        userId={userId}
+        style={style}
+        voice={voice}
+        voiceId={voice}
+        transcriptData={transcriptData}
+        initialFeedbackHistory={initialFeedbackHistory}
+      />
     </>
   );
 };

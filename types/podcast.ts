@@ -33,12 +33,16 @@ export interface SavedMessage {
   role: "user" | "assistant";
   content: string;
 }
-
+export interface WordResult {
+  word: string;
+  match: boolean;
+}
 export interface Message {
   type: string;
   transcriptType?: string;
   role: "user" | "assistant";
   transcript: string;
+  words?: WordResult[];
 }
 
 // Add VAPI-related types
@@ -58,6 +62,7 @@ export interface VapiCallState {
 }
 
 export enum CallStatus {
+  IDLE = "IDLE",
   INACTIVE = "INACTIVE",
   CONNECTING = "CONNECTING",
   ACTIVE = "ACTIVE",

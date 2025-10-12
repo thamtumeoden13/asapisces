@@ -383,8 +383,11 @@ export interface TimingSettings {
   quickMode: boolean; // Có thể dùng cho tương lai
   responseWaitTime: number; // Đây là giá trị quan trọng nhất: GRACE_PERIOD_MS
 }
-
-interface SimilarityResult {
+export interface WordResult {
+  word: string;
+  match: boolean;
+}
+export interface SimilarityResult {
   score: number
   confidence: number
   matchedPhrases: string[]
@@ -393,6 +396,7 @@ interface SimilarityResult {
   isPartialMatch: boolean
   completenessRatio: number
   shouldWaitForMore: boolean
+  words: WordResult[];
 }
 
 type Message = {

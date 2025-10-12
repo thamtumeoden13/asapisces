@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { useConversation } from "@/hooks/use-conversation-enhanced-debug";
+import { useConversation } from "@/hooks/use-conversation";
 import {
   EnhancedVoiceRecognition,
   type SpeechQualityMetrics,
@@ -37,7 +37,11 @@ import type {
   TopicTitles,
 } from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
-import { saveConversationFeedbackAction } from "@/lib/actions/feedback.action";
+import {
+  FeedbackHistoryPoint,
+  saveConversationFeedbackAction,
+} from "@/lib/actions/feedback.action";
+import { AnalyticsChart } from "./AnalyticsChart";
 // import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -59,7 +63,12 @@ interface EnhancedCompanionConversationOptimizedProps
   topicTitles: TopicTitles;
   podcastTopics: PodcastTopics;
   selectedTopic?: TopicKey;
+  isLoadingChart?: boolean;
+  feedbackHistory?: FeedbackHistoryPoint[];
+  userRole?: "Gwen" | "Leo"; // Thêm prop userRole
+  ttsProvider?: "webspeech" | "elevenlabs"; // Thêm prop ttsProvider
   onTopicComplete?: (topic: TopicKey) => void;
+  onCallStateChange?: (state: CallStatus) => void;
 }
 
 const EnhancedCompanionConversationOptimized = ({
@@ -71,8 +80,14 @@ const EnhancedCompanionConversationOptimized = ({
   userName = "Student",
   userId, // Example UUID
   voiceId,
+  topicTitles,
   selectedTopic,
+  isLoadingChart = false,
+  feedbackHistory = [],
+  userRole = "Gwen",
+  ttsProvider = "webspeech",
   onTopicComplete,
+  onCallStateChange,
 }: EnhancedCompanionConversationOptimizedProps) => {
   const lottieRef = useRef<LottieRefCurrentProps>(null);
 
@@ -118,10 +133,6 @@ const EnhancedCompanionConversationOptimized = ({
   const [activeTab, setActiveTab] = useState<
     "conversation" | "feedback" | "analytics" | "settings"
   >("conversation");
-
-  const [ttsProvider, setTtsProvider] = useState<"webspeech" | "elevenlabs">(
-    "webspeech"
-  );
 
   // Auto-advance timer
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -178,6 +189,7 @@ const EnhancedCompanionConversationOptimized = ({
       onTopicComplete?.(currentTopic);
     },
     timingSettings, // Pass timing settings to the hook
+    userRole, // Pass userRole to the hook
   });
 
   // ✨ NEW: Debug state tracking
@@ -294,9 +306,10 @@ const EnhancedCompanionConversationOptimized = ({
       // Chuẩn bị dữ liệu cho hàm feedback
       const feedbackParams = {
         sessionId: `${companionId}-${currentTopic}`,
-        userId, // Thay thế bằng ID người dùng thực tế
+        userId: userId ?? "", // Ensure userId is a string
         transcript: finalMessages.filter((msg) => msg.content.trim() !== ""), // Lọc tin nhắn rỗng
         script: script,
+        userRole: userRole, // Add userRole to match CreateLanguageFeedbackParams
       };
 
       const result = await createLanguageFeedback(feedbackParams);
@@ -310,7 +323,7 @@ const EnhancedCompanionConversationOptimized = ({
         setSaveStatus("");
 
         const saveResult = await saveConversationFeedbackAction({
-          userId,
+          userId: userId ?? "",
           topicId: currentTopic,
           companionId: companionId,
           totalScore: result.feedback.totalScore,
@@ -338,7 +351,7 @@ const EnhancedCompanionConversationOptimized = ({
 
       setIsGeneratingFeedback(false);
     },
-    [userId, companionId, currentTopic]
+    [userId, companionId, currentTopic, userRole]
   ); // Thêm dependencies
   // Throttled message handling to reduce re-renders
   useEffect(() => {
@@ -387,6 +400,10 @@ const EnhancedCompanionConversationOptimized = ({
     };
   }, []);
 
+  useEffect(() => {
+    onCallStateChange?.(callState.status);
+  }, [callState.status, onCallStateChange]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ACTIVE":
@@ -431,7 +448,7 @@ const EnhancedCompanionConversationOptimized = ({
 
   return (
     <div
-      className={cn("max-w-6xl mx-auto", showDebug ? "space-y-6" : "space-y-0")}
+      className={cn("max-w-7xl mx-auto", showDebug ? "space-y-6" : "space-y-0")}
     >
       <div
         className={cn(
@@ -665,7 +682,7 @@ const EnhancedCompanionConversationOptimized = ({
                           <div className="flex items-center space-x-2">
                             <Badge
                               variant={
-                                currentLine.speaker === "Leo"
+                                currentLine.speaker !== userRole
                                   ? "default"
                                   : "secondary"
                               }
@@ -873,7 +890,34 @@ const EnhancedCompanionConversationOptimized = ({
                                   key={`${message.timestamp}-${messageIndex}`}
                                   className="text-sm leading-relaxed text-gray-700"
                                 >
-                                  <p className="mb-1">{message.content}</p>
+                                  {message.similarity?.words &&
+                                  message.similarity.words.length > 0 ? (
+                                    <p className="mb-1 leading-relaxed">
+                                      {message.similarity.words.map(
+                                        (
+                                          wordInfo: {
+                                            word: string;
+                                            match: boolean;
+                                          },
+                                          i: number
+                                        ) => (
+                                          <span
+                                            key={i}
+                                            className={
+                                              !wordInfo.match
+                                                ? "text-red-500 bg-red-100 rounded px-1"
+                                                : ""
+                                            }
+                                          >
+                                            {wordInfo.word}{" "}
+                                          </span>
+                                        )
+                                      )}
+                                    </p>
+                                  ) : (
+                                    <p className="mb-1">{message.content}</p>
+                                  )}
+
                                   {message.similarity && (
                                     <div className="mt-1 text-xs text-gray-500">
                                       Similarity:{" "}
@@ -1019,9 +1063,25 @@ const EnhancedCompanionConversationOptimized = ({
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-4">
-                  <p className="py-8 text-center text-gray-500">
-                    Analytics content...
-                  </p>
+                  {/* --- TÍCH HỢP BIỂU ĐỒ VÀO ĐÂY --- */}
+                  {/* Bạn có thể đặt nó trong một Card hoặc trong Tab "Analytics" */}
+                  <Card className="mt-8">
+                    <CardHeader>
+                      <CardTitle>
+                        Progress History for:{" "}
+                        {topicTitles[selectedTopic ?? topic]}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoadingChart ? (
+                        <div className="flex items-center justify-center h-64">
+                          <p>Loading Chart Data...</p>
+                        </div>
+                      ) : (
+                        <AnalyticsChart data={feedbackHistory} />
+                      )}
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 {showDebug && (
@@ -1228,20 +1288,6 @@ const EnhancedCompanionConversationOptimized = ({
                             🎯 Careful Mode
                           </Button>
                         </div>
-                      </div>
-                      {/* TTS Provider Settings */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          Use High-Quality Voice (ElevenLabs)
-                        </span>
-                        <Switch
-                          checked={ttsProvider === "elevenlabs"}
-                          onCheckedChange={(checked) => {
-                            setTtsProvider(
-                              checked ? "elevenlabs" : "webspeech"
-                            );
-                          }}
-                        />
                       </div>
                     </div>
                   </TabsContent>
