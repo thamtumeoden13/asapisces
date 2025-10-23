@@ -25,60 +25,81 @@ export const createCompanion = async (formData: CreateCompanion) => {
 
 // Get All
 export const getAllCompanions = async ({
-  limit = 10,
+  limit = 8,
   page = 1,
   subject,
   topic,
-  userId,
 }: GetAllCompanions & { userId?: string }) => {
-  // Bắt đầu xây dựng query với Supabase client
-  let query = supabase
-    .from("companions")
-    // --- SỬA ĐỔI CHUỖI SELECT Ở ĐÂY ---
-    .select(
-      `
+  try {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Bắt đầu xây dựng query với Supabase client
+    let query = supabase
+      .from("companions")
+      .select(
+        `
       *, 
       bookmarks(id), 
       transcript:transcripts(data)
-    `
-    )
-    // --- KẾT THÚC SỬA ĐỔI ---
-    .range((page - 1) * limit, page * limit - 1);
+    `,
+        { count: "exact" } // Yêu cầu Supabase đếm tổng số bản ghi phù hợp
+      )
+      // --- KẾT THÚC SỬA ĐỔI ---
+      .range((page - 1) * limit, page * limit - 1);
 
-  // Các điều kiện lọc giữ nguyên
-  if (subject && topic) {
-    query = query
-      .ilike("subject", `%${subject}%`)
-      .or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
-  } else if (subject) {
-    query = query.ilike("subject", `%${subject}%`);
-  } else if (topic) {
-    query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    // Các điều kiện lọc giữ nguyên
+    // if (subject && topic) {
+    //   query = query
+    //     .ilike("subject", `%${subject}%`)
+    //     .or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    // } else if (subject) {
+    //   query = query.ilike("subject", `%${subject}%`);
+    // } else if (topic) {
+    //   query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    // }
+
+    if (subject) query = query.ilike("subject", `%${subject}%`);
+    if (topic) query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+
+    // Sắp xếp và phân trang
+    query = query.order("created_at", { ascending: false }).range(from, to);
+
+    // Lưu ý: Lọc bookmark như thế này có thể không hoạt động như mong đợi
+    // Cách tốt hơn là kiểm tra sau khi lấy dữ liệu hoặc dùng một query phức tạp hơn.
+    // if (userId) {
+    //   query = query.eq("bookmarks.user_id", userId);
+    // }
+
+    // Thực thi query
+    const { data, error, count } = await query;
+    if (error) {
+      console.error("Supabase error fetching all companions:", error);
+      throw new Error(error.message);
+    }
+
+    // Biến đổi dữ liệu trả về
+    const companions = data.map((companion) => ({
+      ...companion,
+      // Gộp transcript_data vào
+      transcript_data: (companion.transcript as any)?.data || null,
+      // Xóa thuộc tính `transcript` lồng nhau
+      transcript: undefined,
+      // Tính toán `bookmarked`
+      bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
+    }));
+
+    // --- CẤU TRÚC TRẢ VỀ MỚI ---
+    return {
+      companions: companions,
+      // Kiểm tra xem có trang tiếp theo không
+      hasNextPage: to < (count ?? 0) - 1,
+    };
+  } catch (error) {
+    console.error("Error in getAllCompanions:", error);
+    // Trả về giá trị mặc định an toàn nếu có lỗi
+    return { companions: [], hasNextPage: false };
   }
-
-  // Lưu ý: Lọc bookmark như thế này có thể không hoạt động như mong đợi
-  // Cách tốt hơn là kiểm tra sau khi lấy dữ liệu hoặc dùng một query phức tạp hơn.
-  // if (userId) {
-  //   query = query.eq("bookmarks.user_id", userId);
-  // }
-
-  // Thực thi query
-  const { data, error } = await query;
-  if (error) {
-    console.error("Supabase error fetching all companions:", error);
-    throw new Error(error.message);
-  }
-
-  // Biến đổi dữ liệu trả về
-  return data.map((companion) => ({
-    ...companion,
-    // Gộp transcript_data vào
-    transcript_data: (companion.transcript as any)?.data || null,
-    // Xóa thuộc tính `transcript` lồng nhau
-    transcript: undefined,
-    // Tính toán `bookmarked`
-    bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
-  }));
 };
 
 export async function getCompanionById(id: string) {

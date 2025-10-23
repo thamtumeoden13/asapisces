@@ -42,6 +42,7 @@ import {
   saveConversationFeedbackAction,
 } from "@/lib/actions/feedback.action";
 import { AnalyticsChart } from "./AnalyticsChart";
+import { TranslatedText } from "./TranslatedText";
 // import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -750,14 +751,18 @@ const EnhancedCompanionConversationOptimized = ({
                           {/* THAY THẾ DÒNG NÀY */}
                           {/* {currentLine.text} */}
                           {/* BẰNG ĐOẠN CODE NÀY ĐỂ XUỐNG DÒNG */}
-                          {currentLine.text
+                          {/* {currentLine.text
                             .split(". ")
                             .map((sentence, index, array) => (
                               <span key={index} className="block mb-2">
                                 {sentence}
                                 {index < array.length - 1 ? "." : ""}
                               </span>
-                            ))}
+                            ))} */}
+                          <blockquote className="text-xl md:text-2xl">
+                            {/* Thay vì chỉ hiển thị text, dùng component mới */}
+                            <TranslatedText text={currentLine.text} />
+                          </blockquote>
                         </p>
 
                         {/* ✨ NEW: Enhanced word count and processing info for long sentences */}
@@ -915,7 +920,17 @@ const EnhancedCompanionConversationOptimized = ({
                                       )}
                                     </p>
                                   ) : (
-                                    <p className="mb-1">{message.content}</p>
+                                    <>
+                                      {group.role === "assistant" ? (
+                                        <TranslatedText
+                                          text={message.content}
+                                        />
+                                      ) : (
+                                        <p className="mb-1">
+                                          {message.content}
+                                        </p>
+                                      )}
+                                    </>
                                   )}
 
                                   {message.similarity && (
