@@ -5,6 +5,45 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase/server";
 import { auth } from "@/auth";
 
+
+// Session History
+export const addToSessionHistory = async (companionId: string) => {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) throw new Error("Unauthorized");
+
+  const { data, error } = await supabase.from("session_history").insert({
+    companion_id: companionId,
+    user_id: userId,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+export const getRecentSessions = async (limit = 10) => {
+  const { data, error } = await supabase
+    .from("session_history")
+    .select(`companions:companion_id (*)`)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return data.map(({ companions }) => companions);
+};
+
+export const getUserSessions = async (userId: string, limit = 10) => {
+  const { data, error } = await supabase
+    .from("session_history")
+    .select(`companions:companion_id (*)`)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return data.map(({ companions }) => companions);
+};
+
 export async function recordSessionStartAction(companionId?: string) {
   // Kiểm tra xem companionId có hợp lệ không
   if (!companionId) {
@@ -103,6 +142,57 @@ export async function calculateStreakAction() {
   } catch (error) {
     console.error("Error calculating streak:", error);
     return { streak: 0, practicedToday: false };
+  }
+}
+
+export async function getMostRecentCompanionAction() {
+  // Lấy thông tin người dùng từ session
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) throw new Error("Unauthorized");
+
+  try {
+    // Lấy phiên luyện tập gần đây nhất của người dùng
+    const { data: recentSessions, error } = await supabase
+      .from("session_history")
+      .select("companion_id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error(
+        "Error fetching recent session for most recent companion:",
+        error
+      );
+      return null;
+    }
+
+    if (recentSessions.length === 0) {
+      return null; // Người dùng chưa có phiên luyện tập nào
+    }
+
+    const mostRecentCompanionId = recentSessions[0].companion_id;
+
+    // Lấy thông tin companion dựa trên ID
+    const { data: companion, error: companionError } = await supabase
+      .from("companions")
+      .select("*")
+      .eq("id", mostRecentCompanionId)
+      .single();
+
+    if (companionError) {
+      console.error(
+        "Error fetching most recent companion details:",
+        companionError
+      );
+      return null;
+    }
+
+    return companion;
+  } catch (error) {
+    console.error("Error in getMostRecentCompanionAction:", error);
+    return null;
   }
 }
 

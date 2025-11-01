@@ -1,75 +1,92 @@
-"use client";
-import { removeBookmark } from "@/lib/actions/companion.actions";
-import { addBookmark } from "@/lib/actions/companion.actions";
-import Image from "next/image";
+// File: components/companion/CompanionCard.tsx
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BookmarkButton } from "./BookmarkButton";
 
-interface CompanionCardProps {
+// Cập nhật kiểu dữ liệu để khớp với thiết kế mới
+type CompanionCardProps = {
   id: string;
-  name: string;
-  topic: string;
+  name: string; // Sẽ được dùng làm Title
+  topic: string; // Sẽ được dùng làm Description
   subject: string;
-  duration: number;
-  color: string;
+  duration: number; // Duration tính bằng phút
+  href: string; // Đường dẫn khi nhấp vào
+  // Thêm color prop để nhận màu từ component cha
+  color?: string;
   bookmarked: boolean;
-  href?: string;
-}
+};
 
-const CompanionCard = ({
+// --- BẢNG MÀU TƯƠNG ỨNG VỚI CÁC SUBJECT ---
+// Bạn có thể mở rộng bảng màu này
+const subjectColors: Record<string, { bg: string; border: string }> = {
+  science: { bg: "bg-purple-100", border: "border-purple-300" },
+  economics: { bg: "bg-green-100", border: "border-green-300" },
+  coding: { bg: "bg-pink-100", border: "border-pink-300" },
+  default: { bg: "bg-gray-100", border: "border-gray-300" },
+};
+
+export default function CompanionCard({
   id,
   name,
   topic,
   subject,
   duration,
-  color,
+  href,
   bookmarked,
-  href = "/companion/companions",
-}: CompanionCardProps) => {
-  const pathname = usePathname();
-  const handleBookmark = async () => {
-    if (bookmarked) {
-      await removeBookmark(id, pathname);
-    } else {
-      await addBookmark(id, pathname);
-    }
-  };
+}: CompanionCardProps) {
+  // Lấy màu dựa trên subject
+  const colors = subjectColors[subject.toLowerCase()] || subjectColors.default;
 
   return (
-    <article className="companion-card" style={{ backgroundColor: color }}>
-      <div className="flex items-center justify-between">
-        <div className="subject-badge">{subject}</div>
-        <button className="companion-bookmark" onClick={handleBookmark}>
-          <Image
-            src={
-              bookmarked ? "/icons/bookmark-filled.svg" : "/icons/bookmark.svg"
-            }
-            alt="bookmark"
-            width={12.5}
-            height={15}
-          />
-        </button>
-      </div>
-
-      <h2 className="text-2xl font-bold text-black-200">{name}</h2>
-      <p className="text-sm text-black-100">{topic}</p>
-      <div className="flex items-center gap-2">
-        <Image
-          src="/icons/clock.svg"
-          alt="duration"
-          width={13.5}
-          height={13.5}
-        />
-        <p className="text-sm text-black-100">{duration} minutes</p>
-      </div>
-
-      <Link href={`${href}/${id}`} className="w-full">
-        <button className="justify-center w-full btn-primary-2">
-          Launch Lesson
-        </button>
-      </Link>
-    </article>
+    // Sử dụng Link để bọc toàn bộ card hoặc chỉ nút bấm
+    <Link href={`${href}/${id}`} className="block h-full">
+      <Card
+        className={cn(
+          "flex flex-col h-full overflow-hidden rounded-2xl border-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-1",
+          colors.bg,
+          colors.border
+        )}
+      >
+        <BookmarkButton companionId={id} initialBookmarked={bookmarked} />
+        <CardHeader className="p-4">
+          <div className="flex justify-between items-center">
+            <Badge
+              variant="secondary"
+              className="bg-gray-800 text-white hover:bg-gray-700 capitalize"
+            >
+              {subject}
+            </Badge>
+          </div>
+          <CardTitle className="pt-4 text-xl font-bold text-gray-900 line-clamp-2">
+            {name}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 flex-grow">
+          <CardDescription className="text-gray-600 line-clamp-3">
+            {topic}
+          </CardDescription>
+        </CardContent>
+        <CardFooter className="p-4 flex flex-col items-start gap-4 mt-auto">
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <Clock className="w-4 h-4" />
+            <span>{duration} minutes</span>
+          </div>
+          <Button className="w-full bg-gray-900 text-white rounded-xl h-12 text-md font-semibold hover:bg-gray-700">
+            Launch Lesson
+          </Button>
+        </CardFooter>
+      </Card>
+    </Link>
   );
-};
-
-export default CompanionCard;
+}

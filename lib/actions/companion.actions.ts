@@ -1,11 +1,8 @@
 "use server";
 
 import { auth } from "@/auth";
-import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase/server";
 import { CreateCompanion, GetAllCompanions } from "@/types";
-import { companions, db } from "../supabase";
-import { eq } from "drizzle-orm";
 
 // Create
 export const createCompanion = async (formData: CreateCompanion) => {
@@ -146,44 +143,6 @@ export async function getCompanionById(id: string) {
   }
 }
 
-// Session History
-export const addToSessionHistory = async (companionId: string) => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error("Unauthorized");
-
-  const { data, error } = await supabase.from("session_history").insert({
-    companion_id: companionId,
-    user_id: userId,
-  });
-
-  if (error) throw new Error(error.message);
-  return data;
-};
-
-export const getRecentSessions = async (limit = 10) => {
-  const { data, error } = await supabase
-    .from("session_history")
-    .select(`companions:companion_id (*)`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-  return data.map(({ companions }) => companions);
-};
-
-export const getUserSessions = async (userId: string, limit = 10) => {
-  const { data, error } = await supabase
-    .from("session_history")
-    .select(`companions:companion_id (*)`)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-  return data.map(({ companions }) => companions);
-};
-
 // My Companions
 export const getUserCompanions = async (userId: string) => {
   const { data, error } = await supabase
@@ -221,48 +180,54 @@ export const newCompanionPermissions = async () => {
   return companionCount < limit;
 };
 
-// Bookmarks
-export const addBookmark = async (companionId: string, path: string) => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return;
-
-  const { data, error } = await supabase.from("bookmarks").insert({
-    companion_id: companionId,
-    user_id: userId,
-  });
-
-  console.log("addBookmark", { data, error });
-
-  if (error) throw new Error(error.message);
-  revalidatePath(path);
-  return data;
-};
-
-export const removeBookmark = async (companionId: string, path: string) => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return;
-
+export async function getNewestCompanionsAction(limit: number = 5) {
   const { data, error } = await supabase
-    .from("bookmarks")
-    .delete()
-    .eq("companion_id", companionId)
-    .eq("user_id", userId);
-
-  console.log("removeBookmark", { data, error });
-
-  if (error) throw new Error(error.message);
-  revalidatePath(path);
-  return data;
-};
-
-export const getBookmarkedCompanions = async (userId: string) => {
-  const { data, error } = await supabase
-    .from("bookmarks")
-    .select(`companions:companion_id (*)`)
-    .eq("user_id", userId);
+    .from("companions")
+    .select(
+      `
+      *, 
+      bookmarks(id)
+      `,
+      { count: "exact" } // Yêu cầu Supabase đếm tổng số bản ghi phù hợp
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error) throw new Error(error.message);
-  return data.map(({ companions }) => companions);
-};
+
+  const companions = data.map((companion) => ({
+    ...companion,
+    // Tính toán `bookmarked`
+    bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
+  }));
+  return companions;
+}
+
+export async function getPopularCompanionsAction(
+  limit: number = 5,
+  timeframe: "week" | "all" = "week"
+) {
+  try {
+    // 2. Gọi hàm PostgreSQL qua RPC
+    const { data: companions, error } = await supabase.rpc(
+      "get_popular_companions",
+      {
+        p_limit: limit,
+        p_timeframe: timeframe,
+      }
+    );
+
+    // 3. Xử lý lỗi
+    if (error) {
+      console.error("RPC Error fetching popular companions:", error);
+      throw error;
+    }
+
+    // 4. Trả về dữ liệu
+    // Dữ liệu trả về đã có định dạng đúng, không cần xử lý thêm
+    return companions || [];
+  } catch (error) {
+    console.error("Error in getPopularCompanionsAction:", error);
+    return [];
+  }
+}

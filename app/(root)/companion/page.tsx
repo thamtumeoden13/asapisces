@@ -1,6 +1,4 @@
-import { getAllCompanions } from "@/lib/actions/companion.actions";
-import CompanionCard from "@/components/companion/CompanionCard";
-import { getSubjectColor } from "@/lib/utils";
+import { getAllCompanions, getPopularCompanionsAction } from "@/lib/actions/companion.actions";
 import SearchInput from "@/components/companion/SearchInput";
 import SubjectFilter from "@/components/companion/SubjectFilter";
 import { CompanionList } from "@/components/companion/CompanionList";
@@ -10,6 +8,14 @@ import { calculateStreakAction } from "@/lib/actions/session.action"; // Action 
 import { StreakDisplay } from "@/components/companion/StreakDisplay"; // Component UI
 import { Card, CardContent } from "@/components/ui/card"; // Để tạo banner đẹp hơn
 import { SearchParams } from "@/types";
+import { getCurrentUser } from "@/lib/actions/auth.action";
+import { QuickFilterTags } from "@/components/companion/QuickFilterTags";
+
+// --- IMPORT CÁC ACTION MỚI ---
+import { getMostRecentCompanionAction } from "@/lib/actions/session.action";
+import { getNewestCompanionsAction } from "@/lib/actions/companion.actions";
+import { CompanionCarousel } from "@/components/companion/CompanionCarousel"; // Component mới
+import { ResumeCard } from "@/components/companion/ResumeCard"; // Component mới
 
 const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
   const filters = await searchParams;
@@ -18,16 +24,26 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
 
   // --- LẤY DỮ LIỆU TRANG ĐẦU TIÊN TRÊN SERVER ---
 
+  const user = await getCurrentUser();
+  const userName = user?.name || "learner";
+
   // --- BƯỚC 2: GỌI CẢ HAI SERVER ACTION ---
   // Các lời gọi này sẽ chạy song song để tối ưu hóa tốc độ tải trang
-  const companionsPromise = getAllCompanions({ subject, topic });
-  const streakDataPromise = calculateStreakAction();
-
-  // Chờ cả hai hoàn tất
-  const [initialData, streakData] = await Promise.all([
-    companionsPromise,
-    streakDataPromise,
+  const [
+    initialData,
+    streakData,
+    mostRecentCompanion,
+    popularCompanions,
+    newestCompanions,
+  ] = await Promise.all([
+    getAllCompanions({ page: 1, subject, topic }),
+    calculateStreakAction(),
+    getMostRecentCompanionAction(),
+    getPopularCompanionsAction(5, "week"),
+    getNewestCompanionsAction(5),
   ]);
+
+  console.log("initialData:", initialData);
 
   return (
     <section className="mx-auto px-14 flex flex-col gap-8 bg-background h-full w-full max-w-[1440px] pt-10 max-sm:px-2">
@@ -35,7 +51,9 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-100 border-blue-200">
         <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Welcome Back!</h2>
+            <h2 className="text-xl font-bold text-gray-800">
+              Welcome Back, {userName}!
+            </h2>
             <p className="text-gray-600 mt-1">
               {streakData.streak > 0
                 ? `Keep up the great work. You're on a ${streakData.streak}-day streak!`
@@ -51,12 +69,38 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
       </Card>
       {/* --- KẾT THÚC BANNER --- */}
 
-      <div className="flex items-center justify-between gap-4 max-sm:flex-col w-full">
-        <h1 className="text-3xl font-bold text-black-200">Companion Library</h1>
-        <div className="flex items-center gap-4">
-          <SearchInput />
-          <SubjectFilter />
+      {/* --- KHU VỰC "RESUME" --- */}
+      {mostRecentCompanion && <ResumeCard companion={mostRecentCompanion} />}
+
+
+      {/* --- KHU VỰC "POPULAR THIS WEEK" --- */}
+      {popularCompanions.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold mb-4 text-black-100">Popular This Week</h2>
+          <CompanionCarousel companions={popularCompanions} />
         </div>
+      )}
+
+      {/* --- KHU VỰC "NEWLY ADDED" --- */}
+      {newestCompanions.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold mb-4 text-black-100">Newly Added</h2>
+          <CompanionCarousel companions={newestCompanions} />
+        </div>
+      )}
+
+      {/* --- THÊM QUICK FILTERS VÀO ĐÂY --- */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4 max-sm:flex-col w-full">
+          <h1 className="text-3xl font-bold text-black-200">
+            Companion Library
+          </h1>
+          <div className="flex items-center gap-4">
+            <SearchInput />
+            <SubjectFilter />
+          </div>
+        </div>
+        <QuickFilterTags /> {/* <-- Đặt component ở đây */}
       </div>
       <CompanionList
         initialCompanions={initialData.companions}

@@ -62,7 +62,7 @@
     "easymde": "^2.18.0",
     "elevenlabs": "^1.59.0",
     "embla-carousel-autoplay": "^8.5.1",
-    "embla-carousel-react": "^8.5.1",
+    "embla-carousel-react": "^8.6.0",
     "firebase-admin": "^13.4.0",
     "framer-motion": "^11.13.1",
     "fs": "^0.0.1-security",

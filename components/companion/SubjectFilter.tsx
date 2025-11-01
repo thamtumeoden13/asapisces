@@ -38,7 +38,7 @@ const SubjectFilter = () => {
 
   return (
     <Select onValueChange={setSubject} value={subject}>
-      <SelectTrigger className="!border-black !bg-white focus-visible:!ring-0 focus-visible:!border-black !w-full capitalize text-black-100">
+      <SelectTrigger className="!border-black !bg-white focus-visible:!ring-0 focus-visible:!border-black !w-full capitalize text-black-100 !p-5">
         <SelectValue placeholder="Subject" />
       </SelectTrigger>
       <SelectContent>
