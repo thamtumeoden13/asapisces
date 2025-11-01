@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
-import { CompanionComponentProps, } from "@/types";
+import { CompanionComponentProps } from "@/types";
 import { getFeedbackHistoryForTopic } from "@/lib/actions/feedback.action"; // Hàm lấy lịch sử điểm số
 import { ConversationPlayer } from "./ConversationPlayer";
+import { StreakDisplay } from "./StreakDisplay";
+import { calculateStreakAction } from "@/lib/actions/session.action";
 
 const voiceStyles = {
   friendly: "pNInz6obpgDQGcFmaJgB", // Adam
@@ -34,6 +36,9 @@ const ConversationComponent = async ({
   const initialTopicKey = transcriptData?.topicConfig?.[0]?.key || "intro";
   const initialFeedbackHistory =
     await getFeedbackHistoryForTopic(initialTopicKey);
+  const streakData = await calculateStreakAction();
+
+  console.log("Streak Data:", streakData);
 
   // Dữ liệu tổng quan có thể được tính toán ở đây nếu cần
   const totalTopics = transcriptData?.topicConfig?.length || 0;

@@ -1,11 +1,8 @@
 "use server";
 
 import { auth } from "@/auth";
-import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase/server";
 import { CreateCompanion, GetAllCompanions } from "@/types";
-import { companions, db } from "../supabase";
-import { eq } from "drizzle-orm";
 
 // Create
 export const createCompanion = async (formData: CreateCompanion) => {
@@ -25,60 +22,81 @@ export const createCompanion = async (formData: CreateCompanion) => {
 
 // Get All
 export const getAllCompanions = async ({
-  limit = 10,
+  limit = 8,
   page = 1,
   subject,
   topic,
-  userId,
 }: GetAllCompanions & { userId?: string }) => {
-  // Bắt đầu xây dựng query với Supabase client
-  let query = supabase
-    .from("companions")
-    // --- SỬA ĐỔI CHUỖI SELECT Ở ĐÂY ---
-    .select(
-      `
+  try {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Bắt đầu xây dựng query với Supabase client
+    let query = supabase
+      .from("companions")
+      .select(
+        `
       *, 
       bookmarks(id), 
       transcript:transcripts(data)
-    `
-    )
-    // --- KẾT THÚC SỬA ĐỔI ---
-    .range((page - 1) * limit, page * limit - 1);
+    `,
+        { count: "exact" } // Yêu cầu Supabase đếm tổng số bản ghi phù hợp
+      )
+      // --- KẾT THÚC SỬA ĐỔI ---
+      .range((page - 1) * limit, page * limit - 1);
 
-  // Các điều kiện lọc giữ nguyên
-  if (subject && topic) {
-    query = query
-      .ilike("subject", `%${subject}%`)
-      .or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
-  } else if (subject) {
-    query = query.ilike("subject", `%${subject}%`);
-  } else if (topic) {
-    query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    // Các điều kiện lọc giữ nguyên
+    // if (subject && topic) {
+    //   query = query
+    //     .ilike("subject", `%${subject}%`)
+    //     .or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    // } else if (subject) {
+    //   query = query.ilike("subject", `%${subject}%`);
+    // } else if (topic) {
+    //   query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    // }
+
+    if (subject) query = query.ilike("subject", `%${subject}%`);
+    if (topic) query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+
+    // Sắp xếp và phân trang
+    query = query.order("created_at", { ascending: false }).range(from, to);
+
+    // Lưu ý: Lọc bookmark như thế này có thể không hoạt động như mong đợi
+    // Cách tốt hơn là kiểm tra sau khi lấy dữ liệu hoặc dùng một query phức tạp hơn.
+    // if (userId) {
+    //   query = query.eq("bookmarks.user_id", userId);
+    // }
+
+    // Thực thi query
+    const { data, error, count } = await query;
+    if (error) {
+      console.error("Supabase error fetching all companions:", error);
+      throw new Error(error.message);
+    }
+
+    // Biến đổi dữ liệu trả về
+    const companions = data.map((companion) => ({
+      ...companion,
+      // Gộp transcript_data vào
+      transcript_data: (companion.transcript as any)?.data || null,
+      // Xóa thuộc tính `transcript` lồng nhau
+      transcript: undefined,
+      // Tính toán `bookmarked`
+      bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
+    }));
+
+    // --- CẤU TRÚC TRẢ VỀ MỚI ---
+    return {
+      companions: companions,
+      // Kiểm tra xem có trang tiếp theo không
+      hasNextPage: to < (count ?? 0) - 1,
+    };
+  } catch (error) {
+    console.error("Error in getAllCompanions:", error);
+    // Trả về giá trị mặc định an toàn nếu có lỗi
+    return { companions: [], hasNextPage: false };
   }
-
-  // Lưu ý: Lọc bookmark như thế này có thể không hoạt động như mong đợi
-  // Cách tốt hơn là kiểm tra sau khi lấy dữ liệu hoặc dùng một query phức tạp hơn.
-  // if (userId) {
-  //   query = query.eq("bookmarks.user_id", userId);
-  // }
-
-  // Thực thi query
-  const { data, error } = await query;
-  if (error) {
-    console.error("Supabase error fetching all companions:", error);
-    throw new Error(error.message);
-  }
-
-  // Biến đổi dữ liệu trả về
-  return data.map((companion) => ({
-    ...companion,
-    // Gộp transcript_data vào
-    transcript_data: (companion.transcript as any)?.data || null,
-    // Xóa thuộc tính `transcript` lồng nhau
-    transcript: undefined,
-    // Tính toán `bookmarked`
-    bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
-  }));
 };
 
 export async function getCompanionById(id: string) {
@@ -125,44 +143,6 @@ export async function getCompanionById(id: string) {
   }
 }
 
-// Session History
-export const addToSessionHistory = async (companionId: string) => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error("Unauthorized");
-
-  const { data, error } = await supabase.from("session_history").insert({
-    companion_id: companionId,
-    user_id: userId,
-  });
-
-  if (error) throw new Error(error.message);
-  return data;
-};
-
-export const getRecentSessions = async (limit = 10) => {
-  const { data, error } = await supabase
-    .from("session_history")
-    .select(`companions:companion_id (*)`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-  return data.map(({ companions }) => companions);
-};
-
-export const getUserSessions = async (userId: string, limit = 10) => {
-  const { data, error } = await supabase
-    .from("session_history")
-    .select(`companions:companion_id (*)`)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-  return data.map(({ companions }) => companions);
-};
-
 // My Companions
 export const getUserCompanions = async (userId: string) => {
   const { data, error } = await supabase
@@ -200,48 +180,54 @@ export const newCompanionPermissions = async () => {
   return companionCount < limit;
 };
 
-// Bookmarks
-export const addBookmark = async (companionId: string, path: string) => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return;
-
-  const { data, error } = await supabase.from("bookmarks").insert({
-    companion_id: companionId,
-    user_id: userId,
-  });
-
-  console.log("addBookmark", { data, error });
-
-  if (error) throw new Error(error.message);
-  revalidatePath(path);
-  return data;
-};
-
-export const removeBookmark = async (companionId: string, path: string) => {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return;
-
+export async function getNewestCompanionsAction(limit: number = 5) {
   const { data, error } = await supabase
-    .from("bookmarks")
-    .delete()
-    .eq("companion_id", companionId)
-    .eq("user_id", userId);
-
-  console.log("removeBookmark", { data, error });
-
-  if (error) throw new Error(error.message);
-  revalidatePath(path);
-  return data;
-};
-
-export const getBookmarkedCompanions = async (userId: string) => {
-  const { data, error } = await supabase
-    .from("bookmarks")
-    .select(`companions:companion_id (*)`)
-    .eq("user_id", userId);
+    .from("companions")
+    .select(
+      `
+      *, 
+      bookmarks(id)
+      `,
+      { count: "exact" } // Yêu cầu Supabase đếm tổng số bản ghi phù hợp
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error) throw new Error(error.message);
-  return data.map(({ companions }) => companions);
-};
+
+  const companions = data.map((companion) => ({
+    ...companion,
+    // Tính toán `bookmarked`
+    bookmarked: companion.bookmarks && companion.bookmarks.length > 0,
+  }));
+  return companions;
+}
+
+export async function getPopularCompanionsAction(
+  limit: number = 5,
+  timeframe: "week" | "all" = "week"
+) {
+  try {
+    // 2. Gọi hàm PostgreSQL qua RPC
+    const { data: companions, error } = await supabase.rpc(
+      "get_popular_companions",
+      {
+        p_limit: limit,
+        p_timeframe: timeframe,
+      }
+    );
+
+    // 3. Xử lý lỗi
+    if (error) {
+      console.error("RPC Error fetching popular companions:", error);
+      throw error;
+    }
+
+    // 4. Trả về dữ liệu
+    // Dữ liệu trả về đã có định dạng đúng, không cần xử lý thêm
+    return companions || [];
+  } catch (error) {
+    console.error("Error in getPopularCompanionsAction:", error);
+    return [];
+  }
+}

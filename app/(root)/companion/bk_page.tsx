@@ -1,6 +1,6 @@
 import React from "react";
 import CompanionCard from "@/components/companion/CompanionCard";
-import CompanionList from "@/components/companion/CompanionList";
+import CompanionList from "@/components/companion/BK_CompanionList";
 import CTA from "@/components/companion/CTA";
 import {
   getAllCompanions,

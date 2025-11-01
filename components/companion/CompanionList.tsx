@@ -1,106 +1,93 @@
-import React from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn, getSubjectColor } from "@/lib/utils";
-import Link from "next/link";
-import Image from "next/image";
+// File: components/companion/CompanionList.tsx
+"use client";
+
+import { useState, useEffect, useTransition } from "react";
+import { useInView } from "react-intersection-observer"; // Thư viện để tự động load khi cuộn
+import { getAllCompanions } from "@/lib/actions/companion.actions";
+import CompanionCard from "@/components/companion/CompanionCard";
+import { getSubjectColor } from "@/lib/utils";
+
+import { CompanionCardSkeleton } from "./CompanionCardSkeleton";
+import { Companion } from "@/types";
+
+// Định nghĩa kiểu dữ liệu cho companion nhận từ action
+
 interface CompanionListProps {
-  title?: string;
-  companions?: Companion[];
-  className?: string;
+  initialCompanions: Companion[];
+  initialHasNextPage: boolean;
+  filters: { subject?: string; topic?: string };
 }
 
-const CompanionList = ({
-  title,
-  companions,
-  className,
-}: CompanionListProps) => {
+export function CompanionList({
+  initialCompanions,
+  initialHasNextPage,
+  filters,
+}: CompanionListProps) {
+  const [companions, setCompanions] = useState<Companion[]>(initialCompanions);
+  const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
+  const [page, setPage] = useState(2); // Trang tiếp theo cần tải là trang 2
+  // const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, startTransition] = useTransition();
+
+  // Hook để theo dõi khi người dùng cuộn đến cuối danh sách
+  const { ref, inView } = useInView();
+
+  // Reset danh sách khi filter thay đổi
+  useEffect(() => {
+    setCompanions(initialCompanions);
+    setHasNextPage(initialHasNextPage);
+    setPage(2);
+  }, [initialCompanions, initialHasNextPage]);
+
+  const loadMoreCompanions = () => {
+    if (isLoading || !hasNextPage) return;
+
+    startTransition(async () => {
+      const res = await getAllCompanions({ page, ...filters });
+      setCompanions((prev) => [...prev, ...res.companions]);
+      setHasNextPage(res.hasNextPage);
+      setPage((prev) => prev + 1);
+    });
+  };
+
+  // Tự động gọi `loadMoreCompanions` khi người dùng cuộn đến phần tử `ref`
+  useEffect(() => {
+    if (inView) {
+      loadMoreCompanions();
+    }
+  }, [inView]);
+
   return (
-    <article className={cn("companion-list", className)}>
-      <h2 className="text-3xl text-black font-bold">{title}</h2>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-2/3 text-lg">Lessons</TableHead>
-            <TableHead className="text-lg">Subject</TableHead>
-            <TableHead className="text-lg">Duration</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {companions?.map(({ id, subject, name, topic, duration }) => (
-            <TableRow key={id}>
-              <TableCell className="">
-                <Link href={`/companion/companions/${id}`}>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="size-[72px] flex items-center justify-center rounded-lg max-md:hidden"
-                      style={{ backgroundColor: getSubjectColor(subject) }}
-                    >
-                      <Image
-                        src={`/icons/${subject}.svg`}
-                        alt={subject}
-                        width={35}
-                        height={35}
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <p className="text-2xl font-bold text-black">{name}</p>
-                      <p className="text-lg text-black">{topic}</p>
-                    </div>
-                  </div>
-                </Link>
-              </TableCell>
-              <TableCell>
-                <div className="subject-badge w-fit max-md:hidden">
-                  {subject}
-                </div>
-                <div
-                  className="flex items-center justify-center p-2 rounded-lg w-fit md:hidden"
-                  style={{ backgroundColor: getSubjectColor(subject) }}
-                >
-                  <Image
-                    src={`/icons/${subject}.svg`}
-                    alt={subject}
-                    width={18}
-                    height={18}
-                  />
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-end w-full gap-2">
-                  <p className="text-xl text-black-100">
-                    {duration} <span className="max-md:hidden">mins</span>
-                  </p>
-                  <Image
-                    src="/icons/clock.svg"
-                    alt="duration"
-                    width={14}
-                    height={14}
-                    className="md:hidden"
-                  />
-                </div>
-              </TableCell>
-            </TableRow>
+    <>
+      <div className="companions-grid">
+        {companions.map((companion) => (
+          <div
+            key={companion.id}
+            className="relative"
+          >
+            <CompanionCard
+              key={companion.id}
+              {...companion}
+              color={getSubjectColor(companion.subject)}
+              href={`/companion/conversation`}
+            />
+          </div>
+        ))}
+        {/* --- HIỂN THỊ SKELETON KHI ĐANG TẢI --- */}
+        {isLoading &&
+          Array.from({ length: 4 }).map((_, index) => (
+            <CompanionCardSkeleton key={index} />
           ))}
-        </TableBody>
-        {/* <TableFooter>
-          <TableRow>
-            <TableCell className="text-lg text-black-100" colSpan={3}>Total</TableCell>
-            <TableCell className="text-right text-black-200">2,500</TableCell>
-          </TableRow>
-        </TableFooter> */}
-      </Table>
-    </article>
-  );
-};
+      </div>
 
-export default CompanionList;
+      {/* Phần tử trigger để tải thêm */}
+      <div ref={ref} className="h-1 w-full"></div>
+
+      <div className="flex justify-center mt-8">
+        {!isLoading && !hasNextPage && companions.length > 0 && (
+          <p className="text-gray-500">You&apos;ve reached the end!</p>
+        )}
+      </div>
+    </>
+  );
+}
