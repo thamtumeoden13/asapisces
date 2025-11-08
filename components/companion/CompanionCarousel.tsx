@@ -44,7 +44,7 @@ export function CompanionCarousel({ companions }: CompanionCarouselProps) {
                 key={companion.id}
                 {...companion}
                 color={getSubjectColor(companion.subject)}
-                href={`/companion/conversation/${companion.id}`}
+                href={`/companion/conversation`}
               />
             </div>
           ))}

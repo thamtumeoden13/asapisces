@@ -4,7 +4,14 @@ import { feedbackSchema, languageFeedbackSchema } from "@/constants";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { supabase } from "../supabase/server";
-import { Feedback } from "@/types";
+import {
+  CreateFeedbackParams,
+  Feedback,
+  GetFeedbackByInterviewIdParams,
+  GetLatestInterviewsParams,
+  Interview,
+} from "@/types";
+import z from "zod";
 
 export async function getInterviewByUserId(
   userId: string
@@ -302,5 +309,118 @@ export async function createLanguageFeedback(
   } catch (error) {
     console.error("Error generating feedback:", error);
     return { success: false, feedback: null };
+  }
+}
+
+const aiTutorResponseSchema = z.object({
+  directAnswer: z
+    .string()
+    .describe("A direct and concise answer to the student's question."),
+  examples: z
+    .array(
+      z.object({
+        fromTranscript: z
+          .string()
+          .describe(
+            "A specific phrase or sentence the student said (as 'Learner')."
+          ),
+        suggestion: z
+          .string()
+          .describe("A corrected or improved version of the phrase."),
+      })
+    )
+    .optional()
+    .describe(
+      "Specific examples from the conversation to illustrate the point, if applicable."
+    ),
+  furtherExplanation: z
+    .string()
+    .optional()
+    .describe(
+      "A brief, additional explanation or tip related to the question."
+    ),
+});
+
+// Schema để xác thực dữ liệu đầu vào (giữ nguyên)
+const askSchema = z.object({
+  question: z.string().min(5, "Question is too short."),
+  userRole: z.enum(["Leo", "Gwen"]),
+  fullTranscript: z.array(z.object({ role: z.string(), content: z.string() })),
+  originalScript: z.array(z.object({ speaker: z.string(), text: z.string() })),
+});
+
+type AskData = z.infer<typeof askSchema>;
+
+// Kiểu dữ liệu trả về cho client
+export type AITutorResponse = z.infer<typeof aiTutorResponseSchema>;
+
+// --- SERVER ACTION ĐÃ NÂNG CẤP VỚI generateObject ---
+export async function askAboutConversationAction(data: AskData): Promise<{
+  success: boolean;
+  answer?: AITutorResponse; // <-- Trả về object thay vì string
+  error?: string;
+}> {
+  const validation = askSchema.safeParse(data);
+  if (!validation.success) {
+    return { success: false, error: "Invalid data provided." };
+  }
+
+  const { question, userRole, fullTranscript, originalScript } =
+    validation.data;
+
+  // ... (phần xây dựng ngữ cảnh và prompt giữ nguyên như trước)
+  // --- XÂY DỰNG NGỮ CẢNH ---
+  const formattedTranscript = fullTranscript
+    .map(
+      (msg) =>
+        `- ${msg.role === "user" ? "Learner" : "AI Companion"}: ${msg.content}`
+    )
+    .join("\n");
+
+  const userScriptLines = originalScript
+    .filter((line) => line.speaker === userRole)
+    .map((line) => `- ${line.text}`)
+    .join("\n");
+
+  const prompt = `
+    You are an expert, friendly, and encouraging AI English language tutor. 
+    A student has just finished a practice conversation and has a specific question. 
+    Your task is to answer their question clearly and concisely, using the provided context.
+
+    **CONTEXT:**
+    1.  **The Learner's Role:** The student was playing the role of "${userRole}".
+    2.  **The Learner's Script:** These are the lines the student was supposed to say:
+        ---
+        ${userScriptLines}
+        ---
+    3.  **Full Conversation Transcript:** This is what actually happened during the practice session. "Learner" is the student, and "AI Companion" is the other role.
+        ---
+        ${formattedTranscript}
+        ---
+
+    **STUDENT'S QUESTION:**
+    "${question}"
+
+    **YOUR TASK:**
+    1.  Analyze the student's question in relation to the conversation context.
+    2.  Provide a direct, helpful, and easy-to-understand answer in English.
+    3.  If the question is about grammar, vocabulary, or pronunciation, use specific examples from their speech ("Learner" lines in the transcript) to illustrate your points.
+    4.  Keep the tone positive and supportive. Start your answer directly, without introductory phrases like "As an AI tutor...".
+    5.  Format your answer using simple markdown (bold for emphasis, bullet points for lists).
+  `;
+
+  try {
+    // --- SỬ DỤNG generateObject ---
+    const { object: answerObject } = await generateObject({
+      model: google("gemini-1.5-flash-latest"),
+      schema: aiTutorResponseSchema, // Cung cấp schema cho AI
+      prompt: prompt,
+      system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}. You must respond in a structured JSON format.`,
+    });
+
+    return { success: true, answer: answerObject };
+  } catch (error) {
+    console.error("AI SDK Error in askAboutConversationAction:", error);
+    return { success: false, error: "The AI tutor is currently unavailable. Please try again later." };
   }
 }

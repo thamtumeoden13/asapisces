@@ -43,6 +43,7 @@ import {
 } from "@/lib/actions/feedback.action";
 import { AnalyticsChart } from "./AnalyticsChart";
 import { TranslatedText } from "./TranslatedText";
+import { AskAITutor } from "./AskAITutor";
 // import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -1075,6 +1076,15 @@ const EnhancedCompanionConversationOptimized = ({
                       )}
                     </div>
                   )}
+
+                  {callState.status === CallStatus.FINISHED &&
+                    messages.length > 0 && (
+                      <AskAITutor
+                        userRole={userRole}
+                        fullTranscript={messages}
+                        originalScript={steps}
+                      />
+                    )}
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-4">
