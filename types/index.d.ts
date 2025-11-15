@@ -299,6 +299,7 @@ interface GetAllCompanions {
   subject?: string | string[];
   topic?: string | string[];
   bookmarked?: boolean;
+  isPublic?: boolean;
 }
 
 interface BuildClient {

@@ -26,6 +26,7 @@ export const getAllCompanions = async ({
   page = 1,
   subject,
   topic,
+  isPublic
 }: GetAllCompanions & { userId?: string }) => {
   try {
     const from = (page - 1) * limit;
@@ -58,6 +59,9 @@ export const getAllCompanions = async ({
 
     if (subject) query = query.ilike("subject", `%${subject}%`);
     if (topic) query = query.or(`topic.ilike.%${topic}%,name.ilike.%${topic}%`);
+    if (isPublic !== undefined) {
+      query = query.eq("is_public", isPublic);
+    }
 
     // Sắp xếp và phân trang
     query = query.order("created_at", { ascending: false }).range(from, to);
@@ -231,3 +235,4 @@ export async function getPopularCompanionsAction(
     return [];
   }
 }
+

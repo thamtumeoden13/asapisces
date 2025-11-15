@@ -60,9 +60,9 @@ export function CompanionList({
   return (
     <>
       <div className="companions-grid">
-        {companions.map((companion) => (
+        {companions.map((companion,index) => (
           <div
-            key={companion.id}
+            key={`${companion.id}-${index}`}
             className="relative"
           >
             <CompanionCard

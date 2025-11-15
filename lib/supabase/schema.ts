@@ -82,7 +82,7 @@ export const companions = pgTable(
 
     voice: varchar("voice"),
 
-    duration: bigint("duration", { mode: "string" }),
+    duration: bigint("duration", { mode: "bigint" }),
 
     author: uuid("author").references(() => users.id, { onDelete: "set null" }),
 
@@ -91,6 +91,9 @@ export const companions = pgTable(
     transcriptId: uuid("transcript_id").references(() => transcripts.id, {
       onDelete: "set null",
     }),
+    description: text("description"),
+    coverImage: text("cover_image"),
+    isPublic: boolean("is_public").notNull().default(false),
   },
   (table) => {
     // Định nghĩa các index bên trong một callback function

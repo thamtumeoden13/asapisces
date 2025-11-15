@@ -1586,7 +1586,6 @@ export const conversationFeedbackSchema = z.object({
   finalAssessment: z.string(),
 });
 
-
 // --- ZOD SCHEMAS (giữ nguyên như bạn đã định nghĩa) ---
 const transcriptDataSchema = z.object({
   rawTranscript: z.string(),
@@ -1604,5 +1603,8 @@ export const upsertCompanionSchema = z.object({
   voice: z.string().min(1, { message: "Voice is required." }),
   style: z.string().min(1, { message: "Style is required." }),
   duration: z.coerce.number().min(1, { message: "Duration is required." }),
+  description: z.string().optional(),
+  coverImage: z.string().url({ message: "Please enter a valid URL." }).or(z.literal('')).optional(),
+  isPublic: z.boolean().default(false),
   transcriptData: transcriptDataSchema,
 });

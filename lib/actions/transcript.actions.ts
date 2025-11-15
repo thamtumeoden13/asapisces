@@ -122,7 +122,7 @@ export const upsertTranscriptCompanion = async (data: UpsertCompanionData) => {
     companionId,
     transcriptData,
     companionCoreData,
-  }); 
+  });
 
   try {
     // Sử dụng Drizzle transaction để đảm bảo tính toàn vẹn dữ liệu
@@ -152,7 +152,13 @@ export const upsertTranscriptCompanion = async (data: UpsertCompanionData) => {
         // 3. Cập nhật bản ghi trong bảng companions
         await tx
           .update(companions)
-          .set(companionCoreData)
+          .set({
+            ...companionCoreData,
+            duration:
+              companionCoreData.duration !== undefined
+                ? BigInt(companionCoreData.duration)
+                : undefined,
+          })
           .where(eq(companions.id, companionId));
 
         finalCompanionId = companionId;
@@ -178,6 +184,10 @@ export const upsertTranscriptCompanion = async (data: UpsertCompanionData) => {
             transcriptId: newTranscriptId,
             author: userId,
             type: "transcript",
+            duration:
+              companionCoreData.duration !== undefined
+                ? BigInt(companionCoreData.duration)
+                : undefined,
           })
           .returning({ id: companions.id });
 
@@ -216,24 +226,42 @@ export async function upsertTranscriptCompanion2(data: UpsertCompanionData) {
   const validation = upsertCompanionSchema.safeParse(data);
   if (!validation.success) throw new Error("Invalid data provided.");
 
-  const { id, name, subject, topic, voice, style, duration, transcriptData } = validation.data;
+  const {
+    id,
+    name,
+    subject,
+    topic,
+    voice,
+    style,
+    duration,
+    description,
+    coverImage,
+    isPublic,
+    transcriptData,
+  } = validation.data;
 
-  console.log("Upserting companion with data:", validation.data)
+  console.log("Upserting companion with data:", validation.data);
 
   const companionIdToSend = id || null;
   try {
     // Gọi hàm PostgreSQL qua Supabase RPC
-    const { data: companionId, error } = await supabase.rpc('upsert_companion_with_transcript', {
-      p_companion_id: companionIdToSend,
-      p_user_id: userId,
-      p_name: name,
-      p_subject: subject,
-      p_topic: topic,
-      p_voice: voice,
-      p_style: style,
-      p_duration: duration,
-      p_transcript_data: transcriptData
-    });
+    const { data: companionId, error } = await supabase.rpc(
+      "upsert_companion_with_transcript",
+      {
+        p_companion_id: companionIdToSend,
+        p_user_id: userId,
+        p_name: name,
+        p_subject: subject,
+        p_topic: topic,
+        p_voice: voice,
+        p_style: style,
+        p_duration: duration,
+        p_description: description,
+        p_cover_image: coverImage,
+        p_is_public: isPublic,
+        p_transcript_data: transcriptData,
+      }
+    );
 
     if (error) {
       // Ném lỗi từ PostgreSQL để client có thể bắt
@@ -244,14 +272,19 @@ export async function upsertTranscriptCompanion2(data: UpsertCompanionData) {
     if (!companionId) {
       throw new Error("Database function did not return a companion ID.");
     }
-    
+
     // Xóa cache
-    revalidatePath("/companion/companions");
-    
+    revalidatePath("/companion");
+    revalidatePath("/community");
+
     // Redirect sau khi thành công
-    
+    if (companionId) {
+      revalidatePath(`/companions/${companionId}`);
+    }
+
+    redirect(`/companions/${companionId}`);
+
     return { success: true, companionId: companionId };
-    
   } catch (error) {
     console.error("Upsert companion failed:", error);
     if (error instanceof Error) {

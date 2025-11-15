@@ -34,7 +34,7 @@ export function CompanionCarousel({ companions }: CompanionCarouselProps) {
   return (
     <div className="relative">
       <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex gap-4">
+        <div className="flex gap-4 mt-2">
           {companions.map((companion) => (
             <div
               key={companion.id}
@@ -55,7 +55,7 @@ export function CompanionCarousel({ companions }: CompanionCarouselProps) {
       <Button
         variant="outline"
         size="icon"
-        className="absolute top-1/2 -translate-y-1/2 -left-4 rounded-full h-10 w-10 hidden md:flex"
+        className="absolute top-1/2 -translate-y-1/2 -left-4 rounded-full h-10 w-10 hidden md:flex bg-slate-300/70"
         onClick={scrollPrev}
       >
         <ArrowLeft className="h-5 w-5" />
@@ -63,7 +63,7 @@ export function CompanionCarousel({ companions }: CompanionCarouselProps) {
       <Button
         variant="outline"
         size="icon"
-        className="absolute top-1/2 -translate-y-1/2 -right-4 rounded-full h-10 w-10 hidden md:flex"
+        className="absolute top-1/2 -translate-y-1/2 -right-4 rounded-full h-10 w-10 hidden md:flex bg-slate-300/70"
         onClick={scrollNext}
       >
         <ArrowRight className="h-5 w-5" />

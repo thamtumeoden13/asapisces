@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -33,10 +34,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+import { Switch } from "@/components/ui/switch"; // Cần cho isPublic
 import { subjects } from "@/constants";
 import {
   UpsertCompanionData,
-  upsertTranscriptCompanion,
   upsertTranscriptCompanion2,
 } from "@/lib/actions/transcript.actions";
 import { ProcessorResult, TopicConfig } from "@/types";
@@ -48,6 +50,9 @@ export const transcriptCompanionSchema = z.object({
   topic: z.string().min(1, { message: "Topic is required." }),
   voice: z.string().min(1, { message: "Voice is required." }),
   style: z.string().min(1, { message: "Style is required." }),
+  description: z.string().min(10, "Description should be at least 10 characters.").optional(),
+  coverImage: z.string().url("Must be a valid URL.").optional(),
+  isPublic: z.boolean().default(false),
   duration: z.coerce.number().min(1, { message: "Duration is required." }),
   // Transcript specific fields
   transcript_data: z.object({
@@ -90,6 +95,9 @@ const formSchema = z.object({
   voice: z.string().min(1, { message: "Voice is required." }),
   style: z.string().min(1, { message: "Style is required." }),
   duration: z.coerce.number().min(1, { message: "Duration is required." }),
+  description: z.string().min(10, "Description should be at least 10 characters.").optional(),
+  coverImage: z.string().url("Must be a valid URL.").optional(),
+  isPublic: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -125,6 +133,9 @@ export function TranscriptSaveForm({
           voice: "female",
           style: "casual",
           duration: 15,
+          description: "",
+          coverImage: "",
+          isPublic: false,
         },
   });
 
@@ -319,6 +330,53 @@ export function TranscriptSaveForm({
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Describe what this conversation is about..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="coverImage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cover Image URL</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://example.com/image.png" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isPublic"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Share with Community</FormLabel>
+                    <FormDescription>
+                      Allow other users to practice with this companion.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

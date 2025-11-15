@@ -23,6 +23,7 @@
     "@fullcalendar/timegrid": "^6.1.17",
     "@google-cloud/text-to-speech": "^6.2.0",
     "@google-cloud/translate": "^9.2.0",
+    "@google/generative-ai": "^0.24.1",
     "@gsap/react": "^2.1.1",
     "@hookform/resolvers": "^5.1.1",
     "@jsmastery/utils": "^1.0.2",

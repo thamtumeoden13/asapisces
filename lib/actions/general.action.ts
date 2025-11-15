@@ -421,6 +421,86 @@ export async function askAboutConversationAction(data: AskData): Promise<{
     return { success: true, answer: answerObject };
   } catch (error) {
     console.error("AI SDK Error in askAboutConversationAction:", error);
-    return { success: false, error: "The AI tutor is currently unavailable. Please try again later." };
+    return {
+      success: false,
+      error: "The AI tutor is currently unavailable. Please try again later.",
+    };
+  }
+}
+
+// --- SCHEMA MỚI CHO SMART RETRY ---
+const smartRetrySchema = z.object({
+  expectedSentence: z.string(),
+  userSentence: z.string(),
+});
+
+const smartRetryResponseSchema = z.object({
+  focusPoint: z
+    .string()
+    .describe(
+      "The single most important word or short phrase the user struggled with (e.g., 'pronunciation of track', 'the phrase fall flat')."
+    ),
+  encouragingPhrase: z
+    .string()
+    .describe(
+      "A short, positive opening phrase (e.g., 'Almost there!', 'Great effort!', 'You're close!')."
+    ),
+});
+
+type SmartRetryData = z.infer<typeof smartRetrySchema>;
+
+// --- SERVER ACTION MỚI ---
+export async function getSmartRetryFeedbackAction(
+  data: SmartRetryData
+): Promise<{ success: boolean; feedbackMessage?: string; error?: string }> {
+  const validation = smartRetrySchema.safeParse(data);
+  if (!validation.success) {
+    return { success: false, error: "Invalid data for smart retry." };
+  }
+
+  const { expectedSentence, userSentence } = validation.data;
+
+  // Nếu câu người dùng nói quá ngắn, trả về feedback mặc định, không cần gọi AI
+  if (userSentence.split(/\s+/).length < 2) {
+    return {
+      success: true,
+      feedbackMessage: `Let's try the full sentence: "${expectedSentence}"`,
+    };
+  }
+
+  const prompt = `
+    As an AI English coach, analyze the difference between what a student was supposed to say and what they actually said. Your goal is to identify one key area for improvement and provide a positive opening phrase.
+
+    **Context:**
+    - Expected Sentence: "${expectedSentence}"
+    - Student's Sentence: "${userSentence}"
+
+    **Your Task:**
+    Based on the comparison, provide a structured JSON object with two fields:
+    1.  'focusPoint': Identify the single most important word or short phrase the user needs to work on. Be specific (e.g., 'the word example', 'pronunciation of 'track'', 'the phrase 'fall flat'').
+    2.  'encouragingPhrase': Provide a short, positive opening phrase (e.g., 'Almost there!', 'Great effort!', 'You're close!').
+  `;
+
+  try {
+    // --- SỬ DỤNG generateObject ---
+    const { object: aiFeedback } = await generateObject({
+      model: google("gemini-1.5-flash-latest"),
+      schema: smartRetryResponseSchema,
+      prompt: prompt,
+      system: "You are an AI English coach that responds in structured JSON.",
+    });
+
+    // --- XÂY DỰNG CÂU PHẢN HỒI CUỐI CÙNG TỪ OBJECT ---
+    const feedbackMessage = `${aiFeedback.encouragingPhrase} Let's focus on ${aiFeedback.focusPoint}. Try saying the full sentence: "${expectedSentence}"`;
+
+    return { success: true, feedbackMessage };
+  } catch (error) {
+    console.error("AI SDK error in getSmartRetryFeedbackAction:", error);
+    // Fallback nếu AI gặp lỗi
+    return {
+      success: false,
+      error: "AI feedback is unavailable, using default message.",
+      feedbackMessage: `Let's practice that again: "${expectedSentence}"`,
+    };
   }
 }

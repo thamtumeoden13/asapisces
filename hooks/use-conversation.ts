@@ -19,6 +19,7 @@ import type {
 import { CallStatus } from "@/types/podcast";
 import type { TimingSettings, Message } from "@/types"; // Đảm bảo Message được import từ types của bạn
 import { recordSessionStartAction } from "@/lib/actions/session.action";
+import { getSmartRetryFeedbackAction } from "@/lib/actions/general.action";
 
 type TTSProvider = "webspeech" | "elevenlabs";
 
@@ -260,7 +261,7 @@ export const useConversation = ({
       ]);
 
       // Quyết định advance hay retry
-      const shouldAdvance = similarityResult.score >= 0.6;
+      const shouldAdvance = similarityResult.score >= 0.7; // Ngưỡng 70%
       isAwaitingAIRef.current = true;
       if (shouldAdvance) {
         console.log(`✅ Good score on step ${stepIndex}. Advancing.`);
@@ -273,12 +274,36 @@ export const useConversation = ({
       } else {
         console.log(`🔄 Low score on step ${stepIndex}. Retrying.`);
         isAwaitingAIRef.current = true; // Khóa input khi AI chuẩn bị nói
+        let retryMsg: string;
 
-        const retryMsg = generateRetryMessage(
-          expectedLine.text,
-          similarityResult.score,
-          partialTranscript
-        );
+        // --- LOGIC QUYẾT ĐỊNH "HYBRID RETRY" ---
+        const lowScoreThreshold = similarityResult.score < 0.4;
+
+        // Trường hợp 1: Người dùng nói đúng quá ít (dưới 40% câu) -> Dùng logic cũ, nhanh và miễn phí
+        if (lowScoreThreshold) {
+          console.log("-> Simple error detected. Using local retry message.");
+          retryMsg = generateRetryMessage(
+            expectedLine.text,
+            similarityResult.score,
+            transcript
+          );
+        } else {
+          // Trường hợp 2: Người dùng đã nói tương đối nhiều -> Cần phân tích sâu từ AI
+          console.log("-> Complex error detected. Calling AI for smart retry.");
+          const smartFeedbackResult = await getSmartRetryFeedbackAction({
+            expectedSentence: expectedLine.text,
+            userSentence: transcript,
+          });
+          retryMsg =
+            smartFeedbackResult.feedbackMessage ||
+            generateRetryMessage(
+              expectedLine.text,
+              similarityResult.score,
+              transcript
+            ); // Fallback
+        }
+        // --- KẾT THÚC LOGIC QUYẾT ĐỊNH ---
+
         setMessages((prev) => [
           {
             type: "assistant",

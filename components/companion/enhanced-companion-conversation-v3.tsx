@@ -748,7 +748,7 @@ const EnhancedCompanionConversationOptimized = ({
                             </Button>
                           </div>
                         </div>
-                        <p className="text-lg font-semibold leading-relaxed text-purple-900">
+                        <div className="text-lg font-semibold leading-relaxed text-purple-900">
                           {/* THAY THẾ DÒNG NÀY */}
                           {/* {currentLine.text} */}
                           {/* BẰNG ĐOẠN CODE NÀY ĐỂ XUỐNG DÒNG */}
@@ -764,7 +764,7 @@ const EnhancedCompanionConversationOptimized = ({
                             {/* Thay vì chỉ hiển thị text, dùng component mới */}
                             <TranslatedText text={currentLine.text} />
                           </blockquote>
-                        </p>
+                        </div>
 
                         {/* ✨ NEW: Enhanced word count and processing info for long sentences */}
                         {currentLine.text.split(/\s+/).length > 10 && (
