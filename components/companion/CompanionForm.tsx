@@ -25,15 +25,7 @@ import { subjects } from "@/constants";
 import { Textarea } from "@/components/ui/textarea";
 import { createCompanion } from "@/lib/actions/companion.actions";
 import { redirect } from "next/navigation";
-
-const formSchema = z.object({
-  name: z.string().min(1, { message: "Companion is required." }),
-  subject: z.string().min(1, { message: "Companion is required." }),
-  topic: z.string().min(1, { message: "Topic is required." }),
-  voice: z.string().min(1, { message: "Voice is required." }),
-  style: z.string().min(1, { message: "Style is required." }),
-  duration: z.coerce.number().min(1, { message: "Duration is required." }),
-});
+import { formSchema } from "@/lib/zodSchema";
 
 const CompanionForm = () => {
   const form = useForm({

@@ -345,7 +345,7 @@ interface CompanionComponentProps {
 }
 
 interface PodcastEntry {
-  speaker: "Leo" | "Gwen";
+  speaker: string;
   text: string;
 }
 
@@ -390,14 +390,14 @@ export interface WordResult {
   match: boolean;
 }
 export interface SimilarityResult {
-  score: number
-  confidence: number
-  matchedPhrases: string[]
-  missingPhrases: string[]
-  feedback: string
-  isPartialMatch: boolean
-  completenessRatio: number
-  shouldWaitForMore: boolean
+  score: number;
+  confidence: number;
+  matchedPhrases: string[];
+  missingPhrases: string[];
+  feedback: string;
+  isPartialMatch: boolean;
+  completenessRatio: number;
+  shouldWaitForMore: boolean;
   words: WordResult[];
 }
 

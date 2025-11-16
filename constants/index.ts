@@ -1,30 +1,3 @@
-// export const socials = [
-//   {
-//     id: '0',
-//     title: 'x',
-//     icon: '/images/socials/x.svg',
-//     url: '#',
-//   },
-//   {
-//     id: '1',
-//     title: 'Threads',
-//     icon: '/images/socials/threads.svg',
-//     url: '#',
-//   },
-//   {
-//     id: '2',
-//     title: 'Instagram',
-//     icon: '/images/socials/instagram.svg',
-//     url: '#',
-//   },
-//   {
-//     id: '3',
-//     title: 'Discord',
-//     icon: '/images/socials/discord.svg',
-//     url: '#',
-//   },
-// ];
-
 export const socials = [
   {
     name: "facebook",
@@ -936,7 +909,7 @@ import {
   shadcn,
   cloudinary,
 } from "@/assets/icons";
-import { Interview } from "@/types";
+import { Interview, TopicConfig } from "@/types";
 
 export const skills = [
   {
@@ -1227,7 +1200,6 @@ export const projects = [
 ];
 
 import { CreateAssistantDTO } from "@vapi-ai/web/dist/api";
-import { z } from "zod";
 
 export const mappings = {
   "react.js": "react",
@@ -1383,40 +1355,6 @@ export const interviewer: CreateAssistantDTO = {
   },
 };
 
-export const feedbackSchema = z.object({
-  totalScore: z.number(),
-  categoryScores: z.tuple([
-    z.object({
-      name: z.literal("Communication Skills"),
-      score: z.number(),
-      comment: z.string(),
-    }),
-    z.object({
-      name: z.literal("Technical Knowledge"),
-      score: z.number(),
-      comment: z.string(),
-    }),
-    z.object({
-      name: z.literal("Problem Solving"),
-      score: z.number(),
-      comment: z.string(),
-    }),
-    z.object({
-      name: z.literal("Cultural Fit"),
-      score: z.number(),
-      comment: z.string(),
-    }),
-    z.object({
-      name: z.literal("Confidence and Clarity"),
-      score: z.number(),
-      comment: z.string(),
-    }),
-  ]),
-  strengths: z.array(z.string()),
-  areasForImprovement: z.array(z.string()),
-  finalAssessment: z.string(),
-});
-
 export const interviewCovers = [
   "/adobe.png",
   "/amazon.png",
@@ -1458,21 +1396,40 @@ export const dummyInterviews: Interview[] = [
 ];
 
 export const subjects = [
-  "maths",
-  "language",
+  "language_learning",
+  "business",
+  "finance",
+  "technology",
+  "coding",
   "science",
   "history",
-  "coding",
+  "health_wellness",
+  "personal_development",
+  "psychology",
+  "arts_culture",
+  "philosophy",
   "economics",
+  "maths",
 ];
 
 export const subjectsColors = {
-  science: "#E5D0FF",
-  maths: "#FFDA6E",
-  language: "#BDE7FF",
-  coding: "#FFC8E4",
-  history: "#FFECC8",
-  economics: "#C8FFDF",
+  // --- Các màu cũ được giữ lại và ánh xạ ---
+  maths: "#FFDA6E", // Vàng pastel
+  language_learning: "#BDE7FF", // Xanh da trời pastel (từ 'language')
+  science: "#E5D0FF", // Tím lavender pastel
+  history: "#FFECC8", // Cam đào pastel
+  coding: "#FFC8E4", // Hồng pastel
+  economics: "#C8FFDF", // Xanh bạc hà pastel
+
+  // --- Các màu mới được bổ sung ---
+  business: "#D1E0FF", // Xanh chuyên nghiệp, nhạt hơn một chút
+  finance: "#D4EDD4", // Xanh lá cây của sự thịnh vượng
+  technology: "#C4F1F9", // Xanh cyan, mang cảm giác kỹ thuật số
+  health_wellness: "#FFDDC1", // Cam ấm áp, màu của sức khỏe
+  personal_development: "#FFD1D1", // Đỏ san hô, màu của sự năng động
+  psychology: "#CAD8E1", // Xám xanh, màu của sự trầm tư
+  arts_culture: "#F4D6FF", // Tím magenta, màu của sự sáng tạo
+  philosophy: "#EAE0D5", // Nâu be, màu của sự cổ điển, tri thức
 };
 
 export const voices = {
@@ -1534,77 +1491,65 @@ export const recentSessions = [
   },
 ];
 
-// 1. ĐỊNH NGHĨA SCHEMA MỚI CHO FEEDBACK HỌC NGÔN NGỮ
-export const languageFeedbackSchema = z.object({
-  totalScore: z
-    .number()
-    .describe(
-      "Overall score from 0 to 100, calculated as the average of category scores."
-    ),
-  categoryScores: z.object({
-    pronunciation: z
-      .number()
-      .describe("Pronunciation and clarity score from 0 to 100."),
-    fluency: z
-      .number()
-      .describe(
-        "Fluency and rhythm score from 0 to 100. How natural the speech sounds."
-      ),
-    grammar: z.number().describe("Grammar accuracy score from 0 to 100."),
-    vocabulary: z
-      .number()
-      .describe(
-        "Vocabulary usage score, including the use of appropriate words, from 0 to 100."
-      ),
-    completion: z
-      .number()
-      .describe(
-        "Task completion score, how well the user followed the script, from 0 to 100."
-      ),
-  }),
-  strengths: z
-    .array(z.string())
-    .describe("List of 2-3 key strengths observed during the conversation."),
-  areasForImprovement: z
-    .array(z.string())
-    .describe(
-      "List of 2-3 specific areas for improvement with examples from the transcript."
-    ),
-  finalAssessment: z
-    .string()
-    .describe("A concise, encouraging final summary for the learner."),
-});
+// Sample data for demo
+export const SAMPLE_TRANSCRIPT = `Leo: Hey hey hey! What's up, everybody? 
+Leo: Welcome back to Pod Chill!
+Leo: I'm Leo – your favorite joke master.
+Gwen: And I'm Gwen. 
+Gwen: I'm here to help Leo stay on track so that he doesn't make too many silly jokes.
+Leo: That's my talent! But today we're not just here for jokes. 
+Leo: We're talking about something serious. Kind of.
+Gwen: A problem many English learners face: You can understand English. You watch movies, you understand songs, maybe you even understand us.
+Leo: But when it's your turn to speak?
+Gwen: It's like... blank.
+Gwen: You freeze. 
+Gwen: Or you say "uh... uh..." like a broken robot.
+Leo: So why does this happen?
+Gwen: Let's go!
 
-export const conversationFeedbackSchema = z.object({
-  userId: z.string().uuid(),
-  topicId: z.string(),
-  companionId: z.string().uuid(), // <-- THÊM DÒNG NÀY
-  totalScore: z.number().min(0).max(100),
-  categoryScores: z.any(),
-  strengths: z.array(z.string()),
-  areasForImprovement: z.array(z.string()),
-  finalAssessment: z.string(),
-});
+Leo: Let's begin with this: Why can you understand English, but not speak it?
+Gwen: Well, listening is a passive skill. 
+Gwen: Your brain just receives information.
+Leo: It's like being stuck in a loop. 
+Leo: But don't worry—we're not gonna leave you hanging. 
+Leo: We've got five things that actually help.
+Gwen: You don't need perfect grammar. Just a brave voice.
+Leo: It's already inside. Let's set it free.
 
-// --- ZOD SCHEMAS (giữ nguyên như bạn đã định nghĩa) ---
-const transcriptDataSchema = z.object({
-  rawTranscript: z.string(),
-  topicConfig: z.array(z.any()),
-  podcastTopics: z.record(z.array(z.any())),
-  topicTitles: z.record(z.string()),
-  metadata: z.any(),
-});
+Gwen: Before wrapping up, we will learn some phrases.
+Leo: Bingo!`;
 
-export const upsertCompanionSchema = z.object({
-  id: z.string().uuid().optional().nullable(),
-  name: z.string().min(1, { message: "Name is required." }),
-  subject: z.string().min(1, { message: "Subject is required." }),
-  topic: z.string().min(1, { message: "Topic is required." }),
-  voice: z.string().min(1, { message: "Voice is required." }),
-  style: z.string().min(1, { message: "Style is required." }),
-  duration: z.coerce.number().min(1, { message: "Duration is required." }),
-  description: z.string().optional(),
-  coverImage: z.string().url({ message: "Please enter a valid URL." }).or(z.literal('')).optional(),
-  isPublic: z.boolean().default(false),
-  transcriptData: transcriptDataSchema,
-});
+// Default topic configuration
+export const DEFAULT_TOPIC_CONFIG: TopicConfig[] = [
+  {
+    key: "intro",
+    keyword: "Let's go!",
+    title: "Introduction & Welcome",
+  },
+  {
+    key: "problem",
+    keyword:
+      "Let's begin with this: Why can you understand English, but not speak it?",
+    title: "The Core Problem",
+  },
+  {
+    key: "barriers",
+    keyword: "It's like being stuck in a loop.",
+    title: "Speaking Barriers",
+  },
+  {
+    key: "techniques",
+    keyword: "Just a brave voice.",
+    title: "Practical Techniques",
+  },
+  {
+    key: "mindset",
+    keyword: "Let's set it free.",
+    title: "Mindset Transformation",
+  },
+  {
+    key: "vocabulary",
+    keyword: "Bingo!",
+    title: "Key Vocabulary",
+  },
+];

@@ -29,10 +29,26 @@ type CompanionCardProps = {
 
 // --- BẢNG MÀU TƯƠNG ỨNG VỚI CÁC SUBJECT ---
 // Bạn có thể mở rộng bảng màu này
-const subjectColors: Record<string, { bg: string; border: string }> = {
+export const subjectColors: Record<string, { bg: string; border: string }> = {
+  // --- Các màu cũ được chuyển đổi sang Tailwind CSS ---
+  maths: { bg: "bg-yellow-100", border: "border-yellow-300" },
+  language_learning: { bg: "bg-blue-100", border: "border-blue-300" },
   science: { bg: "bg-purple-100", border: "border-purple-300" },
-  economics: { bg: "bg-green-100", border: "border-green-300" },
+  history: { bg: "bg-orange-100", border: "border-orange-300" },
   coding: { bg: "bg-pink-100", border: "border-pink-300" },
+  economics: { bg: "bg-green-100", border: "border-green-300" },
+
+  // --- Các màu mới được bổ sung ---
+  business: { bg: "bg-indigo-100", border: "border-indigo-300" },
+  finance: { bg: "bg-emerald-100", border: "border-emerald-300" },
+  technology: { bg: "bg-cyan-100", border: "border-cyan-300" },
+  health_wellness: { bg: "bg-amber-100", border: "border-amber-300" },
+  personal_development: { bg: "bg-red-100", border: "border-red-300" },
+  psychology: { bg: "bg-slate-100", border: "border-slate-300" },
+  arts_culture: { bg: "bg-fuchsia-100", border: "border-fuchsia-300" },
+  philosophy: { bg: "bg-stone-100", border: "border-stone-300" },
+
+  // --- Màu mặc định để dự phòng ---
   default: { bg: "bg-gray-100", border: "border-gray-300" },
 };
 

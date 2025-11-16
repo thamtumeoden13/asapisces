@@ -10,7 +10,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { companions, db, transcripts } from "../supabase";
 import { eq } from "drizzle-orm";
-import { upsertCompanionSchema } from "@/constants";
+import { upsertCompanionSchema } from "../zodSchema";
 
 export const createTranscriptCompanion = async (
   formData: CreateTranscriptCompanion
@@ -281,8 +281,6 @@ export async function upsertTranscriptCompanion2(data: UpsertCompanionData) {
     if (companionId) {
       revalidatePath(`/companions/${companionId}`);
     }
-
-    redirect(`/companions/${companionId}`);
 
     return { success: true, companionId: companionId };
   } catch (error) {

@@ -3,9 +3,14 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
-const popularSubjects = ["english", "business", "travel", "technology", "daily-life"];
+export const popularSubjects = [
+  "language_learning", // Thay thế cho "english"
+  "personal_development", // Thay thế cho "daily-life", một chủ đề rất phổ biến
+  "business", // Giữ nguyên
+  "health_wellness", // Thay thế cho "travel", một chủ đề lối sống hấp dẫn
+  "technology", // Giữ nguyên
+];
 
 export function QuickFilterTags() {
   const router = useRouter();
@@ -16,7 +21,7 @@ export function QuickFilterTags() {
 
   const handleTagClick = (subject: string) => {
     const params = new URLSearchParams(searchParams);
-    
+
     // Nếu nhấp vào tag đang active, hãy xóa bộ lọc
     if (currentSubject === subject) {
       params.delete("subject");
@@ -26,21 +31,21 @@ export function QuickFilterTags() {
 
     // Xóa topic để tránh xung đột filter
     params.delete("topic");
-    
-    router.push(`${pathname}?${params.toString()}`);
+
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-sm font-medium text-gray-600">Popular topics:</span>
-      {popularSubjects.map(subject => (
+      {popularSubjects.map((subject) => (
         <Badge
           key={subject}
           variant={currentSubject === subject ? "default" : "secondary"}
           onClick={() => handleTagClick(subject)}
           className="cursor-pointer transition-transform hover:scale-105"
         >
-          {subject.replace('-', ' ')}
+          {subject.replace("-", " ")}
         </Badge>
       ))}
     </div>

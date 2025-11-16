@@ -58,7 +58,7 @@ export function processTranscript(
     updateTopicFromLine(line);
 
     // Find speaker: Leo or Gwen
-    const match = line.match(/^(Leo|Gwen):\s*(.*)$/);
+    const match = line.match(/^([^:]+):\s*(.*)$/);
     if (match) {
       pastSpeaker = match[1];
       speakers.add(pastSpeaker);
@@ -66,7 +66,7 @@ export function processTranscript(
 
       if (text.length > minTextLength) {
         podcastTopics[currentTopic].push({
-          speaker: match[1] as "Leo" | "Gwen",
+          speaker: match[1],
           text: text,
         });
       }

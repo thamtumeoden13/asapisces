@@ -11,70 +11,9 @@ import {
 import { TopicConfigEditor } from "@/components/companion/topic-config-editor";
 import { TranscriptSaveForm } from "@/components/companion/transcript-save-form";
 import { Button } from "@/components/ui/button";
-import { Save, Download, Settings } from "lucide-react";
-
-// Sample data for demo
-const SAMPLE_TRANSCRIPT = `Leo: Hey hey hey! What's up, everybody? 
-Leo: Welcome back to Pod Chill!
-Leo: I'm Leo – your favorite joke master.
-Gwen: And I'm Gwen. 
-Gwen: I'm here to help Leo stay on track so that he doesn't make too many silly jokes.
-Leo: That's my talent! But today we're not just here for jokes. 
-Leo: We're talking about something serious. Kind of.
-Gwen: A problem many English learners face: You can understand English. You watch movies, you understand songs, maybe you even understand us.
-Leo: But when it's your turn to speak?
-Gwen: It's like... blank.
-Gwen: You freeze. 
-Gwen: Or you say "uh... uh..." like a broken robot.
-Leo: So why does this happen?
-Gwen: Let's go!
-
-Leo: Let's begin with this: Why can you understand English, but not speak it?
-Gwen: Well, listening is a passive skill. 
-Gwen: Your brain just receives information.
-Leo: It's like being stuck in a loop. 
-Leo: But don't worry—we're not gonna leave you hanging. 
-Leo: We've got five things that actually help.
-Gwen: You don't need perfect grammar. Just a brave voice.
-Leo: It's already inside. Let's set it free.
-
-Gwen: Before wrapping up, we will learn some phrases.
-Leo: Bingo!`;
-
-// Default topic configuration
-const DEFAULT_TOPIC_CONFIG: TopicConfig[] = [
-  {
-    key: "intro",
-    keyword: "Let's go!",
-    title: "Introduction & Welcome",
-  },
-  {
-    key: "problem",
-    keyword:
-      "Let's begin with this: Why can you understand English, but not speak it?",
-    title: "The Core Problem",
-  },
-  {
-    key: "barriers",
-    keyword: "It's like being stuck in a loop.",
-    title: "Speaking Barriers",
-  },
-  {
-    key: "techniques",
-    keyword: "Just a brave voice.",
-    title: "Practical Techniques",
-  },
-  {
-    key: "mindset",
-    keyword: "Let's set it free.",
-    title: "Mindset Transformation",
-  },
-  {
-    key: "vocabulary",
-    keyword: "Bingo!",
-    title: "Key Vocabulary",
-  },
-];
+import { Save, Download, Sparkles, Settings } from "lucide-react";
+import { DEFAULT_TOPIC_CONFIG, SAMPLE_TRANSCRIPT } from "@/constants";
+import { generateTopicConfigAction } from "@/lib/actions/general.action";
 
 export default function TranscriptProcessorComponent({
   editMode = false,
@@ -89,6 +28,7 @@ export default function TranscriptProcessorComponent({
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpeaker, setSelectedSpeaker] = useState<string>("all");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Process transcript with current config
   const processedData = useMemo(() => {
@@ -175,6 +115,24 @@ export default function TranscriptProcessorComponent({
     URL.revokeObjectURL(url);
   };
 
+  const handleAutoGenerateTopics = async () => {
+    setIsGenerating(true);
+    try {
+      // THAY ĐỔI Ở ĐÂY: Bỏ các tham số không cần thiết
+      const result = await generateTopicConfigAction({ rawTranscript });
+      if (result.success && result.data) {
+        setTopicConfig(result.data);
+      } else {
+        alert(result.error || "An unknown error occurred.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to connect to the AI service.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
     if (companionData && companionData.transcript_data) {
       setRawTranscript(companionData.transcript_data.rawTranscript || "");
@@ -197,6 +155,16 @@ export default function TranscriptProcessorComponent({
             Topic Configuration
           </h2>
           <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={handleAutoGenerateTopics}
+              variant="outline"
+              size="sm"
+              className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              disabled={isGenerating || !rawTranscript.trim()}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isGenerating ? "Generating..." : "Auto-Generate Topics"}
+            </Button>
             <Button
               onClick={() => setIsEditingConfig(true)}
               variant="outline"
@@ -262,6 +230,17 @@ export default function TranscriptProcessorComponent({
             Topic Configuration
           </h2>
           <div className="flex gap-2">
+            <Button
+              onClick={handleAutoGenerateTopics}
+              variant="outline"
+              size="sm"
+              className="text-blue-400 border-purple hover:bg-purple"
+              disabled={isGenerating || !rawTranscript.trim()}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isGenerating ? "Generating..." : "Auto-Generate Topics"}
+            </Button>
+
             <Button
               onClick={() => setIsEditingConfig(true)}
               variant="outline"

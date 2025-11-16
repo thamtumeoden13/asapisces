@@ -5,7 +5,6 @@ import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -22,12 +21,9 @@ import {
   MicOff,
   RotateCcw,
   SkipForward,
-  Target,
-  Brain,
   Zap,
   Clock,
   FastForward,
-  AlertCircle,
   MessageSquare,
 } from "lucide-react";
 import type {

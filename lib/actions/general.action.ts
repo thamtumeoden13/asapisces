@@ -1,6 +1,5 @@
 "use server";
 
-import { feedbackSchema, languageFeedbackSchema } from "@/constants";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { supabase } from "../supabase/server";
@@ -10,8 +9,20 @@ import {
   GetFeedbackByInterviewIdParams,
   GetLatestInterviewsParams,
   Interview,
+  TopicConfig,
 } from "@/types";
 import z from "zod";
+import {
+  aiTutorResponseSchema,
+  askSchema,
+  companionDetailsGenerationSchema,
+  feedbackSchema,
+  languageFeedbackSchema,
+  smartRetryResponseSchema,
+  smartRetrySchema,
+  topicConfigGenerationSchema,
+} from "../zodSchema";
+import { subjects } from "@/constants";
 
 export async function getInterviewByUserId(
   userId: string
@@ -312,43 +323,6 @@ export async function createLanguageFeedback(
   }
 }
 
-const aiTutorResponseSchema = z.object({
-  directAnswer: z
-    .string()
-    .describe("A direct and concise answer to the student's question."),
-  examples: z
-    .array(
-      z.object({
-        fromTranscript: z
-          .string()
-          .describe(
-            "A specific phrase or sentence the student said (as 'Learner')."
-          ),
-        suggestion: z
-          .string()
-          .describe("A corrected or improved version of the phrase."),
-      })
-    )
-    .optional()
-    .describe(
-      "Specific examples from the conversation to illustrate the point, if applicable."
-    ),
-  furtherExplanation: z
-    .string()
-    .optional()
-    .describe(
-      "A brief, additional explanation or tip related to the question."
-    ),
-});
-
-// Schema để xác thực dữ liệu đầu vào (giữ nguyên)
-const askSchema = z.object({
-  question: z.string().min(5, "Question is too short."),
-  userRole: z.enum(["Leo", "Gwen"]),
-  fullTranscript: z.array(z.object({ role: z.string(), content: z.string() })),
-  originalScript: z.array(z.object({ speaker: z.string(), text: z.string() })),
-});
-
 type AskData = z.infer<typeof askSchema>;
 
 // Kiểu dữ liệu trả về cho client
@@ -428,25 +402,6 @@ export async function askAboutConversationAction(data: AskData): Promise<{
   }
 }
 
-// --- SCHEMA MỚI CHO SMART RETRY ---
-const smartRetrySchema = z.object({
-  expectedSentence: z.string(),
-  userSentence: z.string(),
-});
-
-const smartRetryResponseSchema = z.object({
-  focusPoint: z
-    .string()
-    .describe(
-      "The single most important word or short phrase the user struggled with (e.g., 'pronunciation of track', 'the phrase fall flat')."
-    ),
-  encouragingPhrase: z
-    .string()
-    .describe(
-      "A short, positive opening phrase (e.g., 'Almost there!', 'Great effort!', 'You're close!')."
-    ),
-});
-
 type SmartRetryData = z.infer<typeof smartRetrySchema>;
 
 // --- SERVER ACTION MỚI ---
@@ -501,6 +456,122 @@ export async function getSmartRetryFeedbackAction(
       success: false,
       error: "AI feedback is unavailable, using default message.",
       feedbackMessage: `Let's practice that again: "${expectedSentence}"`,
+    };
+  }
+}
+
+interface GenerateTopicsParams {
+  rawTranscript: string;
+}
+
+export async function generateTopicConfigAction(
+  params: GenerateTopicsParams
+): Promise<{
+  success: boolean;
+  data?: TopicConfig[];
+  error?: string;
+}> {
+  const { rawTranscript } = params;
+
+  if (!rawTranscript || rawTranscript.trim().length < 100) {
+    return { success: false, error: "Transcript is too short to process." };
+  }
+
+  // --- PROMPT ĐÃ ĐƯỢC CẢI TIẾN HOÀN TOÀN ---
+  const prompt = `
+    You are an expert AI assistant that processes podcast transcripts for educational use. Your primary goal is to divide a long transcript into smaller, logical, and well-sized topics.
+
+    **Transcript to Analyze:**
+    ---
+    ${rawTranscript}
+    ---
+
+    **Core Rules (Follow these strictly):**
+    1.  **Topic Splitting Logic:** Your main task is to split the transcript into multiple continuous topics. The number of topics is FLEXIBLE. You should decide the optimal number of topics based on the content flow.
+    2.  **Strict Length Constraints:** Each topic you create MUST have a minimum of **15 lines** and a maximum of **30 lines** of dialogue. This rule is more important than the total number of topics.
+    3.  **Find Natural Breaks:** When deciding where to split topics, prioritize natural conversational breaks. A good split point is often where a new question is asked or the subject shifts. Avoid splitting in the middle of a continuous explanation.
+    4.  **Critical 'keyword' Rule:** The 'keyword' field for each topic MUST be the exact first line of dialogue for that topic block, BUT with the speaker's name and colon (e.g., "Leo: " or "Gwen: ") REMOVED. For example, if the line is "Leo: Hey everyone!", the keyword must be "Hey everyone!".
+    5.  **Content Integrity:** Do not invent, paraphrase, or modify any of the original dialogue.
+
+    Generate a JSON array of topic objects based on all the rules above. The final output must be only the JSON array.
+  `;
+
+  try {
+    const { object: generatedConfig } = await generateObject({
+      model: google("gemini-2.5-pro"),
+      schema: topicConfigGenerationSchema,
+      prompt,
+      system:
+        "You are an AI that structures raw text into a specific JSON format based on user instructions. You only output valid JSON.",
+    });
+
+    const validatedData: TopicConfig[] = generatedConfig.map((item) => ({
+      key: item.key,
+      title: item.title,
+      keyword: item.keyword,
+    }));
+
+    return { success: true, data: validatedData };
+  } catch (error) {
+    console.error("AI SDK Error in generateTopicConfigAction:", error);
+    return {
+      success: false,
+      error: "Failed to generate topics using AI. Please try again.",
+    };
+  }
+}
+
+interface GenerateDetailsParams {
+  rawTranscript: string;
+}
+
+export async function generateCompanionDetailsAction(
+  params: GenerateDetailsParams
+): Promise<{
+  success: boolean;
+  data?: z.infer<typeof companionDetailsGenerationSchema>;
+  error?: string;
+}> {
+  const { rawTranscript } = params;
+
+  if (!rawTranscript || rawTranscript.trim().length < 100) {
+    return { success: false, error: "Transcript is too short to analyze." };
+  }
+
+  const prompt = `
+    You are a helpful AI assistant skilled at analyzing and summarizing content. Your task is to read the following podcast transcript and generate key metadata for it.
+
+    **Transcript to Analyze:**
+    ---
+    ${rawTranscript}
+    ---
+
+    **Your Instructions:**
+    Based on the transcript, generate a JSON object with the following fields:
+    1.  **name**: A short, catchy title for this conversation.
+    2.  **subject**: The primary subject category. Choose only ONE from this list: ${subjects.toString()}.
+    3.  **topic**: A concise sentence describing what this conversation helps a user learn or practice.
+    4.  **description**: A brief summary (2-3 sentences) of the conversation's main points.
+    5.  **duration**: An estimated session duration in minutes (as a number) for a learner to practice this transcript. Consider its length and complexity.
+
+    Please provide the output in a structured JSON format.
+  `;
+
+  try {
+    const { object: generatedDetails } = await generateObject({
+      model: google("gemini-2.5-pro"),
+      schema: companionDetailsGenerationSchema,
+      prompt,
+      system:
+        "You are an AI assistant that provides structured JSON output based on a transcript.",
+    });
+
+    return { success: true, data: generatedDetails };
+  } catch (error) {
+    console.error("AI SDK Error in generateCompanionDetailsAction:", error);
+    return {
+      success: false,
+      error: "Failed to generate details using AI. Please try again.",
     };
   }
 }

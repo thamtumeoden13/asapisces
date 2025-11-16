@@ -3,8 +3,8 @@
 
 import { z } from "zod";
 import { supabase } from "../supabase/server";
-import { conversationFeedbackSchema } from "@/constants";
 import { auth } from "@/auth";
+import { conversationFeedbackSchema } from "../zodSchema";
 
 type FeedbackData = z.infer<typeof conversationFeedbackSchema>;
 

@@ -42,65 +42,19 @@ import {
   upsertTranscriptCompanion2,
 } from "@/lib/actions/transcript.actions";
 import { ProcessorResult, TopicConfig } from "@/types";
+import {
+  transcriptCompanionSchema,
+  transcriptSaveFormSchema,
+} from "@/lib/zodSchema";
 
-// Schema for transcript companion
-export const transcriptCompanionSchema = z.object({
-  name: z.string().min(1, { message: "Name is required." }),
-  subject: z.string().min(1, { message: "Subject is required." }),
-  topic: z.string().min(1, { message: "Topic is required." }),
-  voice: z.string().min(1, { message: "Voice is required." }),
-  style: z.string().min(1, { message: "Style is required." }),
-  description: z.string().min(10, "Description should be at least 10 characters.").optional(),
-  coverImage: z.string().url("Must be a valid URL.").optional(),
-  isPublic: z.boolean().default(false),
-  duration: z.coerce.number().min(1, { message: "Duration is required." }),
-  // Transcript specific fields
-  transcript_data: z.object({
-    rawTranscript: z.string(),
-    topicConfig: z.array(
-      z.object({
-        key: z.string(),
-        keyword: z.string(),
-        title: z.string().optional(),
-      })
-    ),
-    podcastTopics: z.record(
-      z.array(
-        z.object({
-          speaker: z.string(),
-          text: z.string(),
-        })
-      )
-    ),
-    topicTitles: z.record(z.string()),
-    metadata: z.object({
-      totalEntries: z.number(),
-      totalTopics: z.number(),
-      speakers: z.array(z.string()),
-      processingTime: z.number(),
-    }),
-  }),
-});
+import { Sparkles } from "lucide-react"; // Thêm icon
+import { generateCompanionDetailsAction } from "@/lib/actions/general.action";
 
 export type CreateTranscriptCompanion = z.infer<
   typeof transcriptCompanionSchema
 >;
 
-// Form schema for the save form
-const formSchema = z.object({
-  id: z.string().uuid().optional().nullable(),
-  name: z.string().min(1, { message: "Name is required." }),
-  subject: z.string().min(1, { message: "Subject is required." }),
-  topic: z.string().min(1, { message: "Topic is required." }),
-  voice: z.string().min(1, { message: "Voice is required." }),
-  style: z.string().min(1, { message: "Style is required." }),
-  duration: z.coerce.number().min(1, { message: "Duration is required." }),
-  description: z.string().min(10, "Description should be at least 10 characters.").optional(),
-  coverImage: z.string().url("Must be a valid URL.").optional(),
-  isPublic: z.boolean().default(false),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof transcriptSaveFormSchema>;
 
 interface TranscriptSaveFormProps {
   children: React.ReactNode;
@@ -119,11 +73,12 @@ export function TranscriptSaveForm({
 }: TranscriptSaveFormProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingDetails, setIsGeneratingDetails] = useState(false);
 
   const isEditMode = !!companion;
 
   const form = useForm({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(transcriptSaveFormSchema),
     defaultValues: isEditMode
       ? companion
       : {
@@ -138,6 +93,37 @@ export function TranscriptSaveForm({
           isPublic: false,
         },
   });
+
+  const handleAutoFill = async () => {
+    setIsGeneratingDetails(true);
+    try {
+      const result = await generateCompanionDetailsAction({ rawTranscript });
+      if (result.success && result.data) {
+        const subject = result.data.subject;
+        // Giả sử bạn lưu ảnh trong public/images/covers/ và có định dạng .jpg
+        // Ví dụ: /images/covers/finance.jpg
+        const coverImageUrl = `/images/covers/${subject}.png`;
+        // Sử dụng form.setValue để điền dữ liệu vào form
+        form.setValue("name", result.data.name, { shouldValidate: true });
+        form.setValue("subject", result.data.subject, { shouldValidate: true });
+        form.setValue("topic", result.data.topic, { shouldValidate: true });
+        form.setValue("description", result.data.description, {
+          shouldValidate: true,
+        });
+        form.setValue("duration", result.data.duration, {
+          shouldValidate: true,
+        });
+        form.setValue("coverImage", coverImageUrl, { shouldValidate: true });
+      } else {
+        alert(result.error || "An unknown error occurred.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to connect to the AI service.");
+    } finally {
+      setIsGeneratingDetails(false);
+    }
+  };
 
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
@@ -190,6 +176,19 @@ export function TranscriptSaveForm({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="my-4">
+          <Button
+            type="button" // Quan trọng: để không submit form
+            variant="outline"
+            className="w-full text-blue-400 border-purple hover:bg-purple"
+            disabled={isGeneratingDetails || !rawTranscript.trim()}
+            onClick={handleAutoFill}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {isGeneratingDetails ? "Analyzing..." : "Auto-fill with AI"}
+          </Button>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -197,7 +196,9 @@ export function TranscriptSaveForm({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Companion Name</FormLabel>
+                  <FormLabel className="text-black-200">
+                    Companion Name
+                  </FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Enter companion name"
@@ -215,7 +216,7 @@ export function TranscriptSaveForm({
               name="subject"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Subject</FormLabel>
+                  <FormLabel className="text-black-200">Subject</FormLabel>
                   <FormControl>
                     <Select
                       onValueChange={field.onChange}
@@ -248,7 +249,9 @@ export function TranscriptSaveForm({
               name="topic"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>What should the companion help with?</FormLabel>
+                  <FormLabel className="text-black-200">
+                    What should the companion help with?
+                  </FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Ex. English speaking practice, podcast analysis, etc."
@@ -267,7 +270,7 @@ export function TranscriptSaveForm({
                 name="voice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Voice</FormLabel>
+                    <FormLabel className="text-black-200">Voice</FormLabel>
                     <FormControl>
                       <Select
                         onValueChange={field.onChange}
@@ -293,7 +296,7 @@ export function TranscriptSaveForm({
                 name="style"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Style</FormLabel>
+                    <FormLabel className="text-black-200">Style</FormLabel>
                     <FormControl>
                       <Select
                         onValueChange={field.onChange}
@@ -320,7 +323,9 @@ export function TranscriptSaveForm({
               name="duration"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Session Duration (minutes)</FormLabel>
+                  <FormLabel className="text-black-200">
+                    Session Duration (minutes)
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -339,9 +344,13 @@ export function TranscriptSaveForm({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel className="text-black-200">Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Describe what this conversation is about..." {...field} />
+                    <Textarea
+                      className="text-black-200"
+                      placeholder="Describe what this conversation is about..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -352,9 +361,15 @@ export function TranscriptSaveForm({
               name="coverImage"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cover Image URL</FormLabel>
+                  <FormLabel className="text-black-200">
+                    Cover Image URL
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com/image.png" {...field} />
+                    <Input
+                      className="text-black-200"
+                      placeholder="https://example.com/image.png"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
