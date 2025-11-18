@@ -40,6 +40,7 @@ import {
 import { AnalyticsChart } from "./AnalyticsChart";
 import { TranslatedText } from "./TranslatedText";
 import { AskAITutor } from "./AskAITutor";
+import { SHOULDADVANCESCORETHERESHOLD } from "@/constants";
 // import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -861,7 +862,7 @@ const EnhancedCompanionConversationOptimized = ({
                                     "text-xs",
                                     group.messages.find(
                                       (msg: any) => msg.similarity
-                                    )?.similarity?.score >= 0.6
+                                    )?.similarity?.score >= SHOULDADVANCESCORETHERESHOLD
                                       ? "text-green-700 border-green-300 bg-green-50"
                                       : "text-red-700 border-red-300 bg-red-50"
                                   )}
@@ -874,7 +875,7 @@ const EnhancedCompanionConversationOptimized = ({
                                   % match{" "}
                                   {group.messages.find(
                                     (msg: any) => msg.similarity
-                                  )?.similarity?.score >= 0.6
+                                  )?.similarity?.score >= SHOULDADVANCESCORETHERESHOLD
                                     ? "✅"
                                     : "❌"}
                                 </Badge>

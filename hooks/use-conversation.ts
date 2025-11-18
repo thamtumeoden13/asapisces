@@ -20,6 +20,7 @@ import { CallStatus } from "@/types/podcast";
 import type { TimingSettings, Message } from "@/types"; // Đảm bảo Message được import từ types của bạn
 import { recordSessionStartAction } from "@/lib/actions/session.action";
 import { getSmartRetryFeedbackAction } from "@/lib/actions/general.action";
+import { LOWSCORETHERESHOLD, SHOULDADVANCESCORETHERESHOLD } from "@/constants";
 
 type TTSProvider = "webspeech" | "elevenlabs";
 
@@ -33,9 +34,6 @@ interface UseConversationProps {
   userRole: "Gwen" | "Leo";
   onSessionComplete?: () => void;
 }
-
-const LONG_SENTENCE_WORD_THRESHOLD = 8; // <-- GIẢM từ 15 xuống 8 từ
-const LONG_SENTENCE_GRACE_PERIOD_MS_BONUS = 2000; // Thêm 2 giây cho câu dài
 
 export const useConversation = ({
   steps,
@@ -261,7 +259,7 @@ export const useConversation = ({
       ]);
 
       // Quyết định advance hay retry
-      const shouldAdvance = similarityResult.score >= 0.7; // Ngưỡng 70%
+      const shouldAdvance = similarityResult.score >= SHOULDADVANCESCORETHERESHOLD; // Ngưỡng 60%
       isAwaitingAIRef.current = true;
       if (shouldAdvance) {
         console.log(`✅ Good score on step ${stepIndex}. Advancing.`);
@@ -277,7 +275,7 @@ export const useConversation = ({
         let retryMsg: string;
 
         // --- LOGIC QUYẾT ĐỊNH "HYBRID RETRY" ---
-        const lowScoreThreshold = similarityResult.score < 0.4;
+        const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
 
         // Trường hợp 1: Người dùng nói đúng quá ít (dưới 40% câu) -> Dùng logic cũ, nhanh và miễn phí
         if (lowScoreThreshold) {

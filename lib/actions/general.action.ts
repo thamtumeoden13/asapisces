@@ -439,7 +439,7 @@ export async function getSmartRetryFeedbackAction(
   try {
     // --- SỬ DỤNG generateObject ---
     const { object: aiFeedback } = await generateObject({
-      model: google("gemini-1.5-flash-latest"),
+      model: google("gemini-2.5-pro"),
       schema: smartRetryResponseSchema,
       prompt: prompt,
       system: "You are an AI English coach that responds in structured JSON.",

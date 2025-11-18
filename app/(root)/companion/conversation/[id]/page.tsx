@@ -1,6 +1,6 @@
 import React from "react";
 import { getCurrentUser } from "@/lib/actions/auth.action";
-import { getCompanion, getCompanionById } from "@/lib/actions/companion.actions";
+import { getCompanionById } from "@/lib/actions/companion.actions";
 import { redirect } from "next/navigation";
 import ConversationComponent from "@/components/companion/ConversationComponent";
 
@@ -15,10 +15,7 @@ const ConversationPage = async ({ params }: ConversationSessionProps) => {
   const companion = await getCompanionById(id);
   const user = await getCurrentUser();
 
-  const { name, subject, topic, duration } = companion;
-
   if (!user) redirect("/sign-in");
-  if (!name) redirect("/companions");
   return (
     <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="container mx-auto px-4 py-8">

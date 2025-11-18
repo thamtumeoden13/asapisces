@@ -36,13 +36,10 @@ interface ConversationPlayerProps extends CompanionComponentProps {
 export const ConversationPlayer = ({
   companionId,
   subject,
-  topic,
   name,
   userName,
   userImage,
   userId,
-  style,
-  voice,
   transcriptData,
   initialFeedbackHistory,
 }: ConversationPlayerProps) => {
@@ -50,7 +47,7 @@ export const ConversationPlayer = ({
   const [topicConfig, setTopicConfig] = useState<TopicConfig[]>([]);
   const [podcastTopics, setPodcastTopics] = useState<PodcastTopics>({});
 
-  const [selectedTopic, setSelectedTopic] = useState<TopicKey>("intro");
+  const [selectedTopic, setSelectedTopic] = useState<TopicKey | undefined>(undefined);
   const [completedTopics, setCompletedTopics] = useState<Set<TopicKey>>(
     new Set()
   );
@@ -108,20 +105,17 @@ export const ConversationPlayer = ({
 
   // --- LOGIC useEffect ĐỂ CẬP NHẬT BIỂU ĐỒ KHI TOPIC THAY ĐỔI ---
   useEffect(() => {
-    // Không fetch lại cho topic đầu tiên vì đã có initialFeedbackHistory
-    // if (selectedTopic === (transcriptData?.topicConfig[0]?.key || "intro")) {
-    //   return;
-    // }
     console.log("Fetching feedback history for topic:", selectedTopic);
+    if(!selectedTopic) return
     setIsLoadingChart(true);
     getFeedbackHistoryForTopic(selectedTopic).then((data) => {
       setFeedbackHistory(data);
       setIsLoadingChart(false);
     });
-  }, [selectedTopic, transcriptData]);
+  }, [selectedTopic]);
 
   useEffect(() => {
-    if (transcriptData) {
+    if (transcriptData && !selectedTopic) {
       const { topicTitles, podcastTopics, topicConfig } = transcriptData;
 
       setTopicTitles(topicTitles);
@@ -131,7 +125,7 @@ export const ConversationPlayer = ({
         setSelectedTopic(topicConfig[0].key as TopicKey);
       }
     }
-  }, [transcriptData]);
+  }, [transcriptData, selectedTopic]);
 
   return (
     <>
@@ -302,7 +296,6 @@ export const ConversationPlayer = ({
           <EnhancedCompanionConversationV3
             companionId={companionId}
             subject={subject}
-            topic={selectedTopic}
             topicTitles={topicTitles}
             podcastTopics={podcastTopics}
             name={name}
