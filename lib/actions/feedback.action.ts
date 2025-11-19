@@ -59,19 +59,6 @@ export type FeedbackHistoryPoint = {
 export async function getFeedbackHistoryForTopic(
   topicId: string
 ): Promise<FeedbackHistoryPoint[]> {
-  // 1. Khởi tạo Supabase client an toàn ở phía server
-  // const supabase = createClient();
-
-  // 2. Lấy thông tin người dùng đang đăng nhập
-  // const {
-  //   data: { user },
-  // } = await supabase.auth.getUser();
-  // console.log("Current user:", user);
-  // if (!user) {
-  //   // Luôn trả về mảng rỗng nếu không có người dùng
-  //   return [];
-  // }
-
   const session = await auth();
   console.log("Current session:", session);
   const userId = session?.user?.id;
@@ -117,6 +104,41 @@ export async function getFeedbackHistoryForTopic(
   } catch (error) {
     // Bắt các lỗi khác (ví dụ: lỗi mạng) và trả về mảng rỗng
     console.error("Error in getFeedbackHistoryForTopic:", error);
+    return [];
+  }
+}
+
+export type FeedbackHistoryCompletedTopic = {
+  topicId: string;
+};
+
+export const getCompletedTopicForCompanion = async (
+  companionId: string
+): Promise<FeedbackHistoryCompletedTopic[] | []> => {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("conversation_feedbacks")
+      .select("topic_id", { count: "exact" })
+      .eq("user_id", userId)
+      .eq("companion_id", companionId)
+      .neq("total_score", 0); // Chỉ lấy các topic đã có điểm số khác 0
+
+    if (error) {
+      console.error("Supabase error fetching completed topics:", error);
+      throw error;
+    }
+
+    return data.map((item) => ({
+      topicId: item.topic_id,
+    }));
+  } catch (error) {
+    console.error("Error in getCompletedTopicForCompanion:", error);
     return [];
   }
 }

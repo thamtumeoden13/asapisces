@@ -221,7 +221,7 @@ interface CreateLanguageFeedbackParams {
 export async function createLanguageFeedback(
   params: CreateLanguageFeedbackParams
 ) {
-  const { sessionId, userId, transcript, script, userRole } = params;
+  const { transcript, script, userRole } = params;
 
   try {
     // Định dạng transcript và kịch bản để gửi cho AI
@@ -229,13 +229,6 @@ export async function createLanguageFeedback(
       .map(
         (msg: { role: string; content: string }) =>
           `- ${msg.role === "user" ? "Learner" : "AI Companion"}: ${msg.content}`
-      )
-      .join("\n");
-
-    const formattedScript = script
-      .map(
-        (line: { speaker: string; text: string }) =>
-          `- ${line.speaker === "Gwen" ? "Learner (Expected)" : "AI Companion"}: ${line.text}`
       )
       .join("\n");
 
@@ -455,7 +448,7 @@ export async function getSmartRetryFeedbackAction(
     return {
       success: false,
       error: "AI feedback is unavailable, using default message.",
-      feedbackMessage: `Let's practice that again: "${expectedSentence}"`,
+      feedbackMessage: ''
     };
   }
 }

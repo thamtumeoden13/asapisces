@@ -12,6 +12,7 @@ import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
 import {
   getFeedbackHistoryForTopic,
   FeedbackHistoryPoint,
+  FeedbackHistoryCompletedTopic,
 } from "@/lib/actions/feedback.action";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
@@ -32,6 +33,7 @@ interface TopicConfig {
 }
 interface ConversationPlayerProps extends CompanionComponentProps {
   initialFeedbackHistory: FeedbackHistoryPoint[];
+  initialCompletedTopics: FeedbackHistoryCompletedTopic[];
 }
 export const ConversationPlayer = ({
   companionId,
@@ -42,15 +44,20 @@ export const ConversationPlayer = ({
   userId,
   transcriptData,
   initialFeedbackHistory,
+  initialCompletedTopics,
 }: ConversationPlayerProps) => {
+
+  const complementedTopicsSet = new Set(
+    initialCompletedTopics.map((item) => item.topicId)
+  );
+
   const [topicTitles, setTopicTitles] = useState<TopicTitles>({});
   const [topicConfig, setTopicConfig] = useState<TopicConfig[]>([]);
   const [podcastTopics, setPodcastTopics] = useState<PodcastTopics>({});
 
   const [selectedTopic, setSelectedTopic] = useState<TopicKey | undefined>(undefined);
-  const [completedTopics, setCompletedTopics] = useState<Set<TopicKey>>(
-    new Set()
-  );
+  const [completedTopics, setCompletedTopics] = useState<Set<keyof PodcastTopics>>(complementedTopicsSet);
+  
   const [userLevel, setUserLevel] = useState<
     "beginner" | "intermediate" | "advanced"
   >("intermediate");
