@@ -66,6 +66,7 @@ interface EnhancedCompanionConversationOptimizedProps
   feedbackHistory?: FeedbackHistoryPoint[];
   userRole?: "Gwen" | "Leo"; // Thêm prop userRole
   ttsProvider?: "webspeech" | "elevenlabs"; // Thêm prop ttsProvider
+  geminiFeedback?: "standard" | "gemini"; // Thêm prop geminiFeedback
   onTopicComplete?: (topic: TopicKey) => void;
   onCallStateChange?: (state: CallStatus) => void;
 }
@@ -85,6 +86,7 @@ const EnhancedCompanionConversationOptimized = ({
   feedbackHistory = [],
   userRole = "Gwen",
   ttsProvider = "webspeech",
+  geminiFeedback = "standard",
   onTopicComplete,
   onCallStateChange,
 }: EnhancedCompanionConversationOptimizedProps) => {
@@ -174,6 +176,7 @@ const EnhancedCompanionConversationOptimized = ({
     steps,
     voiceId,
     ttsProvider: ttsProvider,
+    geminiFeedback: geminiFeedback,
     companionId,
     onSessionComplete: () => {
       handleSessionComplete(
@@ -390,54 +393,9 @@ const EnhancedCompanionConversationOptimized = ({
     performanceMode.instantFeedback,
   ]);
 
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (autoAdvanceTimer.current) {
-        clearTimeout(autoAdvanceTimer.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     onCallStateChange?.(callState.status);
   }, [callState.status, onCallStateChange]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "bg-green-500";
-      case "CONNECTING":
-        return "bg-yellow-500 animate-pulse";
-      case "ERROR":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "INACTIVE":
-        return "Ready to Start";
-      case "CONNECTING":
-        return "Connecting...";
-      case "ACTIVE":
-        return "Active Call";
-      case "FINISHED":
-        return "Call Ended";
-      case "ERROR":
-        return "Error";
-      default:
-        return status;
-    }
-  };
-
-  const getMetricColor = (value: number) => {
-    if (value >= 80) return "text-green-600";
-    if (value >= 60) return "text-yellow-600";
-    return "text-red-600";
-  };
 
   console.log(
     `[UI RENDER] Step: ${conversationState.currentStep}`,
@@ -673,7 +631,7 @@ const EnhancedCompanionConversationOptimized = ({
                 <TabsContent value="conversation" className="space-y-4">
                   {/* Current Line Display with countdown */}
                   {currentLine && (
-                    <div className="relative p-5 overflow-hidden border-2 border-purple-300 rounded-lg shadow-md bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50">
+                    <div className="relative p-5 overflow-hidden border-2 border-blue-50 rounded-lg shadow-md bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50">
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-100/20 to-indigo-100/20 animate-pulse"></div>
 
                       <div className="relative z-10">
@@ -746,17 +704,6 @@ const EnhancedCompanionConversationOptimized = ({
                           </div>
                         </div>
                         <div className="text-lg font-semibold leading-relaxed text-purple-900">
-                          {/* THAY THẾ DÒNG NÀY */}
-                          {/* {currentLine.text} */}
-                          {/* BẰNG ĐOẠN CODE NÀY ĐỂ XUỐNG DÒNG */}
-                          {/* {currentLine.text
-                            .split(". ")
-                            .map((sentence, index, array) => (
-                              <span key={index} className="block mb-2">
-                                {sentence}
-                                {index < array.length - 1 ? "." : ""}
-                              </span>
-                            ))} */}
                           <blockquote className="text-xl md:text-2xl">
                             {/* Thay vì chỉ hiển thị text, dùng component mới */}
                             <TranslatedText text={currentLine.text} />
@@ -862,7 +809,8 @@ const EnhancedCompanionConversationOptimized = ({
                                     "text-xs",
                                     group.messages.find(
                                       (msg: any) => msg.similarity
-                                    )?.similarity?.score >= SHOULDADVANCESCORETHERESHOLD
+                                    )?.similarity?.score >=
+                                      SHOULDADVANCESCORETHERESHOLD
                                       ? "text-green-700 border-green-300 bg-green-50"
                                       : "text-red-700 border-red-300 bg-red-50"
                                   )}
@@ -875,7 +823,8 @@ const EnhancedCompanionConversationOptimized = ({
                                   % match{" "}
                                   {group.messages.find(
                                     (msg: any) => msg.similarity
-                                  )?.similarity?.score >= SHOULDADVANCESCORETHERESHOLD
+                                  )?.similarity?.score >=
+                                  SHOULDADVANCESCORETHERESHOLD
                                     ? "✅"
                                     : "❌"}
                                 </Badge>
@@ -1319,17 +1268,6 @@ const EnhancedCompanionConversationOptimized = ({
           </Card>
         </div>
       </div>
-      {/* <div>
-        <PodcastPlayer
-          callState={callState}
-          conversationState={conversationState}
-          partialTranscript={partialTranscript}
-          currentLine={currentLine}
-          isSpeaking={isSpeaking}
-          startCall={startCall}
-          endCall={endCall}
-        />
-      </div> */}
     </div>
   );
 };

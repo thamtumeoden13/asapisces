@@ -199,7 +199,7 @@ export default function TranscriptProcessorComponent({
           <textarea
             value={rawTranscript}
             onChange={(e) => setRawTranscript(e.target.value)}
-            className="w-full h-32 p-3 border rounded-lg"
+            className="w-full h-32 p-3 border rounded-lg text-black-100"
             placeholder="Paste your transcript here..."
           />
         </div>
@@ -285,13 +285,13 @@ export default function TranscriptProcessorComponent({
 
       {/* Input Section */}
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2 text-black-300">
+        <label className="block text-sm font-medium mb-2 text-black">
           Raw Transcript:
         </label>
         <textarea
           value={rawTranscript}
           onChange={(e) => setRawTranscript(e.target.value)}
-          className="w-full h-32 p-3 border rounded-lg"
+          className="w-full h-32 p-3 border rounded-lg text-black-300"
           placeholder="Paste your transcript here..."
         />
       </div>
@@ -338,7 +338,7 @@ export default function TranscriptProcessorComponent({
         <select
           value={selectedSpeaker}
           onChange={(e) => setSelectedSpeaker(e.target.value)}
-          className="p-2 border rounded-lg"
+          className="border rounded-lg text-black-300"
         >
           <option value="all">All Speakers</option>
           {processedData.metadata.speakers.map((speaker) => (
@@ -391,7 +391,7 @@ export default function TranscriptProcessorComponent({
 
       {/* Topic Breakdown */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold mb-3">Topic Breakdown</h2>
+        <h2 className="text-xl font-bold mb-3 text-black-100">Topic Breakdown</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {Object.entries(stats.topicBreakdown).map(([topic, data]) => (
             <div key={topic} className="bg-blue-50 p-3 rounded-lg">

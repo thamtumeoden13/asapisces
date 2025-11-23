@@ -1554,8 +1554,8 @@ export const DEFAULT_TOPIC_CONFIG: TopicConfig[] = [
   },
 ];
 
-export const SHOULDADVANCESCORETHERESHOLD = 0.6
-export const LOWSCORETHERESHOLD = 0.4
+export const SHOULDADVANCESCORETHERESHOLD = 0.7
+export const LOWSCORETHERESHOLD = 0.5
 
-export const LONG_SENTENCE_WORD_THRESHOLD = 8; // <-- GIẢM từ 15 xuống 8 từ
+export const LONG_SENTENCE_WORD_THRESHOLD = 10;
 export const LONG_SENTENCE_GRACE_PERIOD_MS_BONUS = 2000; // Thêm 2 giây cho câu dài

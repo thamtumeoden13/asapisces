@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +79,9 @@ export const ConversationPlayer = ({
   const [ttsProvider, setTtsProvider] = useState<"webspeech" | "elevenlabs">(
     "webspeech"
   );
+  const [geminiFeedback, setGeminiFeedback] = useState<"standard" | "gemini">(
+    "standard"
+  );
   // Lấy voiceId dựa trên lựa chọn
   const selectedVoiceId = voiceStyles[voiceStyle];
 
@@ -94,9 +97,12 @@ export const ConversationPlayer = ({
     }
   };
 
-  const handleChangeCallState = (newState: CallStatus) => {
-    console.log("Call state changed to:", newState);
-  };
+  const handleChangeCallState = useCallback(
+    (newStatus: CallStatus) => {
+      setCallState({ status: newStatus });
+    },
+    []
+  );
 
   const getTopicProgress = () => {
     const totalTopics = Object.keys(podcastTopics).length;
@@ -159,7 +165,7 @@ export const ConversationPlayer = ({
               <div className="text-sm text-gray-600">Overall Progress</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600">
+              <div className="text-3xl font-bold text-purple">
                 {Object.keys(podcastTopics).length}
               </div>
               <div className="text-sm text-gray-600">Total Topics</div>
@@ -215,6 +221,18 @@ export const ConversationPlayer = ({
                   disabled={callState.status === CallStatus.ACTIVE} // Vô hiệu hóa khi đang nói
                   onCheckedChange={(checked) => {
                     setTtsProvider(checked ? "elevenlabs" : "webspeech");
+                  }}
+                />
+              </div>
+               <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Use High-Quality Feedback (Gemini)
+                </span>
+                <Switch
+                  checked={geminiFeedback === "gemini"}
+                  disabled={callState.status === CallStatus.ACTIVE} // Vô hiệu hóa khi đang nói
+                  onCheckedChange={(checked) => {
+                    setGeminiFeedback(checked ? "gemini" : "standard");
                   }}
                 />
               </div>
@@ -315,6 +333,7 @@ export const ConversationPlayer = ({
             feedbackHistory={feedbackHistory}
             userRole={userRole}
             ttsProvider={ttsProvider}
+            geminiFeedback={geminiFeedback}
             onCallStateChange={handleChangeCallState}
             onTopicComplete={handleTopicComplete}
           />

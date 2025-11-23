@@ -20,9 +20,15 @@ import { CallStatus } from "@/types/podcast";
 import type { TimingSettings, Message } from "@/types"; // Đảm bảo Message được import từ types của bạn
 import { recordSessionStartAction } from "@/lib/actions/session.action";
 import { getSmartRetryFeedbackAction } from "@/lib/actions/general.action";
-import { LOWSCORETHERESHOLD, SHOULDADVANCESCORETHERESHOLD } from "@/constants";
+import {
+  LONG_SENTENCE_GRACE_PERIOD_MS_BONUS,
+  LONG_SENTENCE_WORD_THRESHOLD,
+  LOWSCORETHERESHOLD,
+  SHOULDADVANCESCORETHERESHOLD,
+} from "@/constants";
 
 type TTSProvider = "webspeech" | "elevenlabs";
+type GeminiFeedbackOption = "standard" | "gemini";
 
 // --- Props ---
 interface UseConversationProps {
@@ -30,6 +36,7 @@ interface UseConversationProps {
   companionId?: string;
   voiceId?: string;
   ttsProvider: TTSProvider;
+  geminiFeedback?: GeminiFeedbackOption;
   timingSettings?: Partial<TimingSettings>;
   userRole: "Gwen" | "Leo";
   onSessionComplete?: () => void;
@@ -40,6 +47,7 @@ export const useConversation = ({
   companionId,
   voiceId,
   ttsProvider,
+  geminiFeedback,
   timingSettings = {},
   userRole,
   onSessionComplete,
@@ -190,35 +198,50 @@ export const useConversation = ({
 
   const generateRetryMessage = useCallback(
     (originalText: string, score: number, partialText?: string) => {
-      const scorePercent = Math.round(score * 100);
+      // --- CÁC NHÓM MẪU CÂU THEO NGỮ CẢNH ---
 
-      // Different messages based on how much was spoken
-      if (partialText && partialText.length > 0) {
-        const partialWords = partialText.trim().split(/\s+/).length;
-        const totalWords = originalText.trim().split(/\s+/).length;
-        const completionPercent = Math.round((partialWords / totalWords) * 100);
-
-        if (completionPercent < 30) {
-          return `I heard "${partialText}" but please continue with the full sentence: "${originalText}"`;
-        } else if (completionPercent < 70) {
-          return `Good start with "${partialText}". Now say the complete sentence: "${originalText}"`;
-        } else {
-          return `Almost there! You said "${partialText}". Try the full sentence: "${originalText}"`;
-        }
-      }
-
-      const retryTemplates = [
-        `Not quite there (${scorePercent}%). Let's try the complete sentence: "${originalText}"`,
-        `Close, but let's practice the full sentence: "${originalText}"`,
-        `Let me help you with the complete sentence. Say: "${originalText}"`,
-        `Try the full sentence once more: "${originalText}"`,
-        `Let's get the complete sentence right: "${originalText}"`,
-        `Almost! Say the entire sentence: "${originalText}"`,
-        `Let's practice that complete sentence again: "${originalText}"`,
-        `Please say the full sentence like this: "${originalText}"`,
+      // 1. Điểm cao (> 0.6): Rất khích lệ, chỉ cần một chút chỉnh sửa.
+      const high_score_templates = [
+        `Almost perfect! Let's try it one more time: "${originalText}"`,
+        `You're so close! Just a little tweak. Say: "${originalText}"`,
+        `Excellent effort! Let's nail the final version: "${originalText}"`,
       ];
 
-      return retryTemplates[Math.floor(Math.random() * retryTemplates.length)];
+      // 2. Điểm trung bình (0.4 - 0.6): Khích lệ và hướng dẫn.
+      // Ưu tiên sử dụng partialText nếu có.
+      const medium_score_templates = partialText
+        ? [
+            `That's a great start with "${partialText}". Now for the full sentence: "${originalText}"`,
+            `I heard "${partialText}", you've got the main idea! Let's try the complete version: "${originalText}"`,
+          ]
+        : [
+            `Good attempt! Let's practice the full sentence now: "${originalText}"`,
+            `You're on the right track. Let's try it like this: "${originalText}"`,
+          ];
+
+      // 3. Điểm thấp (< 0.4): Hướng dẫn nhẹ nhàng, rõ ràng.
+      const low_score_templates = [
+        `Let's try that one from the beginning. Say: "${originalText}"`,
+        `Let me help you with that. The sentence is: "${originalText}"`,
+        `No worries! Let's practice together: "${originalText}"`,
+      ];
+
+      // --- LOGIC CHỌN MẪU CÂU ---
+
+      let selectedTemplates;
+
+      if (score > 0.6) {
+        selectedTemplates = high_score_templates;
+      } else if (score >= 0.4) {
+        selectedTemplates = medium_score_templates;
+      } else {
+        selectedTemplates = low_score_templates;
+      }
+
+      // Chọn ngẫu nhiên một câu trong nhóm đã được chọn
+      return selectedTemplates[
+        Math.floor(Math.random() * selectedTemplates.length)
+      ];
     },
     []
   );
@@ -259,7 +282,8 @@ export const useConversation = ({
       ]);
 
       // Quyết định advance hay retry
-      const shouldAdvance = similarityResult.score >= SHOULDADVANCESCORETHERESHOLD; // Ngưỡng 60%
+      const shouldAdvance =
+        similarityResult.score >= SHOULDADVANCESCORETHERESHOLD; // Ngưỡng 70%
       isAwaitingAIRef.current = true;
       if (shouldAdvance) {
         console.log(`✅ Good score on step ${stepIndex}. Advancing.`);
@@ -277,16 +301,10 @@ export const useConversation = ({
         // --- LOGIC QUYẾT ĐỊNH "HYBRID RETRY" ---
         const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
 
-        // Trường hợp 1: Người dùng nói đúng quá ít (dưới 40% câu) -> Dùng logic cũ, nhanh và miễn phí
-        if (lowScoreThreshold) {
-          console.log("-> Simple error detected. Using local retry message.");
-          retryMsg = generateRetryMessage(
-            expectedLine.text,
-            similarityResult.score,
-            transcript
-          );
-        } else {
-          // Trường hợp 2: Người dùng đã nói tương đối nhiều -> Cần phân tích sâu từ AI
+        if (
+          geminiFeedback === "gemini" ||
+          (geminiFeedback === "standard" && !lowScoreThreshold)
+        ) {
           console.log("-> Complex error detected. Calling AI for smart retry.");
           const smartFeedbackResult = await getSmartRetryFeedbackAction({
             expectedSentence: expectedLine.text,
@@ -298,8 +316,16 @@ export const useConversation = ({
               expectedLine.text,
               similarityResult.score,
               transcript
-            ); // Fallback
+            );
+        } else {
+          console.log("-> Simple error detected. Using local retry message.");
+          retryMsg = generateRetryMessage(
+            expectedLine.text,
+            similarityResult.score,
+            transcript
+          );
         }
+
         // --- KẾT THÚC LOGIC QUYẾT ĐỊNH ---
 
         setMessages((prev) => [
@@ -337,7 +363,13 @@ export const useConversation = ({
       processingUserInputRef.current = false;
       setPartialTranscript("");
     },
-    [steps, userRole, partialTranscript, generateRetryMessage, speakAI]
+    [
+      steps,
+      userRole,
+      geminiFeedback,
+      generateRetryMessage,
+      speakAI,
+    ]
   );
 
   // HÀM SỐ 2: CHỈ XỬ LÝ VIỆC GOM BẢN GHI VÀ GRACE PERIOD
@@ -365,7 +397,7 @@ export const useConversation = ({
       if (!expectedLine) return; // Bảo vệ nếu không có step tiếp theo
 
       if (
-        expectedLine.text.split(/\s+/).length > 10 &&
+        expectedLine.text.split(/\s+/).length > LONG_SENTENCE_WORD_THRESHOLD &&
         accumulatedTranscriptRef.current.split(/\s+/).length <
           expectedLine.text.split(/\s+/).length / 2
       ) {
@@ -376,7 +408,8 @@ export const useConversation = ({
       // Xác định xem có phải câu dài không và tính toán grace period
       const isLongSentence = expectedLine.text.split(/\s+/).length > 8;
       const gracePeriod = isLongSentence
-        ? resolvedTimingSettings.responseWaitTime + 2000
+        ? resolvedTimingSettings.responseWaitTime +
+          LONG_SENTENCE_GRACE_PERIOD_MS_BONUS
         : resolvedTimingSettings.responseWaitTime;
 
       // Đặt timer mới

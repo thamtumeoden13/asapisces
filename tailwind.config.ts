@@ -1,6 +1,5 @@
 import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
-import { fontFamily } from "tailwindcss/defaultTheme";
 import flattenColorPalette from "tailwindcss/lib/util/flattenColorPalette";
 import tailwindcssAnimate from "tailwindcss-animate";
 import typography from "@tailwindcss/typography";
@@ -83,6 +82,7 @@ const config: Config = {
           200: "#141413",
           300: "#7D8087",
           400: "#000000",
+          500: "#1A1A1A",
           DEFAULT: "#1A232E",
         },
         white: {
@@ -91,7 +91,9 @@ const config: Config = {
           300: "#c7c7c7",
           DEFAULT: "#FFFFFF",
         },
-        purple: "#CBACF9",
+        purple:{
+          DEFAULT:  "#CBACF9",
+        },
         p1: "#2EF2FF",
         p2: "#3C52D9",
         p3: "#C8EA80",
@@ -148,8 +150,8 @@ const config: Config = {
           12: "#2E2A41",
           13: "#6C7275",
         },
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
         muted: {
           DEFAULT: "var(--muted)",
           foreground: "var(--muted-foreground)",
@@ -192,8 +194,6 @@ const config: Config = {
         },
       },
       destructive: {
-        // DEFAULT: "hsl(var(--destructive))",
-        // foreground: "hsl(var(--destructive-foreground))",
         DEFAULT: "var(--destructive)",
         foreground: "var(--destructive-foreground)",
       },

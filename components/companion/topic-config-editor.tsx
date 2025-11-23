@@ -180,7 +180,7 @@ export function TopicConfigEditor({ config, onChange, onClose }: TopicConfigEdit
                     type="text"
                     value={topic.key}
                     onChange={(e) => handleTopicChange(index, "key", e.target.value)}
-                    className={`w-full p-2 border rounded-lg ${errors[index] ? "border-red-500" : "border-gray-300"}`}
+                    className={`w-full p-2 border rounded-lg text-black-300 ${errors[index] ? "border-red-500" : "border-gray-300"}`}
                     placeholder="e.g., intro, problem"
                   />
                 </div>
@@ -191,7 +191,7 @@ export function TopicConfigEditor({ config, onChange, onClose }: TopicConfigEdit
                     type="text"
                     value={topic.title || ""}
                     onChange={(e) => handleTopicChange(index, "title", e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
+                    className="w-full p-2 border border-gray-300 rounded-lg text-black-300"
                     placeholder="e.g., Introduction"
                   />
                 </div>
@@ -204,7 +204,7 @@ export function TopicConfigEditor({ config, onChange, onClose }: TopicConfigEdit
                     type="text"
                     value={topic.keyword}
                     onChange={(e) => handleTopicChange(index, "keyword", e.target.value)}
-                    className={`w-full p-2 border rounded-lg ${errors[index] ? "border-red-500" : "border-gray-300"}`}
+                    className={`w-full p-2 border rounded-lg text-black-300 ${errors[index] ? "border-red-500" : "border-gray-300"}`}
                     placeholder="e.g., Let's go!"
                   />
                 </div>
