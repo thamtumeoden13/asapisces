@@ -301,10 +301,7 @@ export const useConversation = ({
         // --- LOGIC QUYẾT ĐỊNH "HYBRID RETRY" ---
         const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
 
-        if (
-          geminiFeedback === "gemini" ||
-          (geminiFeedback === "standard" && !lowScoreThreshold)
-        ) {
+        if (geminiFeedback === "gemini" && !lowScoreThreshold) {
           console.log("-> Complex error detected. Calling AI for smart retry.");
           const smartFeedbackResult = await getSmartRetryFeedbackAction({
             expectedSentence: expectedLine.text,
@@ -363,13 +360,7 @@ export const useConversation = ({
       processingUserInputRef.current = false;
       setPartialTranscript("");
     },
-    [
-      steps,
-      userRole,
-      geminiFeedback,
-      generateRetryMessage,
-      speakAI,
-    ]
+    [steps, userRole, geminiFeedback, generateRetryMessage, speakAI]
   );
 
   // HÀM SỐ 2: CHỈ XỬ LÝ VIỆC GOM BẢN GHI VÀ GRACE PERIOD

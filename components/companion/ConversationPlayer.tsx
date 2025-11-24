@@ -151,7 +151,7 @@ export const ConversationPlayer = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-600">
                 {completedTopics.size}
@@ -241,7 +241,7 @@ export const ConversationPlayer = ({
                 <label className="block mb-3 text-sm font-medium">
                   Choose Topic
                 </label>
-                <div className="max-h-96 space-y-2">
+                <div className="max-h-80 space-y-2 overflow-auto">
                   {topicConfig?.map(({ key, title }) => {
                     const topicKey = key as TopicKey;
                     const isCompleted = completedTopics.has(topicKey);
