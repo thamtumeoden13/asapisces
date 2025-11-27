@@ -6,9 +6,11 @@ import { vapi } from "@/lib/vapi.sdk";
 import Image from "next/image";
 import Lottie, { LottieRefCurrentProps } from "lottie-react";
 import soundwaves from "@/constants/soundwaves.json";
-import { addToSessionHistory } from "@/lib/actions/companion.actions";
 import topicMap from "@/constants/transcriptTopics.json";
 import { AssistantOverrides } from "@vapi-ai/web/dist/api";
+import { CompanionComponentProps, SavedMessage } from "@/types";
+import { addToSessionHistory } from "@/lib/actions/session.action";
+import { Message } from "@/types/podcast";
 
 enum CallStatus {
   INACTIVE = "INACTIVE",

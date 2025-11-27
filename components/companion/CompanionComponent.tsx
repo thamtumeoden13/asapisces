@@ -6,8 +6,9 @@ import { vapi } from "@/lib/vapi.sdk";
 import Image from "next/image";
 import Lottie, { LottieRefCurrentProps } from "lottie-react";
 import soundwaves from "@/constants/soundwaves.json";
-import { addToSessionHistory } from "@/lib/actions/companion.actions";
 import { CallStatus, Message } from "@/types/podcast";
+import { CompanionComponentProps, SavedMessage } from "@/types";
+import { addToSessionHistory } from "@/lib/actions/session.action";
 
 const CompanionComponent = ({
   companionId,
