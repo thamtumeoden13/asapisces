@@ -342,6 +342,8 @@ interface CompanionComponentProps {
   style: string;
   voiceId: string;
   transcriptData: processedData;
+  initialFeedbackHistory: FeedbackHistoryPoint[];
+  initialCompletedTopics: FeedbackHistoryCompletedTopic[];
 }
 
 interface PodcastEntry {

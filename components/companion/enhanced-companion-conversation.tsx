@@ -395,7 +395,7 @@ const EnhancedCompanionConversationOptimized = ({
 
   useEffect(() => {
     onCallStateChange?.(callState.status);
-  }, [callState.status, onCallStateChange]);
+  }, [callState.status]);
 
   console.log(
     `[UI RENDER] Step: ${conversationState.currentStep}`,
