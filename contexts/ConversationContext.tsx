@@ -10,20 +10,23 @@ import type {
 import { CallStatus, type TopicKey } from "@/types/podcast";
 
 // Định nghĩa các giá trị sẽ được lưu trong context
-interface ConversationContextType {
+interface ConversationContextType extends CompanionComponentProps {
   // State
   selectedTopic: TopicKey | undefined;
   completedTopics: Set<keyof PodcastTopics>;
   userRole: "Gwen" | "Leo";
   ttsProvider: "webspeech" | "elevenlabs";
+  geminiFeedback: "standard" | "gemini";
   userLevel: "beginner" | "intermediate" | "advanced";
+  voiceId: string;
   callState: { status: CallStatus };
 
   // Setter functions
   setSelectedTopic: (topic: TopicKey) => void;
-  addCompletedTopic: (topic: TopicKey) => void;
+  onTopicComplete: (topic: TopicKey) => void;
   setUserRole: (role: "Gwen" | "Leo") => void;
   setTtsProvider: (provider: "webspeech" | "elevenlabs") => void;
+  setGeminiFeedback: (feedback: "standard" | "gemini") => void;
   setUserLevel: (level: "beginner" | "intermediate" | "advanced") => void;
   onCallStateChange: (status: CallStatus) => void;
   getTopicProgress: () => number;
@@ -42,9 +45,17 @@ const ConversationContext = createContext<ConversationContextType | undefined>(
   undefined
 );
 
+const voiceStyles = {
+  friendly: "pNInz6obpgDQGcFmaJgB", // Adam
+  professional: "GBv7mTt0atIp3Br8iCZE", // Thomas
+  casual: "2EiwWnXFnvU5JabPnv8n", // Clyde
+  encouraging: "21m00Tcm4TlvDq8ikWAM", // Rachel
+};
+
 // Provider Component
 export const ConversationProvider = (props: ConversationProviderProps) => {
-  const { initialCompletedTopics, transcriptData, children } = props;
+  console.log("ConversationProvider Props:", props);
+  const { initialCompletedTopics, transcriptData, style, children } = props;
   const { podcastTopics, topicConfig, topicTitles } = transcriptData;
   const completedTopicsSet = new Set(
     initialCompletedTopics.map((item) => item.topicId)
@@ -60,6 +71,10 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
     "webspeech"
   );
 
+  const [geminiFeedback, setGeminiFeedback] = useState<"standard" | "gemini">(
+    "standard"
+  );
+
   const [userLevel, setUserLevel] = useState<
     "beginner" | "intermediate" | "advanced"
   >("beginner");
@@ -68,8 +83,17 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
     status: CallStatus.IDLE,
   });
 
-  const addCompletedTopic = (topic: TopicKey) => {
+  const voiceId = voiceStyles[style as keyof typeof voiceStyles];
+
+  const onTopicComplete = (topic: TopicKey) => {
     setCompletedTopics((prev) => new Set([...prev, topic]));
+    const topicKeys = Object.keys(podcastTopics) as TopicKey[];
+    const currentIndex = topicKeys.indexOf(topic);
+
+    if (currentIndex < topicKeys.length - 1) {
+      const nextTopic = topicKeys[currentIndex + 1];
+      setSelectedTopic(nextTopic);
+    }
   };
 
   const onCallStateChange = (status: CallStatus) => {
@@ -83,10 +107,13 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
   };
 
   const value = {
+    ...props,
+    voiceId,
     selectedTopic,
     completedTopics,
     userRole,
     ttsProvider,
+    geminiFeedback,
     podcastTopics,
     topicConfig,
     topicTitles,
@@ -95,8 +122,9 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
     setSelectedTopic,
     setUserRole,
     setTtsProvider,
+    setGeminiFeedback,
     setUserLevel,
-    addCompletedTopic,
+    onTopicComplete,
     onCallStateChange,
     getTopicProgress,
   };

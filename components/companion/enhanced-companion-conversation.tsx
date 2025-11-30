@@ -26,12 +26,7 @@ import {
   FastForward,
   MessageSquare,
 } from "lucide-react";
-import type {
-  CompanionComponentProps,
-  MessageGroup,
-  PodcastTopics,
-  TopicTitles,
-} from "@/types";
+import type { MessageGroup } from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
 import {
   FeedbackHistoryPoint,
@@ -41,6 +36,7 @@ import { AnalyticsChart } from "./AnalyticsChart";
 import { TranslatedText } from "./TranslatedText";
 import { AskAITutor } from "./AskAITutor";
 import { SHOULDADVANCESCORETHERESHOLD } from "@/constants";
+import { useConversationContext } from "@/contexts/ConversationContext";
 // import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -57,39 +53,33 @@ const getSubjectColor = (subject: string) => {
   return colors[subject] || colors.default;
 };
 
-interface EnhancedCompanionConversationOptimizedProps
-  extends Partial<CompanionComponentProps> {
-  topicTitles: TopicTitles;
-  podcastTopics: PodcastTopics;
-  selectedTopic?: TopicKey;
+interface EnhancedCompanionConversationOptimizedProps {
   isLoadingChart?: boolean;
   feedbackHistory?: FeedbackHistoryPoint[];
-  userRole?: "Gwen" | "Leo"; // Thêm prop userRole
-  ttsProvider?: "webspeech" | "elevenlabs"; // Thêm prop ttsProvider
-  geminiFeedback?: "standard" | "gemini"; // Thêm prop geminiFeedback
-  onTopicComplete?: (topic: TopicKey) => void;
-  onCallStateChange?: (state: CallStatus) => void;
 }
 
 const EnhancedCompanionConversationOptimized = ({
-  companionId = "demo",
-  subject = "english",
-  topic = "intro",
-  podcastTopics,
-  name = "Leo & Gwen",
-  userName = "Student",
-  userId, // Example UUID
-  voiceId,
-  topicTitles,
-  selectedTopic,
   isLoadingChart = false,
   feedbackHistory = [],
-  userRole = "Gwen",
-  ttsProvider = "webspeech",
-  geminiFeedback = "standard",
-  onTopicComplete,
-  onCallStateChange,
 }: EnhancedCompanionConversationOptimizedProps) => {
+  const {
+    companionId,
+    subject,
+    topic,
+    name,
+    userName,
+    userId,
+    voiceId,
+    userRole,
+    ttsProvider,
+    geminiFeedback,
+    selectedTopic,
+    podcastTopics,
+    topicTitles,
+    onTopicComplete,
+    onCallStateChange,
+  } = useConversationContext();
+
   const lottieRef = useRef<LottieRefCurrentProps>(null);
 
   // Timing Configuration State
@@ -118,15 +108,10 @@ const EnhancedCompanionConversationOptimized = ({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [pronunciationFeedback, setPronunciationFeedback] =
     useState<unknown>(null);
-  const [realTimeMetrics, setRealTimeMetrics] = useState({
-    responseTime: 0,
-    confidenceLevel: 0,
-    speechClarity: 0,
-  });
 
   // THÊM CÁC STATE NÀY
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
-  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null); // Kiểu 'any' để đơn giản, bạn có thể dùng kiểu từ schema
+  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null); 
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"success" | "error" | "">("");
@@ -414,13 +399,13 @@ const EnhancedCompanionConversationOptimized = ({
         )}
       >
         {/* Main Conversation Area */}
-        <div className="space-y-6 col-span-3">
+        <div className="col-span-3 space-y-6">
           {/* Enhanced Avatar and Controls */}
           <Card>
             <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row items-center space-y-6">
+              <div className="flex flex-col items-center space-y-6 md:flex-row">
                 {/* Enhanced Companion Avatar */}
-                <div className="flex flex-1 flex-col items-center justify-items-center space-y-4">
+                <div className="flex flex-col items-center flex-1 space-y-4 justify-items-center">
                   <div
                     className="relative flex items-center justify-center w-40 h-40 rounded-full"
                     style={{ backgroundColor: getSubjectColor(subject) }}
@@ -480,7 +465,7 @@ const EnhancedCompanionConversationOptimized = ({
                   </div>
                 </div>
                 {/* Enhanced Control Buttons */}
-                <div className="flex flex-1 flex-col items-center justify-items-center space-y-4">
+                <div className="flex flex-col items-center flex-1 space-y-4 justify-items-center">
                   <audio ref={audioPlayerRef} className="hidden" />{" "}
                   {/* THÊM DÒNG NÀY */}
                   <Button
@@ -631,7 +616,7 @@ const EnhancedCompanionConversationOptimized = ({
                 <TabsContent value="conversation" className="space-y-4">
                   {/* Current Line Display with countdown */}
                   {currentLine && (
-                    <div className="relative p-5 overflow-hidden border-2 border-blue-50 rounded-lg shadow-md bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50">
+                    <div className="relative p-5 overflow-hidden border-2 rounded-lg shadow-md border-blue-50 bg-gradient-to-r from-purple-50 via-rose-50 to-indigo-50">
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-100/20 to-indigo-100/20 animate-pulse"></div>
 
                       <div className="relative z-10">

@@ -139,6 +139,7 @@ export const useConversation = ({
   // 1. Hàm phát giọng nói của AI qua ElevenLabs
   const speakAIByElevenLabs = useCallback(
     async (text: string) => {
+      console.log("ElevenLabs Speak AI called with text:", voiceId);
       if (!voiceId) {
         console.error("ElevenLabs voiceId is required but was not provided.");
         return;
@@ -186,7 +187,7 @@ export const useConversation = ({
   const speakAI = useCallback(
     (text: string) => {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-
+      console.log("speakAI called with text:", ttsProvider, text);
       if (ttsProvider === "elevenlabs") {
         return speakAIByElevenLabs(text);
       }
@@ -628,6 +629,7 @@ export const useConversation = ({
           },
           ...prev,
         ]);
+        console.log("Speaking AI line:", line.text);
         await speakAI(line.text);
         if (keepAliveInterval) clearInterval(keepAliveInterval);
 
@@ -670,7 +672,7 @@ export const useConversation = ({
     conversationState.currentStep,
     conversationState.retryCounter,
     callState.status,
-    userRole,
+    userRole
   ]);
 
   return {

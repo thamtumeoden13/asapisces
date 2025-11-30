@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +22,9 @@ const SettingsPanel = () => {
     completedTopics,
     podcastTopics,
     callState,
+    geminiFeedback,
+    setGeminiFeedback,
   } = useConversationContext();
-
-  const [geminiFeedback, setGeminiFeedback] = useState<"standard" | "gemini">(
-    "standard"
-  );
 
   const getTopicBadgeVariant = (topic: TopicKey) => {
     if (completedTopics.has(topic)) return "default";
@@ -93,7 +90,7 @@ const SettingsPanel = () => {
         {/* Topic Selection */}
         <div>
           <label className="block mb-3 text-sm font-medium">Choose Topic</label>
-          <div className="max-h-80 space-y-2 overflow-auto">
+          <div className="space-y-2 overflow-auto max-h-80">
             {topicConfig?.map(({ key, title }) => {
               const topicKey = key as TopicKey;
               const isCompleted = completedTopics.has(topicKey);

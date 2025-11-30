@@ -10,8 +10,7 @@ import { CompanionComponentProps } from "@/types";
 
 export const PracticeUI = (props: CompanionComponentProps) => {
   // Truyền các props chưa dùng đến
-  const { selectedTopic, podcastTopics, topicTitles , onCallStateChange } =
-    useConversationContext();
+  const { selectedTopic } = useConversationContext();
 
   // State và logic fetch biểu đồ có thể ở đây hoặc trong component con
   const [feedbackHistory, setFeedbackHistory] = useState(
@@ -32,19 +31,14 @@ export const PracticeUI = (props: CompanionComponentProps) => {
     <>
       <ProgressOverview />
       <div className="flex flex-col gap-8">
-        <div className="max-w-7xl mx-auto w-full">
+        <div className="w-full mx-auto max-w-7xl">
           <SettingsPanel />
         </div>
 
         <div className="">
           <EnhancedCompanionConversation
-            {...props} // Truyền các props còn lại
-            selectedTopic={selectedTopic}
-            podcastTopics={podcastTopics}
-            topicTitles={topicTitles}
             feedbackHistory={feedbackHistory}
             isLoadingChart={isLoadingChart}
-            onCallStateChange={(status) => onCallStateChange(status)}
           />
         </div>
       </div>
