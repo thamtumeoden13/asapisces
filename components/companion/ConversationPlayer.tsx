@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation-v3";
+import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation";
 import { CallStatus, type TopicKey } from "@/types/podcast";
 import { BookOpen, Target, TrendingUp } from "lucide-react";
 import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";
@@ -143,7 +143,7 @@ export const ConversationPlayer = ({
   return (
     <>
       {/* Progress Overview - Có thể hiển thị một phần dữ liệu tĩnh từ server */}
-      <Card className="max-w-7xl mx-auto mb-8">
+      <Card className="mx-auto mb-8 max-w-7xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
@@ -181,7 +181,7 @@ export const ConversationPlayer = ({
       </Card>
       <div className="flex flex-col gap-8">
         {/* Topic Selection Sidebar */}
-        <div className="max-w-7xl mx-auto">
+        <div className="mx-auto max-w-7xl">
           <Card className="">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -241,7 +241,7 @@ export const ConversationPlayer = ({
                 <label className="block mb-3 text-sm font-medium">
                   Choose Topic
                 </label>
-                <div className="max-h-80 space-y-2 overflow-auto">
+                <div className="space-y-2 overflow-auto max-h-80">
                   {topicConfig?.map(({ key, title }) => {
                     const topicKey = key as TopicKey;
                     const isCompleted = completedTopics.has(topicKey);
