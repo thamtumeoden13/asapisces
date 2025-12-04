@@ -111,7 +111,7 @@ const EnhancedCompanionConversationOptimized = ({
 
   // THÊM CÁC STATE NÀY
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
-  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null); 
+  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"success" | "error" | "">("");

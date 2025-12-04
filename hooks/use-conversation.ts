@@ -1,7 +1,14 @@
 // File: hooks/use-conversation.ts (FINAL, RESTRUCTURED VERSION)
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useReducer,
+} from "react";
 import {
   createClient,
   LiveClient,
@@ -11,13 +18,9 @@ import {
   calculateAdvancedSimilarity,
   resetSimilarityContext,
 } from "@/lib/enhanced-similarity-for-long-sentences";
-import type {
-  VapiCallState,
-  ConversationState,
-  TranscriptLine,
-} from "@/types/podcast";
+import type { TranscriptLine } from "@/types/podcast";
 import { CallStatus } from "@/types/podcast";
-import type { TimingSettings, Message } from "@/types"; // Đảm bảo Message được import từ types của bạn
+import type { TimingSettings, Message, SimilarityResult } from "@/types"; // Đảm bảo Message được import từ types của bạn
 import { recordSessionStartAction } from "@/lib/actions/session.action";
 import { getSmartRetryFeedbackAction } from "@/lib/actions/general.action";
 import {
@@ -42,6 +45,107 @@ interface UseConversationProps {
   onSessionComplete?: () => void;
 }
 
+// Định nghĩa cấu trúc state tập trung
+interface ConversationReducerState {
+  status: CallStatus;
+  error?: string;
+  currentStep: number;
+  isWaitingForUser: boolean;
+  isAwaitingAI: boolean;
+  preventProcessingSpeech: boolean;
+  similarity: SimilarityResult | null;
+}
+
+// Định nghĩa tất cả các hành động có thể thay đổi state
+type ConversationAction =
+  | { type: "STARTING_CALL" }
+  | { type: "CALL_STARTED" }
+  | { type: "CALL_FAILED"; payload: string }
+  | { type: "END_CALL" }
+  | { type: "RESET" }
+  | { type: "ADVANCE_STEP" }
+  | { type: "SET_USER_TURN" }
+  | { type: "SET_AI_TURN" }
+  | { type: "START_PROCESSING_SPEECH" }
+  | { type: "STOP_PROCESSING_SPEECH" }
+  | { type: "RETRY_STEP" }
+  | { type: "SKIP_TO_STEP"; payload: { stepIndex: number } };
+
+const initialConversationState: ConversationReducerState = {
+  status: CallStatus.INACTIVE,
+  currentStep: 0,
+  isWaitingForUser: false,
+  isAwaitingAI: false,
+  preventProcessingSpeech: true,
+  similarity: null,
+};
+
+// Hàm Reducer: Logic trung tâm để xử lý các thay đổi state
+const conversationReducer = (
+  state: ConversationReducerState,
+  action: ConversationAction
+): ConversationReducerState => {
+  switch (action.type) {
+    case "STARTING_CALL":
+      return { ...state, status: CallStatus.CONNECTING, error: undefined };
+    case "CALL_STARTED":
+      return { ...state, status: CallStatus.ACTIVE };
+    case "CALL_FAILED":
+      return { ...state, status: CallStatus.ERROR, error: action.payload };
+    case "END_CALL":
+      return {
+        ...state,
+        status: CallStatus.FINISHED,
+        isWaitingForUser: false,
+        isAwaitingAI: false,
+        preventProcessingSpeech: true,
+      };
+    case "RESET":
+      return initialConversationState;
+    case "ADVANCE_STEP":
+      return {
+        ...state,
+        currentStep: state.currentStep + 1,
+        isWaitingForUser: false,
+        isAwaitingAI: false,
+      };
+    case "SET_USER_TURN":
+      return {
+        ...state,
+        isWaitingForUser: true,
+        isAwaitingAI: false,
+      };
+    case "SET_AI_TURN":
+      return {
+        ...state,
+        isAwaitingAI: true,
+        isWaitingForUser: false,
+      };
+    case "START_PROCESSING_SPEECH":
+      return { ...state, preventProcessingSpeech: true };
+    case "STOP_PROCESSING_SPEECH":
+      return { ...state, preventProcessingSpeech: false };
+    case "RETRY_STEP":
+      return {
+        ...state,
+        isWaitingForUser: false,
+        isAwaitingAI: false,
+        preventProcessingSpeech: false,
+      };
+    case "SKIP_TO_STEP":
+      return {
+        ...state,
+        currentStep: action.payload.stepIndex,
+        similarity: null,
+        isWaitingForUser: false,
+        isAwaitingAI: false,
+        preventProcessingSpeech: false,
+      };
+    default:
+      return state;
+  }
+};
+
 export const useConversation = ({
   steps,
   companionId,
@@ -52,19 +156,11 @@ export const useConversation = ({
   userRole,
   onSessionComplete,
 }: UseConversationProps) => {
-  // --- STATE & REFS ---
-  const [callState, setCallState] = useState<VapiCallState>({
-    status: CallStatus.INACTIVE,
-  });
-  const [conversationState, setConversationState] = useState<
-    ConversationState & { similarity?: unknown; retryCounter: number }
-  >({
-    currentStep: 0,
-    totalSteps: steps.length,
-    isWaitingForUser: false,
-    similarity: null,
-    retryCounter: 0,
-  });
+  const [state, dispatch] = useReducer(
+    conversationReducer,
+    initialConversationState
+  );
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -77,32 +173,26 @@ export const useConversation = ({
   } | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentStepRef = useRef(0);
-  const isWaitingForUserRef = useRef(false);
-  const isAwaitingAIRef = useRef(false);
   const messagesRef = useRef(messages);
-  const conversationCompletedRef = useRef(false);
-  const processingUserInputRef = useRef(false);
   const accumulatedTranscriptRef = useRef<string>("");
-  const finalTranscriptGracePeriodRef = useRef<NodeJS.Timeout | null>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const turnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const stateRef = useRef<ConversationReducerState>(state);
 
   // Cập nhật refs khi state thay đổi
-  useEffect(() => {
-    currentStepRef.current = conversationState.currentStep;
-  }, [conversationState.currentStep]);
-  useEffect(() => {
-    isWaitingForUserRef.current = conversationState.isWaitingForUser;
-  }, [conversationState.isWaitingForUser]);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // --- DERIVED STATE & MEMOS ---
   const currentLine: TranscriptLine | null = useMemo(
-    () => steps[conversationState.currentStep] || null,
-    [steps, conversationState.currentStep]
+    () => steps[state.currentStep] || null,
+    [steps, state.currentStep]
   );
 
   const resolvedTimingSettings = useMemo(
@@ -139,7 +229,6 @@ export const useConversation = ({
   // 1. Hàm phát giọng nói của AI qua ElevenLabs
   const speakAIByElevenLabs = useCallback(
     async (text: string) => {
-      console.log("ElevenLabs Speak AI called with text:", voiceId);
       if (!voiceId) {
         console.error("ElevenLabs voiceId is required but was not provided.");
         return;
@@ -187,7 +276,6 @@ export const useConversation = ({
   const speakAI = useCallback(
     (text: string) => {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      console.log("speakAI called with text:", ttsProvider, text);
       if (ttsProvider === "elevenlabs") {
         return speakAIByElevenLabs(text);
       }
@@ -246,31 +334,27 @@ export const useConversation = ({
     },
     []
   );
-  // --- CÁC HÀM ĐIỀU KHIỂN CHÍNH ---
-  // HÀM SỐ 1: CHỈ XỬ LÝ LOGIC ĐÁNH GIÁ VÀ QUYẾT ĐỊNH
+
   const handleUserSpeech = useCallback(
     async (transcript: string) => {
-      const stepIndex = currentStepRef.current;
-
       // --- Bắt đầu xử lý ---
-      processingUserInputRef.current = true;
+      const currentState = stateRef.current;
+      const expectedLine = steps[currentState.currentStep];
+      dispatch({ type: "START_PROCESSING_SPEECH" });
 
-      // Lấy đúng câu thoại cần so sánh
-      const expectedLine = steps[stepIndex];
-      // Điều kiện bảo vệ: chỉ xử lý nếu đúng lượt của người dùng
       if (!expectedLine || expectedLine.speaker !== userRole) {
-        processingUserInputRef.current = false;
+        console.warn(
+          "Received user speech when it's not the user's turn or no expected line."
+        );
+        // dispatch({ type: "STOP_PROCESSING_SPEECH" });
         return;
       }
 
-      // Tính toán similarity
       const similarityResult = calculateAdvancedSimilarity(
         transcript,
         expectedLine.text,
-        `step-${stepIndex}`
+        `step-${currentState.currentStep}`
       );
-
-      // Cập nhật tin nhắn vào UI
       setMessages((prev) => [
         {
           type: "user",
@@ -282,28 +366,25 @@ export const useConversation = ({
         ...prev,
       ]);
 
-      // Quyết định advance hay retry
       const shouldAdvance =
-        similarityResult.score >= SHOULDADVANCESCORETHERESHOLD; // Ngưỡng 70%
-      isAwaitingAIRef.current = true;
-      if (shouldAdvance) {
-        console.log(`✅ Good score on step ${stepIndex}. Advancing.`);
-        setConversationState((prev) => ({
-          ...prev,
-          similarity: similarityResult,
-          currentStep: prev.currentStep + 1,
-          isWaitingForUser: false,
-        }));
-      } else {
-        console.log(`🔄 Low score on step ${stepIndex}. Retrying.`);
-        isAwaitingAIRef.current = true; // Khóa input khi AI chuẩn bị nói
-        let retryMsg: string;
+        similarityResult.score >= SHOULDADVANCESCORETHERESHOLD;
 
-        // --- LOGIC QUYẾT ĐỊNH "HYBRID RETRY" ---
+      if (shouldAdvance) {
+        console.log(
+          `✅ Good score on step ${currentState.currentStep}. Advancing.`
+        );
+
+        dispatch({ type: "ADVANCE_STEP" });
+      } else {
+        console.log(
+          `🔄 Low score on step ${currentState.currentStep}. Retrying.`
+        );
+        dispatch({ type: "START_PROCESSING_SPEECH" });
+        dispatch({ type: "SET_AI_TURN" });
+        let retryMsg: string;
         const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
 
         if (geminiFeedback === "gemini" && !lowScoreThreshold) {
-          console.log("-> Complex error detected. Calling AI for smart retry.");
           const smartFeedbackResult = await getSmartRetryFeedbackAction({
             expectedSentence: expectedLine.text,
             userSentence: transcript,
@@ -316,15 +397,12 @@ export const useConversation = ({
               transcript
             );
         } else {
-          console.log("-> Simple error detected. Using local retry message.");
           retryMsg = generateRetryMessage(
             expectedLine.text,
             similarityResult.score,
             transcript
           );
         }
-
-        // --- KẾT THÚC LOGIC QUYẾT ĐỊNH ---
 
         setMessages((prev) => [
           {
@@ -335,30 +413,20 @@ export const useConversation = ({
           },
           ...prev,
         ]);
-
-        await speakAI(retryMsg); // Chờ AI nói xong
+        await speakAI(retryMsg);
         if (turnTimeoutRef.current) {
           clearTimeout(turnTimeoutRef.current);
         }
         turnTimeoutRef.current = setTimeout(() => {
           console.log(
-            `👤 User's turn (step ${stepIndex}). Listener is now active.`
+            `👤 User's turn (step ${currentState.currentStep}). Listener is now active.`
           );
 
-          isAwaitingAIRef.current = false;
-          resetSimilarityContext(`step-${stepIndex}`);
-          setConversationState((prev) => ({
-            ...prev,
-            similarity: similarityResult,
-            isWaitingForUser: true,
-            retryCounter: (prev.retryCounter || 0) + 1,
-          }));
+          resetSimilarityContext(`step-${currentState.currentStep}`);
+          dispatch({ type: "STOP_PROCESSING_SPEECH" });
+          dispatch({ type: "SET_USER_TURN" });
         }, 750);
       }
-      console.log("after update processing is false");
-
-      // --- Kết thúc xử lý ---
-      processingUserInputRef.current = false;
       setPartialTranscript("");
     },
     [steps, userRole, geminiFeedback, generateRetryMessage, speakAI]
@@ -384,8 +452,8 @@ export const useConversation = ({
       if (gracePeriodTimerRef.current) {
         clearTimeout(gracePeriodTimerRef.current);
       }
-
-      const expectedLine = steps[currentStepRef.current];
+      const currentState = stateRef.current;
+      const expectedLine = steps[currentState.currentStep];
       if (!expectedLine) return; // Bảo vệ nếu không có step tiếp theo
 
       if (
@@ -411,7 +479,7 @@ export const useConversation = ({
         accumulatedTranscriptRef.current = "";
 
         // Chỉ xử lý nếu có transcript và không có xử lý nào khác đang chạy
-        if (fullTranscript && !processingUserInputRef.current) {
+        if (fullTranscript && !currentState.preventProcessingSpeech) {
           handleUserSpeech(fullTranscript);
         }
       }, gracePeriod);
@@ -419,8 +487,8 @@ export const useConversation = ({
     [steps, resolvedTimingSettings.responseWaitTime, handleUserSpeech]
   );
   const endCall = useCallback(() => {
-    if (callState.status === CallStatus.FINISHED) return;
-    setCallState({ status: CallStatus.FINISHED });
+    if (state.status === CallStatus.FINISHED) return;
+    dispatch({ type: "END_CALL" });
 
     deepgramClientRef.current?.requestClose();
     deepgramClientRef.current = null;
@@ -437,27 +505,19 @@ export const useConversation = ({
       audioPlayerRef.current.src = "";
     }
     window.speechSynthesis?.cancel();
-    conversationCompletedRef.current = true;
-  }, [callState.status]);
+  }, [state.status]);
+
+  const handleCompletedCall = useCallback(() => {
+    endCall();
+    onSessionComplete?.();
+  }, [endCall, onSessionComplete]);
 
   const resetConversation = useCallback(() => {
     endCall();
-    setConversationState({
-      currentStep: 0,
-      totalSteps: steps.length,
-      isWaitingForUser: false,
-      retryCounter: 0,
-    });
+    dispatch({ type: "RESET" });
     setMessages([]);
     setPartialTranscript("");
-    conversationCompletedRef.current = false;
-    if (finalTranscriptGracePeriodRef.current) {
-      clearTimeout(finalTranscriptGracePeriodRef.current);
-    }
-    if (finalTranscriptGracePeriodRef.current) {
-      clearTimeout(finalTranscriptGracePeriodRef.current);
-    }
-  }, [endCall, steps]);
+  }, [endCall]);
 
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
@@ -473,7 +533,7 @@ export const useConversation = ({
 
   const startCall = useCallback(async () => {
     resetConversation();
-    setCallState({ status: CallStatus.CONNECTING });
+    dispatch({ type: "STARTING_CALL" });
     try {
       if (companionId) recordSessionStartAction(companionId);
       const response = await fetch("/api/deepgram");
@@ -500,29 +560,30 @@ export const useConversation = ({
         };
         microphoneRef.current = { stream, recorder };
         recorder.start(250);
-        setCallState({ status: CallStatus.ACTIVE });
+        dispatch({ type: "CALL_STARTED" });
       });
 
       client.on(LiveTranscriptionEvents.Transcript, (data) => {
+        const currentState = stateRef.current;
         const transcript = data.channel.alternatives[0].transcript;
-        console.log("Transcript received:", transcript);
 
-        console.log("isWaitingForUserRef:", isWaitingForUserRef.current);
-        console.log("isAwaitingAIRef:", isAwaitingAIRef.current);
-        console.log("processingUserInputRef:", processingUserInputRef.current);
-
+        console.log("isWaitingForUser:", currentState.isWaitingForUser);
+        console.log("isAwaitingAI:", currentState.isAwaitingAI);
+        console.log(
+          "preventProcessingSpeech:",
+          currentState.preventProcessingSpeech
+        );
         if (
           !transcript ||
-          !isWaitingForUserRef.current ||
-          isAwaitingAIRef.current
+          !currentState.isWaitingForUser ||
+          currentState.preventProcessingSpeech ||
+          currentState.isAwaitingAI
         )
           return;
         resetInactivityTimer();
         if (data.is_final) {
-          if (!processingUserInputRef.current) {
-            processFinalTranscript(transcript);
-          }
-        } else {
+          processFinalTranscript(transcript);
+        } else if (!data.is_final) {
           setPartialTranscript(transcript);
         }
       });
@@ -533,10 +594,7 @@ export const useConversation = ({
       });
       client.on(LiveTranscriptionEvents.Close, () => endCall());
     } catch (error) {
-      setCallState({
-        status: CallStatus.ERROR,
-        error: (error as Error).message,
-      });
+      dispatch({ type: "CALL_FAILED", payload: (error as Error).message });
     }
   }, [
     resetConversation,
@@ -561,46 +619,33 @@ export const useConversation = ({
   const skipToStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex >= 0 && stepIndex < steps.length) {
-        setConversationState((prev) => ({
-          ...prev,
-          currentStep: stepIndex,
-          isWaitingForUser: false,
-          similarity: null,
-        }));
-        processingUserInputRef.current = false;
+        dispatch({ type: "SKIP_TO_STEP", payload: { stepIndex } });
       }
     },
     [steps.length]
   );
 
   const retryCurrentStep = useCallback(() => {
-    setConversationState((prev) => ({
-      ...prev,
-      isWaitingForUser: true,
-      retryCounter: (prev.retryCounter || 0) + 1,
-      feedback: `🎯 Let's try again: "${currentLine.text}"`,
-    }));
+    if (currentLine) dispatch({ type: "RETRY_STEP" });
   }, [currentLine]);
-
-  const manualTriggerAI = useCallback(() => {
-    if (currentLine?.speaker !== userRole) speakAI(currentLine.text);
-  }, [currentLine, userRole, speakAI]);
 
   // --- useEffect TRUNG TÂM ---
   useEffect(() => {
-    if (callState.status !== "ACTIVE" || conversationCompletedRef.current)
-      return;
+    if (state.status !== "ACTIVE") return;
+
+    const currentState = stateRef.current;
+
     let isCancelled = false;
     let keepAliveInterval: NodeJS.Timeout | null = null;
     let turnTimeoutId: NodeJS.Timeout | null = null;
-
     const processTurn = async () => {
       if (isCancelled) return;
 
-      const line = steps[conversationState.currentStep];
+      const line = steps[state.currentStep];
       if (!line) {
-        onSessionComplete?.();
-        endCall();
+        handleCompletedCall();
+        // endCall();
+        // onSessionComplete?.();
         return;
       }
 
@@ -608,18 +653,17 @@ export const useConversation = ({
 
       if (isAITurn) {
         console.log(`🗣️ AI's turn (as ${line.speaker})`);
+        const lastMessage = messagesRef.current[0];
         if (
-          messagesRef.current.some(
-            (msg) => msg.content === line.text && msg.role === "assistant"
-          )
+          lastMessage?.role === "assistant" &&
+          lastMessage?.content === line.text
         ) {
           return;
         }
-        processingUserInputRef.current = true; // Khóa input khi Leo chuẩn bị nói
+        dispatch({ type: "START_PROCESSING_SPEECH" });
         const client = deepgramClientRef.current;
         if (client)
           keepAliveInterval = setInterval(() => client.keepAlive(), 10000);
-
         setMessages((prev) => [
           {
             type: "assistant",
@@ -632,35 +676,25 @@ export const useConversation = ({
         console.log("Speaking AI line:", line.text);
         await speakAI(line.text);
         if (keepAliveInterval) clearInterval(keepAliveInterval);
-
-        if (!isCancelled) {
-          turnTimeoutId = setTimeout(() => {
-            if (!isCancelled) {
-              setConversationState((prev) => ({
-                ...prev,
-                currentStep: prev.currentStep + 1,
-              }));
-            }
-          }, resolvedTimingSettings.stepTransitionDelay);
-        }
+        if (isCancelled) return;
+        turnTimeoutId = setTimeout(() => {
+          if (isCancelled) return;
+          console.log("Advancing to next step after AI speech.");
+          dispatch({ type: "ADVANCE_STEP" });
+        }, resolvedTimingSettings.stepTransitionDelay);
+        return;
       } else {
         console.log(`👤 User's turn (as ${line.speaker})`);
-        if (!isWaitingForUserRef.current) {
+        if (!currentState.isWaitingForUser) {
           turnTimeoutId = setTimeout(() => {
             if (isCancelled) return;
-            processingUserInputRef.current = false; // Mở khóa input khi đến lượt Gwen
-
-            isAwaitingAIRef.current = false;
+            dispatch({ type: "STOP_PROCESSING_SPEECH" });
+            dispatch({ type: "SET_USER_TURN" });
             resetInactivityTimer();
-            setConversationState((prev) => ({
-              ...prev,
-              isWaitingForUser: true,
-            }));
           }, 750);
         }
       }
     };
-
     processTurn();
 
     return () => {
@@ -668,16 +702,20 @@ export const useConversation = ({
       if (keepAliveInterval) clearInterval(keepAliveInterval);
       if (turnTimeoutId) clearTimeout(turnTimeoutId);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    conversationState.currentStep,
-    conversationState.retryCounter,
-    callState.status,
-    userRole
+    state.status,
+    state.currentStep,
+    userRole,
   ]);
 
   return {
-    callState,
-    conversationState,
+    callState: { status: state.status, error: state.error },
+    conversationState: {
+      currentStep: state.currentStep,
+      totalSteps: steps.length,
+      isWaitingForUser: state.isWaitingForUser,
+    },
     messages,
     isSpeaking,
     isMuted,
@@ -690,6 +728,5 @@ export const useConversation = ({
     resetConversation,
     skipToStep,
     retryCurrentStep,
-    manualTriggerAI,
   };
 };

@@ -54,7 +54,6 @@ const voiceStyles = {
 
 // Provider Component
 export const ConversationProvider = (props: ConversationProviderProps) => {
-  console.log("ConversationProvider Props:", props);
   const { initialCompletedTopics, transcriptData, style, children } = props;
   const { podcastTopics, topicConfig, topicTitles } = transcriptData;
   const completedTopicsSet = new Set(
