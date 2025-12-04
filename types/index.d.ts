@@ -342,6 +342,8 @@ interface CompanionComponentProps {
   style: string;
   voiceId: string;
   transcriptData: processedData;
+  initialFeedbackHistory: FeedbackHistoryPoint[];
+  initialCompletedTopics: FeedbackHistoryCompletedTopic[];
 }
 
 interface PodcastEntry {
@@ -402,6 +404,7 @@ export interface SimilarityResult {
 }
 
 type Message = {
+  type?: string;
   role: string;
   content: string;
   timestamp: number;

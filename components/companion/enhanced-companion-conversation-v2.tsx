@@ -23,7 +23,6 @@ import {
   type TopicKey,
   type CompanionComponentProps,
   CallStatus,
-  TranscriptLine,
 } from "@/types/podcast";
 import soundwaves from "@/constants/soundwaves.json";
 import {

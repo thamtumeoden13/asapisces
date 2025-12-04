@@ -26,12 +26,7 @@ import {
   FastForward,
   MessageSquare,
 } from "lucide-react";
-import type {
-  CompanionComponentProps,
-  MessageGroup,
-  PodcastTopics,
-  TopicTitles,
-} from "@/types";
+import type { MessageGroup } from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
 import {
   FeedbackHistoryPoint,
@@ -41,6 +36,7 @@ import { AnalyticsChart } from "./AnalyticsChart";
 import { TranslatedText } from "./TranslatedText";
 import { AskAITutor } from "./AskAITutor";
 import { SHOULDADVANCESCORETHERESHOLD } from "@/constants";
+import { useConversationContext } from "@/contexts/ConversationContext";
 // import { PodcastPlayer } from "./podcast-player";
 
 const cn = (...classes: (string | undefined)[]) =>
@@ -57,39 +53,33 @@ const getSubjectColor = (subject: string) => {
   return colors[subject] || colors.default;
 };
 
-interface EnhancedCompanionConversationOptimizedProps
-  extends Partial<CompanionComponentProps> {
-  topicTitles: TopicTitles;
-  podcastTopics: PodcastTopics;
-  selectedTopic?: TopicKey;
+interface EnhancedCompanionConversationOptimizedProps {
   isLoadingChart?: boolean;
   feedbackHistory?: FeedbackHistoryPoint[];
-  userRole?: "Gwen" | "Leo"; // Thêm prop userRole
-  ttsProvider?: "webspeech" | "elevenlabs"; // Thêm prop ttsProvider
-  geminiFeedback?: "standard" | "gemini"; // Thêm prop geminiFeedback
-  onTopicComplete?: (topic: TopicKey) => void;
-  onCallStateChange?: (state: CallStatus) => void;
 }
 
 const EnhancedCompanionConversationOptimized = ({
-  companionId = "demo",
-  subject = "english",
-  topic = "intro",
-  podcastTopics,
-  name = "Leo & Gwen",
-  userName = "Student",
-  userId, // Example UUID
-  voiceId,
-  topicTitles,
-  selectedTopic,
   isLoadingChart = false,
   feedbackHistory = [],
-  userRole = "Gwen",
-  ttsProvider = "webspeech",
-  geminiFeedback = "standard",
-  onTopicComplete,
-  onCallStateChange,
 }: EnhancedCompanionConversationOptimizedProps) => {
+  const {
+    companionId,
+    subject,
+    topic,
+    name,
+    userName,
+    userId,
+    voiceId,
+    userRole,
+    ttsProvider,
+    geminiFeedback,
+    selectedTopic,
+    podcastTopics,
+    topicTitles,
+    onTopicComplete,
+    onCallStateChange,
+  } = useConversationContext();
+
   const lottieRef = useRef<LottieRefCurrentProps>(null);
 
   // Timing Configuration State
@@ -118,15 +108,10 @@ const EnhancedCompanionConversationOptimized = ({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [pronunciationFeedback, setPronunciationFeedback] =
     useState<unknown>(null);
-  const [realTimeMetrics, setRealTimeMetrics] = useState({
-    responseTime: 0,
-    confidenceLevel: 0,
-    speechClarity: 0,
-  });
 
   // THÊM CÁC STATE NÀY
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
-  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null); // Kiểu 'any' để đơn giản, bạn có thể dùng kiểu từ schema
+  const [sessionFeedback, setSessionFeedback] = useState<any | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"success" | "error" | "">("");
@@ -395,7 +380,7 @@ const EnhancedCompanionConversationOptimized = ({
 
   useEffect(() => {
     onCallStateChange?.(callState.status);
-  }, [callState.status, onCallStateChange]);
+  }, [callState.status]);
 
   console.log(
     `[UI RENDER] Step: ${conversationState.currentStep}`,
