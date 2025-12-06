@@ -1,5 +1,10 @@
 // File: components/companion/CompanionCardSkeleton.tsx
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function CompanionCardSkeleton() {
@@ -17,8 +22,8 @@ export function CompanionCardSkeleton() {
       <CardContent className="flex-grow p-4">
         {/* Mô phỏng CardDescription */}
         <div className="space-y-2">
-            <Skeleton className="w-full h-4 bg-gray-200" />
-            <Skeleton className="w-5/6 h-4 bg-gray-200" />
+          <Skeleton className="w-full h-4 bg-gray-200" />
+          <Skeleton className="w-5/6 h-4 bg-gray-200" />
         </div>
       </CardContent>
       <CardFooter className="flex flex-col items-start gap-4 p-4 mt-auto">

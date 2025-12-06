@@ -110,7 +110,7 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
             <SubjectFilter />
           </div>
         </div>
-        <QuickFilterTags /> {/* <-- Đặt component ở đây */}
+        <QuickFilterTags title="Popular topics:" />
       </div>
       <CompanionList
         initialCompanions={initialData.companions}

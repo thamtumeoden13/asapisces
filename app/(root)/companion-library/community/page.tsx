@@ -4,7 +4,7 @@ import { CompanionList } from "@/components/companion/CompanionList";
 import { SearchParams } from "@/types";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { redirect } from "next/navigation";
-// ...
+import { QuickFilterTags } from "@/components/companion/QuickFilterTags";
 
 const CommunityPage = async ({ searchParams }: SearchParams) => {
   const user = await getCurrentUser();
@@ -25,8 +25,10 @@ const CommunityPage = async ({ searchParams }: SearchParams) => {
         Practice with lessons created by other users.
       </p>
 
-      {/* Search/Filter có thể được thêm vào đây */}
-
+      {/* --- THÊM QUICK FILTERS VÀO ĐÂY --- */}
+      <div className="flex flex-col gap-4 pt-4">
+        <QuickFilterTags />
+      </div>
       <div className="mt-8">
         <CompanionList
           initialCompanions={initialData.companions}

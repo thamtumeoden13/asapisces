@@ -10,7 +10,7 @@ interface ConversationSessionProps {
   }>;
 }
 
-const ConversationPage = async ({ params }: ConversationSessionProps) => {
+const CompanionPage = async ({ params }: ConversationSessionProps) => {
   const user = await getCurrentUser();
 
   if (!user) redirect("/companion-library");
@@ -41,4 +41,4 @@ const ConversationPage = async ({ params }: ConversationSessionProps) => {
   );
 };
 
-export default ConversationPage;
+export default CompanionPage;

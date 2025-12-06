@@ -12,7 +12,7 @@ export const popularSubjects = [
   "technology", // Giữ nguyên
 ];
 
-export function QuickFilterTags() {
+export function QuickFilterTags({ title }: { title?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -37,7 +37,7 @@ export function QuickFilterTags() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium text-gray-600">Popular topics:</span>
+      {title && <span className="text-sm font-medium text-gray-600">{title}</span>}
       {popularSubjects.map((subject) => (
         <Badge
           key={subject}
