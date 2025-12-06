@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-const VapiConversation = async () => {
+const Companion = async () => {
   redirect("/companion-library/");
 
   return (
@@ -10,4 +10,4 @@ const VapiConversation = async () => {
   );
 };
 
-export default VapiConversation;
+export default Companion;

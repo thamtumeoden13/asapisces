@@ -11,7 +11,7 @@ const navItems = [
   { name: "Awwwards", route: "/" },
   { name: "Brainwave", route: "/brainwave" },
   { name: "PrepWise", route: "/interview" },
-  { name: "Companion", route: "/companion" },
+  { name: "Companion", route: "/companion-library" },
   { name: "Portfolio", route: "/portfolio" },
   { name: "Contact", route: "/portfolio/contact" },
 ];

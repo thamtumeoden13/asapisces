@@ -204,8 +204,8 @@ export const upsertTranscriptCompanion = async (data: UpsertCompanionData) => {
     }
 
     // Xóa cache và điều hướng
-    revalidatePath("/companions");
-    revalidatePath(`/companions/${savedCompanion.id}`);
+    revalidatePath("/companion-library");
+    revalidatePath(`/companion-library/companion/${savedCompanion.id}`);
     redirect(`/companions/${savedCompanion.id}`);
   } catch (error) {
     console.error("Upsert companion failed:", error);
@@ -274,12 +274,12 @@ export async function upsertTranscriptCompanion2(data: UpsertCompanionData) {
     }
 
     // Xóa cache
-    revalidatePath("/companion");
+    revalidatePath("/companion-library");
     revalidatePath("/community");
 
     // Redirect sau khi thành công
     if (companionId) {
-      revalidatePath(`/companions/${companionId}`);
+      revalidatePath(`companion-library/conversation/${companionId}`);
     }
 
     return { success: true, companionId: companionId };

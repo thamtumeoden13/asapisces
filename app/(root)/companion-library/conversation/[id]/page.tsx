@@ -11,20 +11,20 @@ interface ConversationSessionProps {
 }
 
 const ConversationPage = async ({ params }: ConversationSessionProps) => {
-  const { id } = await params;
-  const companion = await getCompanionById(id);
   const user = await getCurrentUser();
 
   if (!user) redirect("/sign-in");
+  const { id } = await params;
+  const companion = await getCompanionById(id);
   return (
     <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container px-4 py-8 mx-auto">
         {/* Header Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+        <div className="mb-8 text-center">
+          <h1 className="mb-4 text-4xl font-bold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text">
             AI Conversation Practice
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="max-w-2xl mx-auto text-xl text-gray-600">
             Practice English conversation with AI companions using advanced
             voice recognition and real-time feedback
           </p>

@@ -63,7 +63,7 @@ export async function recordSessionStartAction(companionId?: string) {
     });
 
     // Xóa cache của trang chính để nó tải lại danh sách recent/popular
-    revalidatePath("/companion");
+    revalidatePath("/companion-library");
 
     return { success: true };
   } catch (error) {

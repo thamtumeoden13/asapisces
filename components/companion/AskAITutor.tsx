@@ -78,7 +78,7 @@ export function AskAITutor({
         </form>
 
         {(isLoading || error || answer) && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border space-y-4">
+          <div className="p-4 mt-4 space-y-4 border rounded-lg bg-gray-50">
             {isLoading && (
               <p className="text-gray-500 animate-pulse">
                 Your tutor is typing...
@@ -90,7 +90,7 @@ export function AskAITutor({
             {answer && (
               <div className="space-y-4 text-sm">
                 {/* 1. Câu trả lời trực tiếp */}
-                <div className="prose prose-sm max-w-none">
+                <div className="prose-sm prose max-w-none">
                   <ReactMarkdown>{answer.directAnswer}</ReactMarkdown>
                 </div>
 
@@ -112,7 +112,7 @@ export function AskAITutor({
                               &quot;{ex.fromTranscript}&quot;
                             </span>
                           </p>
-                          <p className="text-gray-700 mt-1">
+                          <p className="mt-1 text-gray-700">
                             Suggestion:{" "}
                             <span className="font-mono text-green-600">
                               &quot;{ex.suggestion}&quot;
@@ -130,7 +130,7 @@ export function AskAITutor({
                     <h5 className="font-semibold mb-2 flex items-center gap-1.5">
                       <Lightbulb className="w-4 h-4 text-yellow-500" /> Pro Tip:
                     </h5>
-                    <div className="prose prose-sm max-w-none text-gray-600">
+                    <div className="prose-sm prose text-gray-600 max-w-none">
                       <ReactMarkdown>{answer.furtherExplanation}</ReactMarkdown>
                     </div>
                   </div>

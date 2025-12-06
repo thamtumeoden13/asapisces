@@ -24,10 +24,10 @@ const TranscriptProcessorPage = async ({
 
   const { id } = await params;
   const companion = await getCompanionById(id);
-  if (!companion) redirect("/companion/companions");
+  if (!companion) redirect("/companion-library");
 
   return (
-    <main className="min-h-screen bg-white py-10">
+    <main className="min-h-screen py-10 bg-white">
       <TranscriptProcessorComponent editMode={true} companionData={companion} />
     </main>
   );

@@ -25,6 +25,7 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
   const user = await getCurrentUser();
 
   if (!user) redirect("/sign-in");
+
   const userName = user?.name || "learner";
 
   const filters = await searchParams;

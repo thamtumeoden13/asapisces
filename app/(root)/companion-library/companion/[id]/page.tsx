@@ -14,7 +14,6 @@ const ConversationPage = async ({ params }: ConversationSessionProps) => {
   const user = await getCurrentUser();
 
   if (!user) redirect("/companion-library");
-
   const { id } = await params;
   const companion = await getCompanionById(id);
   return (

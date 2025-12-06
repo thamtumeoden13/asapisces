@@ -9,6 +9,7 @@ import Image from "next/image";
 import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { RouteParams } from "@/types";
 
 const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
@@ -29,7 +30,7 @@ const Page = async ({ params }: RouteParams) => {
 
   return (
     <div className="flex flex-col gap-12 px-16 mx-auto my-16 max-w-7xl max-sm:px-4 max-sm:my-8">
-      <section className="section-feedback min-h-screen">
+      <section className="min-h-screen section-feedback">
         <div className="flex flex-row justify-center">
           <h1 className="text-4xl font-semibold">
             Feedback on the Interview -{" "}
@@ -39,11 +40,11 @@ const Page = async ({ params }: RouteParams) => {
 
         <div className="flex flex-row justify-center">
           <div className="flex flex-row gap-5">
-            <div className="flex flex-row gap-2 items-center">
+            <div className="flex flex-row items-center gap-2">
               <Image src="/star.svg" width={22} height={22} alt="star" />
               <p>
                 Overall Impression:{" "}
-                <span className="text-primary-200 font-bold">
+                <span className="font-bold text-primary-200">
                   {feedback?.totalScore}
                 </span>
                 /100
@@ -101,20 +102,20 @@ const Page = async ({ params }: RouteParams) => {
         </div>
 
         <div className="buttons">
-          <Button className="btn-secondary flex-1">
-            <Link href="/" className="flex w-full justify-center">
-              <p className="text-sm font-semibold text-primary-200 text-center">
+          <Button className="flex-1 btn-secondary">
+            <Link href="/" className="flex justify-center w-full">
+              <p className="text-sm font-semibold text-center text-primary-200">
                 Back to dashboard
               </p>
             </Link>
           </Button>
 
-          <Button className="btn-primary flex-1">
+          <Button className="flex-1 btn-primary">
             <Link
               href={`/interview/${id}`}
-              className="flex w-full justify-center"
+              className="flex justify-center w-full"
             >
-              <p className="text-sm font-semibold text-black text-center">
+              <p className="text-sm font-semibold text-center text-black">
                 Retake Interview
               </p>
             </Link>

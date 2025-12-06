@@ -145,7 +145,6 @@ export function TranscriptSaveForm({
 
       if (savedCompanion.success) {
         setOpen(false);
-        // router.push(`/companions/${savedCompanion.id}`);
       }
     } catch (error) {
       console.error("Failed to save transcript companion:", error);
@@ -379,7 +378,7 @@ export function TranscriptSaveForm({
               control={form.control}
               name="isPublic"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                <FormItem className="flex flex-row items-center justify-between p-3 border rounded-lg shadow-sm">
                   <div className="space-y-0.5">
                     <FormLabel>Share with Community</FormLabel>
                     <FormDescription>

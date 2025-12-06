@@ -3,22 +3,23 @@ import DisplayTechIcons from "@/components/interview/DisplayTechIcons";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { getInterviewById } from "@/lib/actions/general.action";
 import { getRandomInterviewCover } from "@/lib/utils";
+import { RouteParams } from "@/types";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import React from "react";
 
 const Page = async ({ params }: RouteParams) => {
-  const { id } = await params;
   const user = await getCurrentUser();
 
   if(!user) redirect("/sign-in")
+  const { id } = await params;
 
   const interview = await getInterviewById(id);
 
   if (!interview) redirect("/interview");
 
   return (
-    <div className="flex flex-col gap-12 px-16 mx-auto my-16 max-w-7xl max-sm:px-4 max-sm:my-8 min-h-screen">
+    <div className="flex flex-col min-h-screen gap-12 px-16 mx-auto my-16 max-w-7xl max-sm:px-4 max-sm:my-8">
       <div className="flex flex-row justify-between gap-4">
         <div className="flex flex-row items-center gap-4 max-sm:flex-col">
           <div className="flex flex-row items-center gap-4">

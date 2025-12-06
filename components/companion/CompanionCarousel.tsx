@@ -38,13 +38,13 @@ export function CompanionCarousel({ companions }: CompanionCarouselProps) {
           {companions.map((companion) => (
             <div
               key={companion.id}
-              className="flex-shrink-0 w-full sm:w-1/2 md:w-1/3 lg:w-1/4 relative"
+              className="relative flex-shrink-0 w-full sm:w-1/2 md:w-1/3 lg:w-1/4"
             >
               <CompanionCard
                 key={companion.id}
                 {...companion}
                 color={getSubjectColor(companion.subject)}
-                href={`/companion/conversation`}
+                href={`/companion-library/conversation`}
               />
             </div>
           ))}
@@ -55,18 +55,18 @@ export function CompanionCarousel({ companions }: CompanionCarouselProps) {
       <Button
         variant="outline"
         size="icon"
-        className="absolute top-1/2 -translate-y-1/2 -left-4 rounded-full h-10 w-10 hidden md:flex bg-slate-300/70"
+        className="absolute hidden w-10 h-10 -translate-y-1/2 rounded-full top-1/2 -left-4 md:flex bg-slate-300/70"
         onClick={scrollPrev}
       >
-        <ArrowLeft className="h-5 w-5" />
+        <ArrowLeft className="w-5 h-5" />
       </Button>
       <Button
         variant="outline"
         size="icon"
-        className="absolute top-1/2 -translate-y-1/2 -right-4 rounded-full h-10 w-10 hidden md:flex bg-slate-300/70"
+        className="absolute hidden w-10 h-10 -translate-y-1/2 rounded-full top-1/2 -right-4 md:flex bg-slate-300/70"
         onClick={scrollNext}
       >
-        <ArrowRight className="h-5 w-5" />
+        <ArrowRight className="w-5 h-5" />
       </Button>
     </div>
   );

@@ -69,7 +69,7 @@ export function CompanionList({
               key={companion.id}
               {...companion}
               color={getSubjectColor(companion.subject)}
-              href={`/companion/conversation`}
+              href={`/companion-library/conversation`}
             />
           </div>
         ))}
@@ -81,7 +81,7 @@ export function CompanionList({
       </div>
 
       {/* Phần tử trigger để tải thêm */}
-      <div ref={ref} className="h-1 w-full"></div>
+      <div ref={ref} className="w-full h-1"></div>
 
       <div className="flex justify-center mt-8">
         {!isLoading && !hasNextPage && companions.length > 0 && (

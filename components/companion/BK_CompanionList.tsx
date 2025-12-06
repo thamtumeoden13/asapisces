@@ -24,7 +24,7 @@ const CompanionList = ({
 }: CompanionListProps) => {
   return (
     <article className={cn("companion-list", className)}>
-      <h2 className="text-3xl text-black font-bold">{title}</h2>
+      <h2 className="text-3xl font-bold text-black">{title}</h2>
 
       <Table>
         <TableHeader>
@@ -38,7 +38,7 @@ const CompanionList = ({
           {companions?.map(({ id, subject, name, topic, duration }) => (
             <TableRow key={id}>
               <TableCell className="">
-                <Link href={`/companion/companions/${id}`}>
+                <Link href={`/companion-library/companion/${id}`}>
                   <div className="flex items-center gap-2">
                     <div
                       className="size-[72px] flex items-center justify-center rounded-lg max-md:hidden"
