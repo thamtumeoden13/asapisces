@@ -1,4 +1,7 @@
-import { getAllCompanions, getPopularCompanionsAction } from "@/lib/actions/companion.actions";
+import {
+  getAllCompanions,
+  getPopularCompanionsAction,
+} from "@/lib/actions/companion.actions";
 import SearchInput from "@/components/companion/SearchInput";
 import SubjectFilter from "@/components/companion/SubjectFilter";
 import { CompanionList } from "@/components/companion/CompanionList";
@@ -16,16 +19,19 @@ import { getMostRecentCompanionAction } from "@/lib/actions/session.action";
 import { getNewestCompanionsAction } from "@/lib/actions/companion.actions";
 import { CompanionCarousel } from "@/components/companion/CompanionCarousel"; // Component mới
 import { ResumeCard } from "@/components/companion/ResumeCard"; // Component mới
+import { redirect } from "next/navigation";
 
 const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
+  const user = await getCurrentUser();
+
+  if (!user) redirect("/sign-in");
+  const userName = user?.name || "learner";
+
   const filters = await searchParams;
   const subject = filters.subject ? filters.subject : "";
   const topic = filters.topic ? filters.topic : "";
 
   // --- LẤY DỮ LIỆU TRANG ĐẦU TIÊN TRÊN SERVER ---
-
-  const user = await getCurrentUser();
-  const userName = user?.name || "learner";
 
   // --- BƯỚC 2: GỌI CẢ HAI SERVER ACTION ---
   // Các lời gọi này sẽ chạy song song để tối ưu hóa tốc độ tải trang
@@ -48,13 +54,13 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
   return (
     <section className="mx-auto px-14 flex flex-col gap-8 bg-background h-full w-full max-w-[1440px] pt-10 max-sm:px-2">
       {/* --- BƯỚC 3: THÊM BANNER HIỂN THỊ STREAK --- */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-100 border-blue-200">
-        <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-100">
+        <CardContent className="flex flex-col items-center justify-between gap-4 p-6 md:flex-row">
           <div>
             <h2 className="text-xl font-bold text-gray-800">
               Welcome Back, {userName}!
             </h2>
-            <p className="text-gray-600 mt-1">
+            <p className="mt-1 text-gray-600">
               {streakData.streak > 0
                 ? `Keep up the great work. You're on a ${streakData.streak}-day streak!`
                 : "Start a session today to build your practice habit."}
@@ -72,11 +78,12 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
       {/* --- KHU VỰC "RESUME" --- */}
       {mostRecentCompanion && <ResumeCard companion={mostRecentCompanion} />}
 
-
       {/* --- KHU VỰC "POPULAR THIS WEEK" --- */}
       {popularCompanions.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4 text-black-100">Popular This Week</h2>
+          <h2 className="mb-4 text-2xl font-bold text-black-100">
+            Popular This Week
+          </h2>
           <CompanionCarousel companions={popularCompanions} />
         </div>
       )}
@@ -84,14 +91,16 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
       {/* --- KHU VỰC "NEWLY ADDED" --- */}
       {newestCompanions.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4 text-black-100">Newly Added</h2>
+          <h2 className="mb-4 text-2xl font-bold text-black-100">
+            Newly Added
+          </h2>
           <CompanionCarousel companions={newestCompanions} />
         </div>
       )}
 
       {/* --- THÊM QUICK FILTERS VÀO ĐÂY --- */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-4 max-sm:flex-col w-full">
+        <div className="flex items-center justify-between w-full gap-4 max-sm:flex-col">
           <h1 className="text-3xl font-bold text-black-200">
             Companion Library
           </h1>
