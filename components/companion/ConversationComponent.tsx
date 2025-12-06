@@ -11,12 +11,12 @@ const ConversationComponent = async (props: CompanionComponentProps) => {
   const { companionId, transcriptData } = props;
   // Lấy dữ liệu biểu đồ ban đầu cho topic đầu tiên
   const initialTopicKey = transcriptData?.topicConfig?.[0]?.key || "intro";
-  const initialFeedbackHistory =
-    await getFeedbackHistoryForTopic(initialTopicKey);
-  const streakData = await calculateStreakAction();
-  const initialCompletedTopics =
-    await getCompletedTopicForCompanion(companionId);
-
+  const [initialFeedbackHistory, streakData, initialCompletedTopics] =
+    await Promise.all([
+      getFeedbackHistoryForTopic(initialTopicKey),
+      calculateStreakAction(),
+      getCompletedTopicForCompanion(companionId),
+    ]);
   console.log("Streak Data:", streakData);
 
   return (
