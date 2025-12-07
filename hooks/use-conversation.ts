@@ -29,6 +29,10 @@ import {
   LOWSCORETHERESHOLD,
   SHOULDADVANCESCORETHERESHOLD,
 } from "@/constants";
+import { toast } from "./use-toast";
+
+import { startConversationSessionAction } from "@/lib/actions/conversation.action";
+import { generateSpeechAction } from "@/lib/actions/tts.action";
 
 type TTSProvider = "webspeech" | "elevenlabs";
 type GeminiFeedbackOption = "standard" | "gemini";
@@ -230,43 +234,61 @@ export const useConversation = ({
   const speakAIByElevenLabs = useCallback(
     async (text: string) => {
       if (!voiceId) {
-        console.error("ElevenLabs voiceId is required but was not provided.");
+        console.error("ElevenLabs voiceId is required.");
         return;
       }
+
       return new Promise<void>(async (resolve, reject) => {
         if (!text) return resolve();
         setIsSpeaking(true);
-        try {
-          const response = await fetch("/api/tts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, voiceId }),
-          });
-          if (!response.ok || !response.body)
-            throw new Error("API call to /api/tts failed");
 
-          const audioBlob = await response.blob();
+        const result = await generateSpeechAction(text, voiceId);
+
+        if (result.success && result.audioBuffer) {
+          // Chuyển ArrayBuffer thành Blob URL để thẻ <audio> có thể phát
+          const audioBlob = new Blob([result.audioBuffer], {
+            type: "audio/mpeg",
+          });
           const audioUrl = URL.createObjectURL(audioBlob);
 
           if (!audioPlayerRef.current) audioPlayerRef.current = new Audio();
-
           const player = audioPlayerRef.current;
           player.src = audioUrl;
           player.onended = () => {
             setIsSpeaking(false);
-            URL.revokeObjectURL(audioUrl);
+            URL.revokeObjectURL(audioUrl); // Dọn dẹp URL
             resolve();
           };
           player.onerror = (e) => {
+            console.error("Audio playback error:", e);
             setIsSpeaking(false);
             URL.revokeObjectURL(audioUrl);
-            reject(e);
+            reject(new Error("Audio playback failed."));
           };
-          await player.play();
-        } catch (error) {
+
+          try {
+            await player.play();
+          } catch (playError) {
+            console.error("Audio play() failed:", playError);
+            setIsSpeaking(false);
+            URL.revokeObjectURL(audioUrl);
+            reject(
+              new Error(
+                "Could not play audio. User interaction might be required."
+              )
+            );
+          }
+        } else {
+          console.error("Failed to generate speech:", result.error);
+          // Tùy chọn: bạn có thể fallback về WebSpeech API ở đây
+          // await speakAIByWebSpeechAPI(text);
           setIsSpeaking(false);
-          console.error("ElevenLabs Speak AI error:", error);
-          reject(error);
+          reject(
+            new Error(
+              result.error ||
+                "Failed to generate speech due to an unknown error."
+            )
+          );
         }
       });
     },
@@ -535,12 +557,27 @@ export const useConversation = ({
     resetConversation();
     dispatch({ type: "STARTING_CALL" });
     try {
-      if (companionId) recordSessionStartAction(companionId);
-      const response = await fetch("/api/deepgram");
-      const data = await response.json();
-      if (!data.deepgramToken) throw new Error("Failed to get Deepgram token.");
+      // if (companionId) recordSessionStartAction(companionId);
+      // const response = await fetch("/api/deepgram");
+      // const data = await response.json();
+      // if (!data.deepgramToken) throw new Error("Failed to get Deepgram token.");
 
-      const client = createClient(data.deepgramToken).listen.live({
+      // 1. Gọi Server Action để kiểm tra credit và lấy token
+      const sessionResult = await startConversationSessionAction();
+
+      if (!sessionResult.success || !sessionResult.token) {
+        // Ném lỗi để khối catch bên dưới xử lý và hiển thị cho người dùng
+        console.error(
+          "Failed to start conversation session:",
+          sessionResult.error
+        );
+        throw new Error(sessionResult.error || "Failed to start session.");
+      }
+
+      // 2. Nếu thành công, tiếp tục logic kết nối Deepgram với token đã nhận
+      if (companionId) recordSessionStartAction(companionId);
+
+      const client = createClient(sessionResult.token).listen.live({
         model: "nova-2",
         language: "en-US",
         interim_results: true,
@@ -594,7 +631,14 @@ export const useConversation = ({
       });
       client.on(LiveTranscriptionEvents.Close, () => endCall());
     } catch (error) {
-      dispatch({ type: "CALL_FAILED", payload: (error as Error).message });
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred.";
+      dispatch({ type: "CALL_FAILED", payload: errorMessage });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
     }
   }, [
     resetConversation,
@@ -673,16 +717,35 @@ export const useConversation = ({
           },
           ...prev,
         ]);
-        console.log("Speaking AI line:", line.text);
-        await speakAI(line.text);
-        if (keepAliveInterval) clearInterval(keepAliveInterval);
-        if (isCancelled) return;
-        turnTimeoutId = setTimeout(() => {
+        try {
+          console.log("Speaking AI line:", line.text);
+          await speakAI(line.text);
+          if (keepAliveInterval) clearInterval(keepAliveInterval);
           if (isCancelled) return;
-          console.log("Advancing to next step after AI speech.");
-          dispatch({ type: "ADVANCE_STEP" });
-        }, resolvedTimingSettings.stepTransitionDelay);
-        return;
+          turnTimeoutId = setTimeout(() => {
+            if (isCancelled) return;
+            console.log("Advancing to next step after AI speech.");
+            dispatch({ type: "ADVANCE_STEP" });
+          }, resolvedTimingSettings.stepTransitionDelay);
+        } catch (error) {
+          // Xử lý lỗi ở đây
+          if (isCancelled) return; // Bỏ qua nếu đã cleanup
+
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : "An unknown error occurred.";
+          console.error("Critical speak error:", errorMessage);
+
+          // Hiển thị toast cho người dùng
+          toast({
+            variant: "destructive",
+            title: "Speech Error",
+            description: errorMessage,
+          });
+          // Kết thúc cuộc gọi
+          endCall();
+        }
       } else {
         console.log(`👤 User's turn (as ${line.speaker})`);
         if (!currentState.isWaitingForUser) {
@@ -702,12 +765,8 @@ export const useConversation = ({
       if (keepAliveInterval) clearInterval(keepAliveInterval);
       if (turnTimeoutId) clearTimeout(turnTimeoutId);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.status,
-    state.currentStep,
-    userRole,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status, state.currentStep, userRole]);
 
   return {
     callState: { status: state.status, error: state.error },

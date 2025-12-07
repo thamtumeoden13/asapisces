@@ -1554,8 +1554,43 @@ export const DEFAULT_TOPIC_CONFIG: TopicConfig[] = [
   },
 ];
 
-export const SHOULDADVANCESCORETHERESHOLD = 0.7
-export const LOWSCORETHERESHOLD = 0.5
+export const SHOULDADVANCESCORETHERESHOLD = 0.7;
+export const LOWSCORETHERESHOLD = 0.5;
 
 export const LONG_SENTENCE_WORD_THRESHOLD = 10;
 export const LONG_SENTENCE_GRACE_PERIOD_MS_BONUS = 2000; // Thêm 2 giây cho câu dài
+
+// Bảng chi phí tập trung
+export const CREDIT_COSTS = {
+  DEEPGRAM_TRANSCRIPTION_PER_MINUTE: 100, // Chi phí cho mỗi phút ghi âm
+  ELEVENLABS_TTS_PER_1000_CHARS: 1800, // Chi phí cho mỗi 1000 ký tự TTS
+  GEMINI_PRO_FEEDBACK: 100, // Chi phí tạo feedback (dùng Pro nên đắt hơn)
+  GEMINI_FLASH_ACTION: 25, // Chi phí cho các tác vụ nhỏ (dùng Flash)
+  DEEPGRAM_TRANSCRIPTION_PER_30_SECONDS: 50,
+};
+
+export const USER_ROLES = {
+  ADMIN: "admin",
+  DEVELOPER: "developer",
+  PRO: "pro", // Thêm vai trò cho người dùng trả phí
+  VIEWER: "viewer", // Người dùng miễn phí
+} as const; // 'as const' để TypeScript hiểu đây là các giá trị hằng
+
+// Định nghĩa các quyền hạn
+export const ROLE_PERMISSIONS = {
+  // Admin và Developer có quyền không giới hạn
+  [USER_ROLES.ADMIN]: {
+    UNLIMITED_CREDITS: true,
+  },
+  [USER_ROLES.DEVELOPER]: {
+    UNLIMITED_CREDITS: true,
+  },
+  // Người dùng Pro có thể có các quyền lợi khác trong tương lai
+  [USER_ROLES.PRO]: {
+    UNLIMITED_CREDITS: false, // Hoặc true nếu gói pro là không giới hạn
+  },
+  // Người dùng miễn phí không có quyền đặc biệt
+  [USER_ROLES.VIEWER]: {
+    UNLIMITED_CREDITS: false,
+  },
+};

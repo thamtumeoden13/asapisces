@@ -22,7 +22,9 @@ import {
   smartRetrySchema,
   topicConfigGenerationSchema,
 } from "../zodSchema";
-import { subjects } from "@/constants";
+import { CREDIT_COSTS, subjects } from "@/constants";
+
+import { withCreditCheck } from "./credits.action";
 
 export async function getInterviewByUserId(
   userId: string
@@ -106,30 +108,31 @@ export async function getInterviewById(id: string): Promise<Interview | null> {
 }
 
 export async function createFeedback(params: CreateFeedbackParams) {
-  const { interviewId, userId, transcript } = params;
+  return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    const { interviewId, userId, transcript } = params;
 
-  try {
-    const formattedTranscript = transcript
-      .map(
-        (sentence: { role: string; content: string }) =>
-          `- ${sentence.role}: ${sentence.content} \n`
-      )
-      .join("");
+    try {
+      const formattedTranscript = transcript
+        .map(
+          (sentence: { role: string; content: string }) =>
+            `- ${sentence.role}: ${sentence.content} \n`
+        )
+        .join("");
 
-    const {
-      object: {
-        totalScore,
-        categoryScores,
-        strengths,
-        areasForImprovement,
-        finalAssessment,
-      },
-    } = await generateObject({
-      model: google("gemini-2.0-flash-001", {
-        structuredOutputs: false,
-      }),
-      schema: feedbackSchema,
-      prompt: `
+      const {
+        object: {
+          totalScore,
+          categoryScores,
+          strengths,
+          areasForImprovement,
+          finalAssessment,
+        },
+      } = await generateObject({
+        model: google("gemini-2.0-flash-001", {
+          structuredOutputs: false,
+        }),
+        schema: feedbackSchema,
+        prompt: `
         You are an AI interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories. Be thorough and detailed in your analysis. Don't be lenient with the candidate. If there are mistakes or areas for improvement, point them out.
         Transcript:
         ${formattedTranscript}
@@ -141,41 +144,42 @@ export async function createFeedback(params: CreateFeedbackParams) {
         - **Cultural & Role Fit**: Alignment with company values and job role.
         - **Confidence & Clarity**: Confidence in responses, engagement, and clarity.
         `,
-      system:
-        "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
-    });
+        system:
+          "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
+      });
 
-    const { data, error } = await supabase
-      .from("feedbacks")
-      .insert([
-        {
-          interview_id: interviewId,
-          user_id: userId,
-          total_score: totalScore,
-          category_scores: categoryScores,
-          strengths: strengths,
-          areas_for_improvement: areasForImprovement,
-          final_assessment: finalAssessment,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select("id");
+      const { data, error } = await supabase
+        .from("feedbacks")
+        .insert([
+          {
+            interview_id: interviewId,
+            user_id: userId,
+            total_score: totalScore,
+            category_scores: categoryScores,
+            strengths: strengths,
+            areas_for_improvement: areasForImprovement,
+            final_assessment: finalAssessment,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select("id");
 
-    if (error) {
+      if (error) {
+        console.error(error);
+        return { success: false };
+      }
+
+      return {
+        success: true,
+        feedbackId: data?.[0]?.id,
+      };
+    } catch (error) {
       console.error(error);
-      return { success: false };
+      return {
+        success: false,
+      };
     }
-
-    return {
-      success: true,
-      feedbackId: data?.[0]?.id,
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      success: false,
-    };
-  }
+  });
 }
 
 export async function getFeedbackByInterviewId(
@@ -221,30 +225,31 @@ interface CreateLanguageFeedbackParams {
 export async function createLanguageFeedback(
   params: CreateLanguageFeedbackParams
 ) {
-  const { transcript, script, userRole } = params;
+  return withCreditCheck(CREDIT_COSTS.GEMINI_PRO_FEEDBACK, async () => {
+    const { transcript, script, userRole } = params;
 
-  try {
-    // Định dạng transcript và kịch bản để gửi cho AI
-    const formattedTranscript = transcript
-      .map(
-        (msg: { role: string; content: string }) =>
-          `- ${msg.role === "user" ? "Learner" : "AI Companion"}: ${msg.content}`
-      )
-      .join("\n");
+    try {
+      // Định dạng transcript và kịch bản để gửi cho AI
+      const formattedTranscript = transcript
+        .map(
+          (msg: { role: string; content: string }) =>
+            `- ${msg.role === "user" ? "Learner" : "AI Companion"}: ${msg.content}`
+        )
+        .join("\n");
 
-    // Lọc ra chỉ những câu thoại mà người dùng phải nói
-    const userScriptLines = script
-      .filter((line) => line.speaker === userRole)
-      .map((line) => `- ${line.text}`)
-      .join("\n");
+      // Lọc ra chỉ những câu thoại mà người dùng phải nói
+      const userScriptLines = script
+        .filter((line) => line.speaker === userRole)
+        .map((line) => `- ${line.text}`)
+        .join("\n");
 
-    // Lấy tên của AI Companion
-    const aiCompanionRole = userRole === "Leo" ? "Gwen" : "Leo";
+      // Lấy tên của AI Companion
+      const aiCompanionRole = userRole === "Leo" ? "Gwen" : "Leo";
 
-    const { object: feedbackData } = await generateObject({
-      model: google("gemini-2.5-pro"), // Sử dụng model mới hơn nếu có thể
-      schema: languageFeedbackSchema,
-      prompt: `
+      const { object: feedbackData } = await generateObject({
+        model: google("gemini-2.5-pro"), // Sử dụng model mới hơn nếu có thể
+        schema: languageFeedbackSchema,
+        prompt: `
         You are an expert AI English tutor. Your task is to provide constructive and encouraging feedback to a student who has just completed a conversation practice session.
 
         **Crucial Context:**
@@ -271,13 +276,13 @@ export async function createLanguageFeedback(
 
         For 'strengths' and 'areasForImprovement', be specific. Use examples from the "Learner" parts of the full transcript and compare them to the "Learner's Script". Keep the tone positive and motivational.
       `,
-      system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}.`,
-    });
+        system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}.`,
+      });
 
-    console.log("✅ AI Feedback Generated:", feedbackData);
+      console.log("✅ AI Feedback Generated:", feedbackData);
 
-    // Lưu vào Supabase (logic này bạn có thể giữ nguyên hoặc điều chỉnh)
-    /*
+      // Lưu vào Supabase (logic này bạn có thể giữ nguyên hoặc điều chỉnh)
+      /*
     const { data, error } = await supabase
       .from("language_feedbacks") // Có thể là một bảng mới
       .insert([
@@ -305,15 +310,16 @@ export async function createLanguageFeedback(
     };
     */
 
-    // Tạm thời trả về dữ liệu mà không lưu DB để test
-    return {
-      success: true,
-      feedback: feedbackData,
-    };
-  } catch (error) {
-    console.error("Error generating feedback:", error);
-    return { success: false, feedback: null };
-  }
+      // Tạm thời trả về dữ liệu mà không lưu DB để test
+      return {
+        success: true,
+        feedback: feedbackData,
+      };
+    } catch (error) {
+      console.error("Error generating feedback:", error);
+      return { success: false, feedback: null };
+    }
+  });
 }
 
 type AskData = z.infer<typeof askSchema>;
@@ -335,8 +341,6 @@ export async function askAboutConversationAction(data: AskData): Promise<{
   const { question, userRole, fullTranscript, originalScript } =
     validation.data;
 
-  // ... (phần xây dựng ngữ cảnh và prompt giữ nguyên như trước)
-  // --- XÂY DỰNG NGỮ CẢNH ---
   const formattedTranscript = fullTranscript
     .map(
       (msg) =>
@@ -353,46 +357,48 @@ export async function askAboutConversationAction(data: AskData): Promise<{
     You are an expert, friendly, and encouraging AI English language tutor. 
     A student has just finished a practice conversation and has a specific question. 
     Your task is to answer their question clearly and concisely, using the provided context.
-
+    
     **CONTEXT:**
     1.  **The Learner's Role:** The student was playing the role of "${userRole}".
     2.  **The Learner's Script:** These are the lines the student was supposed to say:
-        ---
-        ${userScriptLines}
-        ---
+    ---
+    ${userScriptLines}
+    ---
     3.  **Full Conversation Transcript:** This is what actually happened during the practice session. "Learner" is the student, and "AI Companion" is the other role.
-        ---
-        ${formattedTranscript}
-        ---
-
+    ---
+    ${formattedTranscript}
+    ---
+    
     **STUDENT'S QUESTION:**
     "${question}"
-
+    
     **YOUR TASK:**
     1.  Analyze the student's question in relation to the conversation context.
     2.  Provide a direct, helpful, and easy-to-understand answer in English.
     3.  If the question is about grammar, vocabulary, or pronunciation, use specific examples from their speech ("Learner" lines in the transcript) to illustrate your points.
     4.  Keep the tone positive and supportive. Start your answer directly, without introductory phrases like "As an AI tutor...".
     5.  Format your answer using simple markdown (bold for emphasis, bullet points for lists).
-  `;
+    `;
 
-  try {
-    // --- SỬ DỤNG generateObject ---
-    const { object: answerObject } = await generateObject({
-      model: google("gemini-1.5-flash-latest"),
-      schema: aiTutorResponseSchema, // Cung cấp schema cho AI
-      prompt: prompt,
-      system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}. You must respond in a structured JSON format.`,
-    });
+  return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    try {
+      // --- SỬ DỤNG generateObject ---
+      const { object: answerObject } = await generateObject({
+        model: google("gemini-1.5-flash-latest"),
+        schema: aiTutorResponseSchema, // Cung cấp schema cho AI
+        prompt: prompt,
+        system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}. You must respond in a structured JSON format.`,
+      });
 
-    return { success: true, answer: answerObject };
-  } catch (error) {
-    console.error("AI SDK Error in askAboutConversationAction:", error);
-    return {
-      success: false,
-      error: "The AI tutor is currently unavailable. Please try again later.",
-    };
-  }
+      return { success: true, answer: answerObject };
+    } catch (error) {
+      console.error("AI SDK Error in askAboutConversationAction:", error);
+      return {
+        success: false,
+        error: "The AI tutor is currently unavailable. Please try again later.",
+      };
+    }
+  });
 }
 
 type SmartRetryData = z.infer<typeof smartRetrySchema>;
@@ -415,8 +421,8 @@ export async function getSmartRetryFeedbackAction(
       feedbackMessage: `Let's try the full sentence: "${expectedSentence}"`,
     };
   }
-
-  const prompt = `
+  return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    const prompt = `
     As an AI English coach, analyze the difference between what a student was supposed to say and what they actually said. Your goal is to identify one key area for improvement and provide a positive opening phrase.
 
     **Context:**
@@ -429,28 +435,29 @@ export async function getSmartRetryFeedbackAction(
     2.  'encouragingPhrase': Provide a short, positive opening phrase (e.g., 'Almost there!', 'Great effort!', 'You're close!').
   `;
 
-  try {
-    // --- SỬ DỤNG generateObject ---
-    const { object: aiFeedback } = await generateObject({
-      model: google("gemini-2.5-pro"),
-      schema: smartRetryResponseSchema,
-      prompt: prompt,
-      system: "You are an AI English coach that responds in structured JSON.",
-    });
+    try {
+      // --- SỬ DỤNG generateObject ---
+      const { object: aiFeedback } = await generateObject({
+        model: google("gemini-1.5-flash-latest"),
+        schema: smartRetryResponseSchema,
+        prompt: prompt,
+        system: "You are an AI English coach that responds in structured JSON.",
+      });
 
-    // --- XÂY DỰNG CÂU PHẢN HỒI CUỐI CÙNG TỪ OBJECT ---
-    const feedbackMessage = `${aiFeedback.encouragingPhrase} Let's focus on ${aiFeedback.focusPoint}. Try saying the full sentence: "${expectedSentence}"`;
+      // --- XÂY DỰNG CÂU PHẢN HỒI CUỐI CÙNG TỪ OBJECT ---
+      const feedbackMessage = `${aiFeedback.encouragingPhrase} Let's focus on ${aiFeedback.focusPoint}. Try saying the full sentence: "${expectedSentence}"`;
 
-    return { success: true, feedbackMessage };
-  } catch (error) {
-    console.error("AI SDK error in getSmartRetryFeedbackAction:", error);
-    // Fallback nếu AI gặp lỗi
-    return {
-      success: false,
-      error: "AI feedback is unavailable, using default message.",
-      feedbackMessage: ''
-    };
-  }
+      return { success: true, feedbackMessage };
+    } catch (error) {
+      console.error("AI SDK error in getSmartRetryFeedbackAction:", error);
+      // Fallback nếu AI gặp lỗi
+      return {
+        success: false,
+        error: "AI feedback is unavailable, using default message.",
+        feedbackMessage: "",
+      };
+    }
+  });
 }
 
 interface GenerateTopicsParams {
@@ -469,9 +476,8 @@ export async function generateTopicConfigAction(
   if (!rawTranscript || rawTranscript.trim().length < 100) {
     return { success: false, error: "Transcript is too short to process." };
   }
-
-  // --- PROMPT ĐÃ ĐƯỢC CẢI TIẾN HOÀN TOÀN ---
-  const prompt = `
+  return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    const prompt = `
     You are an expert AI assistant that processes podcast transcripts for educational use. Your primary goal is to divide a long transcript into smaller, logical, and well-sized topics.
 
     **Transcript to Analyze:**
@@ -489,29 +495,30 @@ export async function generateTopicConfigAction(
     Generate a JSON array of topic objects based on all the rules above. The final output must be only the JSON array.
   `;
 
-  try {
-    const { object: generatedConfig } = await generateObject({
-      model: google("gemini-2.5-pro"),
-      schema: topicConfigGenerationSchema,
-      prompt,
-      system:
-        "You are an AI that structures raw text into a specific JSON format based on user instructions. You only output valid JSON.",
-    });
+    try {
+      const { object: generatedConfig } = await generateObject({
+        model: google("gemini-2.5-pro"),
+        schema: topicConfigGenerationSchema,
+        prompt,
+        system:
+          "You are an AI that structures raw text into a specific JSON format based on user instructions. You only output valid JSON.",
+      });
 
-    const validatedData: TopicConfig[] = generatedConfig.map((item) => ({
-      key: item.key,
-      title: item.title,
-      keyword: item.keyword,
-    }));
+      const validatedData: TopicConfig[] = generatedConfig.map((item) => ({
+        key: item.key,
+        title: item.title,
+        keyword: item.keyword,
+      }));
 
-    return { success: true, data: validatedData };
-  } catch (error) {
-    console.error("AI SDK Error in generateTopicConfigAction:", error);
-    return {
-      success: false,
-      error: "Failed to generate topics using AI. Please try again.",
-    };
-  }
+      return { success: true, data: validatedData };
+    } catch (error) {
+      console.error("AI SDK Error in generateTopicConfigAction:", error);
+      return {
+        success: false,
+        error: "Failed to generate topics using AI. Please try again.",
+      };
+    }
+  });
 }
 
 interface GenerateDetailsParams {
@@ -530,8 +537,8 @@ export async function generateCompanionDetailsAction(
   if (!rawTranscript || rawTranscript.trim().length < 100) {
     return { success: false, error: "Transcript is too short to analyze." };
   }
-
-  const prompt = `
+  return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    const prompt = `
     You are a helpful AI assistant skilled at analyzing and summarizing content. Your task is to read the following podcast transcript and generate key metadata for it.
 
     **Transcript to Analyze:**
@@ -550,21 +557,22 @@ export async function generateCompanionDetailsAction(
     Please provide the output in a structured JSON format.
   `;
 
-  try {
-    const { object: generatedDetails } = await generateObject({
-      model: google("gemini-2.5-pro"),
-      schema: companionDetailsGenerationSchema,
-      prompt,
-      system:
-        "You are an AI assistant that provides structured JSON output based on a transcript.",
-    });
+    try {
+      const { object: generatedDetails } = await generateObject({
+        model: google("gemini-1.5-flash-latest"),
+        schema: companionDetailsGenerationSchema,
+        prompt,
+        system:
+          "You are an AI assistant that provides structured JSON output based on a transcript.",
+      });
 
-    return { success: true, data: generatedDetails };
-  } catch (error) {
-    console.error("AI SDK Error in generateCompanionDetailsAction:", error);
-    return {
-      success: false,
-      error: "Failed to generate details using AI. Please try again.",
-    };
-  }
+      return { success: true, data: generatedDetails };
+    } catch (error) {
+      console.error("AI SDK Error in generateCompanionDetailsAction:", error);
+      return {
+        success: false,
+        error: "Failed to generate details using AI. Please try again.",
+      };
+    }
+  });
 }

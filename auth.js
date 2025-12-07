@@ -26,6 +26,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           image: user.image,
           bio: account.provider === "github" ? profile.bio || "" : "",
           role: "viewer",
+          credits: 10000, // Cấp 10,000 credits ban đầu
           provider: account.provider,
         });
 
@@ -51,6 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (user) {
           token.id = user.id;
+          token.role = user.role;
         }
       }
 

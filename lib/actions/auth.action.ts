@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { cookies } from "next/headers";
 import { supabase } from "../supabase/server";
+import { SignInParams, SignUpParams, User } from "@/types";
 
 const SESSION_DURATION = 60 * 60 * 24 * 7; // 1 week
 

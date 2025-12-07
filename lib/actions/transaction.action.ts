@@ -6,6 +6,7 @@ import { connectToDatabase } from "../database/mongoose";
 import Transaction from "../database/models/transaction.model";
 import { handleError } from "../utils";
 import { updateCredits } from "./user.action";
+import { CheckoutTransactionParams, CreateTransactionParams } from "@/types";
 
 export async function checkoutCredits(transaction: CheckoutTransactionParams) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)

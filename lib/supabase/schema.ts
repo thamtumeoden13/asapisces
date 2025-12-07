@@ -27,6 +27,11 @@ export const users = pgTable("users", {
   name: text("name"),
   username: text("username"),
   email: text("email"),
+  image: text("image"),
+  bio: text("bio"),
+  role: text("role").default("viewer"), // viewer, pro, admin
+  createdAt: timestamp("created_at").defaultNow(),
+  credits: bigint("credits", { mode: "bigint" }).default(BigInt(1000)),
 });
 
 export const interviews = pgTable("interviews", {
@@ -95,19 +100,24 @@ export const companions = pgTable(
     coverImage: text("cover_image"),
     isPublic: boolean("is_public").notNull().default(false),
   },
-  (table) => {
-    // Định nghĩa các index bên trong một callback function
-    return {
-      // create index IF not exists idx_companions_type ...
-      typeIndex: index("idx_companions_type").on(table.type),
+  (t) => [
+    index("idx_companions_type").on(t.type),
 
-      // create index IF not exists idx_companions_author_type ...
-      authorTypeIndex: index("idx_companions_author_type").on(
-        table.author,
-        table.type
-      ),
-    };
-  }
+    index("idx_companions_author_type").on(t.author, t.type),
+  ]
+  // (table) => {
+  //   // Định nghĩa các index bên trong một callback function
+  //   return {
+  //     // create index IF not exists idx_companions_type ...
+  //     typeIndex: index("idx_companions_type").on(table.type),
+
+  //     // create index IF not exists idx_companions_author_type ...
+  //     authorTypeIndex: index("idx_companions_author_type").on(
+  //       table.author,
+  //       table.type
+  //     ),
+  //   };
+  // }
 );
 
 export const conversationFeedbacks = pgTable("conversation_feedbacks", {
