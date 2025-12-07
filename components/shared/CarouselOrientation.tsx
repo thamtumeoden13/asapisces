@@ -42,7 +42,7 @@ export function CarouselOrientation(
               className="h-48 w-full object-cover object-left-top rounded-lg "
               height="400"
               width="400"
-              alt={card.subtitle || "Art Sunday"}
+              alt={card.subtitle || "As a Pisces"}
             />
           </CarouselItem>
         ))}

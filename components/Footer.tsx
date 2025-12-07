@@ -57,8 +57,8 @@ const Footer = () => {
 				</h4> */}
           <div className="flex flex-col">
             <Image
-              src={"/bg-artsunday.png"}
-              alt="Art Sunday"
+              src={"/assets/4-smal.png"}
+              alt="As a Pisces"
               width={500}
               height={500}
               className="object-contain w-[360px] h-[100px]"
@@ -113,7 +113,7 @@ const Footer = () => {
           <div className="flex flex-wrap items-center justify-end gap-4 md:justify-between">
             <ContactModal />
             <p className="font-normal text-[14px] text-white opacity-50">
-              Copyright © 2023 - 2025 Art Sunday. All rights reserved.
+              Copyright © 2023 - 2025 As a Pisces. All rights reserved.
             </p>
             <div className="flex gap-4 ">
               {socials.map((social, index) => (

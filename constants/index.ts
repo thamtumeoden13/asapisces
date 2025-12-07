@@ -2,22 +2,22 @@ export const socials = [
   {
     name: "facebook",
     url: "/facebook.svg",
-    href: "https://www.facebook.com/artsunday.vn/",
+    href: "https://www.facebook.com/asapisces.vn/",
   },
   {
     name: "youtube",
     url: "/youtube.svg",
-    href: "https://www.youtube.com/@vinhsunday",
+    href: "https://www.youtube.com/@asapisces",
   },
   {
     name: "tiktok",
     url: "/tiktok.svg",
-    href: "https://www.tiktok.com/@artsunday.vn",
+    href: "https://www.tiktok.com/@asapisces.vn",
   },
   {
     name: "pinterest",
     url: "/pinterest.svg",
-    href: "https://www.pinterest.com/artsundayvn/?actingBusinessId=893401782238073606",
+    href: "https://www.pinterest.com/asapisces/?actingBusinessId=893401782238073606",
   },
 ];
 
@@ -1048,7 +1048,7 @@ export const experiences = [
     iconBg: "#b7e4c7",
     date: "Jun 2021 - Present",
     points: [
-      "ArtSunday.vn / Cococstudio.com (Website): Designed and developed ArtSunday.vn, an online platform for showcasing and selling artwork.",
+      "AsaPisces.vn / Cococstudio.com (Website): Designed and developed AsaPisces.vn, an online platform for showcasing and selling artwork.",
       "Technical Stack: ReactJS, NextJS, NodeJS, MongoDB, TypeScript, Tailwind CSS",
       "Responsibilities: Designed and implemented the front-end using ReactJS/Next.JS. Developed and optimized RESTful APIs for seamless backend integration. Ensured responsive and high-performance UI/UX",
       "Achievements: Successfully launched the website with a user-friendly design and smooth performance, Optimized API response times, improving overall website speed. Enhanced SEO and accessibility, increasing user engagement",
@@ -1147,7 +1147,7 @@ export const projects = [
     name: "Art Showcase Platform",
     description:
       "Developed a web application that an online platform for showcasing and selling artwork.",
-    link: "https://artsunday.vn/",
+    link: "https://asapisces.com/",
   },
   {
     iconUrl: threads,

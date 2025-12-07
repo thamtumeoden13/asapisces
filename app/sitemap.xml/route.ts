@@ -3,7 +3,7 @@ import { CONSTRUCTION_BY_SLUG_QUERY, PROJECT_DETAILS_BY_QUERY, PROJECTS_BY_QUERY
 import { ProjectDetail } from "@/sanity/types";
 import { getServerSideSitemap } from 'next-sitemap'
 
-const baseUrl = 'https://artsunday.vn';
+const baseUrl = 'https://asapisces.com';
 
 // Định nghĩa kiểu cho các đối tượng trả về
 type PostType = Pick<ProjectDetail, "slug" | "_updatedAt">;

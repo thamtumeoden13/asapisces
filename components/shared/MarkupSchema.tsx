@@ -25,7 +25,7 @@ export default function MarkupSchema({ path, post, }: { path: string, post?: any
     "dateModified": "2024-12-08",
     "mainEntityOfPage": {
       "@type": "WebPage",
-      "@id": `https://artsunday.vn/${path}`
+      "@id": `https://asapisces.com/${path}`
     },
     "articleBody": post?.subtitle || "Kiến Trúc, Xây Dựng Bình Dương | ART SUNDAY",
     "description": post?.description || "Thiết Kế Và Thi Công Kiến Trúc: Nhà Phố, Biệt Thự, Khách Sạn, Nhà Thờ, Nhà Giáo Lý Và Nội Thất Chuyên Nghiệp"

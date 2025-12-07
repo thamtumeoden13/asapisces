@@ -16,12 +16,12 @@ const Layout = async ({ children }: { children: ReactNode }) => {
         <div className="auth-box">
           <div className="flex flex-row items-center justify-center gap-3">
             <Image
-              src="/images/artsunday.png"
+              src="/images/4-small.png"
               alt="logo"
               width={64}
               height={64}
             />
-            <h1 className="text-2xl font-semibold text-white">Art Sunday</h1>
+            <h1 className="text-2xl font-semibold text-white">As a Pisces</h1>
           </div>
 
           <div>{children}</div>

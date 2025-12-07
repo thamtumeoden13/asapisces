@@ -36,7 +36,7 @@ const SimpleCard = ({ post, path, className }: { post: SimpleCardType, path: str
       <Link href={`/${path}/${slug?.current}`}>
         <CloudinaryImage
           src={thumbnail!}
-          alt={subtitle ?? "Art Sunday"}
+          alt={subtitle ?? "As a Pisces"}
           width={500}
           height={500}
           className={"simple-card_img"}

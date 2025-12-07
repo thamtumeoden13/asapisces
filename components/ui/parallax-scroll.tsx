@@ -189,7 +189,7 @@ export const ParallaxScroll = ({
                   className="h-[414px] w-full object-cover object-left-top rounded-lg gap-5 !m-0 !p-0"
                   height="400"
                   width="400"
-                  alt={el.subtitle ?? "Art Sunday"}
+                  alt={el.subtitle ?? "As a Pisces"}
                 />
               </motion.div>
             ))}
@@ -207,7 +207,7 @@ export const ParallaxScroll = ({
                   className="h-[414px] w-full object-cover object-left-top rounded-lg gap-10 !m-0 !p-0"
                   height="400"
                   width="400"
-                  alt={el.subtitle ?? "Art Sunday"}
+                  alt={el.subtitle ?? "As a Pisces"}
                 />
               </motion.div>
             ))}
@@ -225,7 +225,7 @@ export const ParallaxScroll = ({
                   className="h-[414px] w-full object-cover object-left-top rounded-lg gap-10 !m-0 !p-0"
                   height="400"
                   width="400"
-                  alt={el.subtitle ?? "Art Sunday"}
+                  alt={el.subtitle ?? "As a Pisces"}
                 />
               </motion.div>
             ))}

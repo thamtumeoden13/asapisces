@@ -54,7 +54,6 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
 
   return (
     <section className="mx-auto px-14 flex flex-col gap-8 bg-background h-full w-full max-w-[1440px] pt-10 max-sm:px-2">
-      {/* --- BƯỚC 3: THÊM BANNER HIỂN THỊ STREAK --- */}
       <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-100">
         <CardContent className="flex flex-col items-center justify-between gap-4 p-6 md:flex-row">
           <div>
@@ -67,19 +66,15 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
                 : "Start a session today to build your practice habit."}
             </p>
           </div>
-          {/* Truyền dữ liệu vào component StreakDisplay */}
           <StreakDisplay
             streak={streakData.streak}
             practicedToday={streakData.practicedToday}
           />
         </CardContent>
       </Card>
-      {/* --- KẾT THÚC BANNER --- */}
 
-      {/* --- KHU VỰC "RESUME" --- */}
       {mostRecentCompanion && <ResumeCard companion={mostRecentCompanion} />}
 
-      {/* --- KHU VỰC "POPULAR THIS WEEK" --- */}
       {popularCompanions.length > 0 && (
         <div>
           <h2 className="mb-4 text-2xl font-bold text-black-100">
@@ -89,7 +84,6 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
         </div>
       )}
 
-      {/* --- KHU VỰC "NEWLY ADDED" --- */}
       {newestCompanions.length > 0 && (
         <div>
           <h2 className="mb-4 text-2xl font-bold text-black-100">
@@ -99,7 +93,6 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
         </div>
       )}
 
-      {/* --- THÊM QUICK FILTERS VÀO ĐÂY --- */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between w-full gap-4 max-sm:flex-col">
           <h1 className="text-3xl font-bold text-black-200">

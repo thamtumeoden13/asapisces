@@ -69,7 +69,7 @@ const Navbar = () => {
                     <div
                         className="flex items-center gap-7"
                     >
-                        <img src="/images/artsunday.png" alt="logo" className='w-10' />
+                        <img src="/assets/4-small.png" alt="logo" className='w-10' />
 
                         {/* <Button
                             id='product-button'

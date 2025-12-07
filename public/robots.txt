@@ -5,7 +5,7 @@ Disallow: /auth/
 Disallow: /_next/static/media/
 
 # Host
-Host: https://artsunday.vn/
+Host: https://asapisces.com/
 
 # Sitemaps
-Sitemap: https://artsunday.vn/sitemap.xml
+Sitemap: https://asapisces.com/sitemap.xml

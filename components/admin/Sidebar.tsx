@@ -17,14 +17,14 @@ const Sidebar = ({ user }: { user: User }) => {
       <div>
         <div className="logo">
           <Image
-            src="/images/artsunday.png"
-            alt="Art Sunday"
+            src="/assets/4-small.png"
+            alt="As a Pisces"
             className="object-contain"
             width={42}
             height={42}
           />
 
-          <h1>Art Sunday</h1>
+          <h1>As a Pisces</h1>
         </div>
 
         <div className="flex flex-col gap-5 mt-10">

@@ -42,7 +42,7 @@ export const FocusCard = React.memo(
           className="h-[414px] w-full object-cover object-left-top rounded-lg "
           height="400"
           width="400"
-          alt={card.subtitle || "Art Sunday"}
+          alt={card.subtitle || "As a Pisces"}
         />
         <div
           className={cn(
