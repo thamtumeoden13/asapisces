@@ -1,8 +1,5 @@
 import { getCurrentUser } from "@/lib/actions/auth.action";
-import {
-  getFeedbackByInterviewId,
-  getInterviewById,
-} from "@/lib/actions/general.action";
+import { getInterviewById } from "@/lib/actions/general.action";
 import { redirect } from "next/navigation";
 import React from "react";
 import Image from "next/image";
@@ -10,6 +7,7 @@ import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { RouteParams } from "@/types";
+import { getFeedbackByInterviewId } from "@/lib/actions/feedback.action";
 
 const Page = async ({ params }: RouteParams) => {
   const { id } = await params;
@@ -26,7 +24,7 @@ const Page = async ({ params }: RouteParams) => {
     userId: user!.id!,
   });
 
-  console.log({feedback})
+  console.log({ feedback });
 
   return (
     <div className="flex flex-col gap-12 px-16 mx-auto my-16 max-w-7xl max-sm:px-4 max-sm:my-8">

@@ -1594,3 +1594,5 @@ export const ROLE_PERMISSIONS = {
     UNLIMITED_CREDITS: false,
   },
 };
+
+export const ONE_WEEK_IN_SECONDS = 60 * 60 * 24 * 7;

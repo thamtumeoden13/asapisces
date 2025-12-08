@@ -5,6 +5,7 @@ import { z } from "zod";
 import { supabase } from "../supabase/server";
 import { auth } from "@/auth";
 import { conversationFeedbackSchema } from "../zodSchema";
+import { Feedback, GetFeedbackByInterviewIdParams } from "@/types";
 
 type FeedbackData = z.infer<typeof conversationFeedbackSchema>;
 
@@ -141,4 +142,34 @@ export const getCompletedTopicForCompanion = async (
     console.error("Error in getCompletedTopicForCompanion:", error);
     return [];
   }
+};
+
+export async function getFeedbackByInterviewId(
+  params: GetFeedbackByInterviewIdParams
+): Promise<Feedback | null> {
+  const { interviewId, userId } = params;
+
+  const { data, error } = await supabase
+    .from("feedbacks")
+    .select("*")
+    .eq("interview_id", interviewId)
+    .eq("user_id", userId)
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    console.error(error);
+    return null;
+  }
+
+  return {
+    id: data?.id,
+    interviewId: data?.interview_id,
+    totalScore: data?.total_score,
+    categoryScores: data?.category_scores,
+    strengths: data?.strengths,
+    areasForImprovement: data?.areas_for_improvement,
+    finalAssessment: data?.final_assessment,
+    createdAt: data?.created_at,
+  } as Feedback;
 }

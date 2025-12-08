@@ -5,8 +5,6 @@ import { generateObject } from "ai";
 import { supabase } from "../supabase/server";
 import {
   CreateFeedbackParams,
-  Feedback,
-  GetFeedbackByInterviewIdParams,
   GetLatestInterviewsParams,
   Interview,
   TopicConfig,
@@ -22,9 +20,12 @@ import {
   smartRetrySchema,
   topicConfigGenerationSchema,
 } from "../zodSchema";
-import { CREDIT_COSTS, subjects } from "@/constants";
+import { CREDIT_COSTS, ONE_WEEK_IN_SECONDS, subjects } from "@/constants";
 
 import { withCreditCheck } from "./credits.action";
+
+import { cache } from "@/lib/cache";
+import crypto from "crypto";
 
 export async function getInterviewByUserId(
   userId: string
@@ -182,36 +183,6 @@ export async function createFeedback(params: CreateFeedbackParams) {
   });
 }
 
-export async function getFeedbackByInterviewId(
-  params: GetFeedbackByInterviewIdParams
-): Promise<Feedback | null> {
-  const { interviewId, userId } = params;
-
-  const { data, error } = await supabase
-    .from("feedbacks")
-    .select("*")
-    .eq("interview_id", interviewId)
-    .eq("user_id", userId)
-    .limit(1)
-    .single();
-
-  if (error || !data) {
-    console.error(error);
-    return null;
-  }
-
-  return {
-    id: data?.id,
-    interviewId: data?.interview_id,
-    totalScore: data?.total_score,
-    categoryScores: data?.category_scores,
-    strengths: data?.strengths,
-    areasForImprovement: data?.areas_for_improvement,
-    finalAssessment: data?.final_assessment,
-    createdAt: data?.created_at,
-  } as Feedback;
-}
-
 // Định nghĩa kiểu cho params
 interface CreateLanguageFeedbackParams {
   sessionId: string; // Có thể là companionId + topic
@@ -222,9 +193,7 @@ interface CreateLanguageFeedbackParams {
 }
 
 // 2. SỬA ĐỔI HÀM createFeedback
-export async function createLanguageFeedback(
-  params: CreateLanguageFeedbackParams
-) {
+async function _createLanguageFeedback(params: CreateLanguageFeedbackParams) {
   return withCreditCheck(CREDIT_COSTS.GEMINI_PRO_FEEDBACK, async () => {
     const { transcript, script, userRole } = params;
 
@@ -404,7 +373,7 @@ export async function askAboutConversationAction(data: AskData): Promise<{
 type SmartRetryData = z.infer<typeof smartRetrySchema>;
 
 // --- SERVER ACTION MỚI ---
-export async function getSmartRetryFeedbackAction(
+async function _getSmartRetryFeedback(
   data: SmartRetryData
 ): Promise<{ success: boolean; feedbackMessage?: string; error?: string }> {
   const validation = smartRetrySchema.safeParse(data);
@@ -464,9 +433,7 @@ interface GenerateTopicsParams {
   rawTranscript: string;
 }
 
-export async function generateTopicConfigAction(
-  params: GenerateTopicsParams
-): Promise<{
+async function _generateTopicConfig(params: GenerateTopicsParams): Promise<{
   success: boolean;
   data?: TopicConfig[];
   error?: string;
@@ -525,7 +492,7 @@ interface GenerateDetailsParams {
   rawTranscript: string;
 }
 
-export async function generateCompanionDetailsAction(
+async function _generateCompanionDetails(
   params: GenerateDetailsParams
 ): Promise<{
   success: boolean;
@@ -576,3 +543,39 @@ export async function generateCompanionDetailsAction(
     }
   });
 }
+
+// --- CÁC HÀM ĐÃ ĐƯỢC CACHE (HÀM SẼ ĐƯỢC EXPORT) ---
+
+// Helper để tạo hash từ object
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createHash = (obj: any) =>
+  crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
+
+export const createLanguageFeedback = cache(
+  _createLanguageFeedback,
+  (params) =>
+    createHash({
+      transcript: params.transcript,
+      script: params.script,
+      userRole: params.userRole,
+    }),
+  { keyPrefix: "language-feedback", expiration: ONE_WEEK_IN_SECONDS }
+);
+
+export const getSmartRetryFeedbackAction = cache(
+  _getSmartRetryFeedback,
+  (data) => `${data.expectedSentence}:${data.userSentence}`, // Key đơn giản
+  { keyPrefix: "smart-retry", expiration: ONE_WEEK_IN_SECONDS }
+);
+
+export const generateTopicConfigAction = cache(
+  _generateTopicConfig,
+  (params) => createHash(params.rawTranscript), // Hash transcript để làm key
+  { keyPrefix: "topic-config", expiration: ONE_WEEK_IN_SECONDS }
+);
+
+export const generateCompanionDetailsAction = cache(
+  _generateCompanionDetails,
+  (params) => createHash(params.rawTranscript), // Hash transcript để làm key
+  { keyPrefix: "companion-details", expiration: ONE_WEEK_IN_SECONDS }
+);
