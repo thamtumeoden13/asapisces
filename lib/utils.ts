@@ -4,6 +4,7 @@ import { CreateAssistantDTO } from "@vapi-ai/web/dist/api";
 import { clsx, type ClassValue } from "clsx";
 import MarkdownIt from "markdown-it";
 import { twMerge } from "tailwind-merge";
+import crypto from "crypto";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -374,3 +375,16 @@ export const configureAssistant = (voice: string, style: string) => {
   };
   return vapiAssistant;
 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const createHash = (obj: any) =>
+  crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
+
+// SỬA LẠI HÀM HELPER
+export const createHashFromString = (input: string) =>
+  crypto.createHash("sha256").update(input, "utf-8").digest("hex");
+
+// Bạn vẫn có thể giữ lại hàm hash object nếu cần dùng ở nơi khác
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const createHashFromObject = (obj: any) =>
+  crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");

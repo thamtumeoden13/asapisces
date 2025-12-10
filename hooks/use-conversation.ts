@@ -232,63 +232,64 @@ export const useConversation = ({
 
   // 1. Hàm phát giọng nói của AI qua ElevenLabs
   const speakAIByElevenLabs = useCallback(
-    async (text: string) => {
+    (text: string) => {
       if (!voiceId) {
         console.error("ElevenLabs voiceId is required.");
-        return;
+        // Trả về một Promise đã bị reject ngay lập tức
+        return Promise.reject(
+          new Error("ElevenLabs voiceId is not configured.")
+        );
       }
 
       return new Promise<void>(async (resolve, reject) => {
         if (!text) return resolve();
         setIsSpeaking(true);
+        try {
+          const result = await generateSpeechAction(text, voiceId);
 
-        const result = await generateSpeechAction(text, voiceId);
+          if (!result.success || !result.audioUrl) {
+            // Ném lỗi để khối catch bên dưới xử lý
+            throw new Error(result.error || "Failed to get audio URL.");
+          }
 
-        if (result.success && result.audioBuffer) {
-          // Chuyển ArrayBuffer thành Blob URL để thẻ <audio> có thể phát
-          const audioBlob = new Blob([result.audioBuffer], {
-            type: "audio/mpeg",
-          });
-          const audioUrl = URL.createObjectURL(audioBlob);
-
-          if (!audioPlayerRef.current) audioPlayerRef.current = new Audio();
+          // 2. Phát audio từ URL nhận được
+          if (!audioPlayerRef.current) {
+            audioPlayerRef.current = new Audio();
+          }
           const player = audioPlayerRef.current;
-          player.src = audioUrl;
+          player.src = result.audioUrl;
+
+          // Xóa các event listener cũ để tránh bị gọi nhiều lần
+          player.onended = null;
+          player.onerror = null;
+
           player.onended = () => {
             setIsSpeaking(false);
-            URL.revokeObjectURL(audioUrl); // Dọn dẹp URL
             resolve();
           };
+
           player.onerror = (e) => {
             console.error("Audio playback error:", e);
             setIsSpeaking(false);
-            URL.revokeObjectURL(audioUrl);
+            // Vẫn resolve để không làm treo cuộc gọi, nhưng log lỗi
+            // Hoặc bạn có thể reject nếu muốn dừng cuộc gọi khi audio lỗi
             reject(new Error("Audio playback failed."));
           };
 
-          try {
-            await player.play();
-          } catch (playError) {
-            console.error("Audio play() failed:", playError);
-            setIsSpeaking(false);
-            URL.revokeObjectURL(audioUrl);
-            reject(
-              new Error(
-                "Could not play audio. User interaction might be required."
-              )
-            );
-          }
-        } else {
-          console.error("Failed to generate speech:", result.error);
-          // Tùy chọn: bạn có thể fallback về WebSpeech API ở đây
-          // await speakAIByWebSpeechAPI(text);
+          await player.play();
+        } catch (error) {
+          // 3. Bắt tất cả các lỗi (từ generateSpeechAction hoặc player.play())
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : "An unknown speech error occurred.";
+          console.error("Failed to speak with ElevenLabs:", errorMessage);
+
           setIsSpeaking(false);
-          reject(
-            new Error(
-              result.error ||
-                "Failed to generate speech due to an unknown error."
-            )
-          );
+
+          // Reject Promise để `useEffect` trung tâm có thể bắt và xử lý
+          // (ví dụ: hiển thị toast và endCall)
+          reject(new Error(errorMessage));
         }
       });
     },

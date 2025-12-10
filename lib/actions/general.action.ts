@@ -24,8 +24,12 @@ import { CREDIT_COSTS, ONE_WEEK_IN_SECONDS, subjects } from "@/constants";
 
 import { withCreditCheck } from "./credits.action";
 
-import { cache } from "@/lib/cache";
-import crypto from "crypto";
+import {
+  createHashFromObject,
+  createHashFromString,
+} from "../utils";
+
+import { kv } from "@/lib/redis";
 
 export async function getInterviewByUserId(
   userId: string
@@ -193,8 +197,25 @@ interface CreateLanguageFeedbackParams {
 }
 
 // 2. SỬA ĐỔI HÀM createFeedback
-async function _createLanguageFeedback(params: CreateLanguageFeedbackParams) {
+export async function createLanguageFeedback(
+  params: CreateLanguageFeedbackParams
+) {
   return withCreditCheck(CREDIT_COSTS.GEMINI_PRO_FEEDBACK, async () => {
+    const cacheKey = `feedback:${createHashFromObject({ transcript: params.transcript, script: params.script, userRole: params.userRole })}`;
+
+    try {
+      const cachedResult = await kv.get(cacheKey);
+      if (cachedResult) {
+        console.log(`[CACHE] HIT for key: ${cacheKey}`);
+        // Ensure the cached result always has the required 'success' property
+        return { success: true, ...cachedResult };
+      }
+    } catch (error) {
+      console.error("[CACHE] Redis GET error:", error);
+    }
+
+    console.log(`[CACHE] MISS for key: ${cacheKey}`);
+
     const { transcript, script, userRole } = params;
 
     try {
@@ -278,12 +299,15 @@ async function _createLanguageFeedback(params: CreateLanguageFeedbackParams) {
       feedbackId: data?.[0]?.id,
     };
     */
+      const result = { feedback: feedbackData };
+
+      // Lưu vào cache
+      kv.set(cacheKey, result, { ex: ONE_WEEK_IN_SECONDS }).catch((err) =>
+        console.error("[CACHE] Redis SET error:", err)
+      );
 
       // Tạm thời trả về dữ liệu mà không lưu DB để test
-      return {
-        success: true,
-        feedback: feedbackData,
-      };
+      return { success: true, feedback: feedbackData };
     } catch (error) {
       console.error("Error generating feedback:", error);
       return { success: false, feedback: null };
@@ -373,7 +397,7 @@ export async function askAboutConversationAction(data: AskData): Promise<{
 type SmartRetryData = z.infer<typeof smartRetrySchema>;
 
 // --- SERVER ACTION MỚI ---
-async function _getSmartRetryFeedback(
+export async function getSmartRetryFeedbackAction(
   data: SmartRetryData
 ): Promise<{ success: boolean; feedbackMessage?: string; error?: string }> {
   const validation = smartRetrySchema.safeParse(data);
@@ -390,6 +414,20 @@ async function _getSmartRetryFeedback(
       feedbackMessage: `Let's try the full sentence: "${expectedSentence}"`,
     };
   }
+  const cacheKey = `smart-retry:${data.expectedSentence}:${data.userSentence}`;
+
+  try {
+    const cachedResult = await kv.get(cacheKey);
+    if (cachedResult) {
+      console.log(`[CACHE] HIT for key: ${cacheKey}`);
+      return { success: true, ...cachedResult };
+    }
+  } catch (error) {
+    console.error("[CACHE] Redis GET error:", error);
+  }
+
+  console.log(`[CACHE] MISS for key: ${cacheKey}`);
+
   return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
     const prompt = `
     As an AI English coach, analyze the difference between what a student was supposed to say and what they actually said. Your goal is to identify one key area for improvement and provide a positive opening phrase.
@@ -415,6 +453,11 @@ async function _getSmartRetryFeedback(
 
       // --- XÂY DỰNG CÂU PHẢN HỒI CUỐI CÙNG TỪ OBJECT ---
       const feedbackMessage = `${aiFeedback.encouragingPhrase} Let's focus on ${aiFeedback.focusPoint}. Try saying the full sentence: "${expectedSentence}"`;
+      const result = { feedbackMessage };
+
+      kv.set(cacheKey, result, { ex: ONE_WEEK_IN_SECONDS }).catch((err) =>
+        console.error("[CACHE] Redis SET error:", err)
+      );
 
       return { success: true, feedbackMessage };
     } catch (error) {
@@ -433,7 +476,9 @@ interface GenerateTopicsParams {
   rawTranscript: string;
 }
 
-async function _generateTopicConfig(params: GenerateTopicsParams): Promise<{
+export async function generateTopicConfigAction(
+  params: GenerateTopicsParams
+): Promise<{
   success: boolean;
   data?: TopicConfig[];
   error?: string;
@@ -443,6 +488,21 @@ async function _generateTopicConfig(params: GenerateTopicsParams): Promise<{
   if (!rawTranscript || rawTranscript.trim().length < 100) {
     return { success: false, error: "Transcript is too short to process." };
   }
+
+  const cacheKey = `topic-config:${createHashFromString(params.rawTranscript)}`;
+
+  try {
+    const cachedResult = await kv.get(cacheKey);
+    if (cachedResult) {
+      console.log(`[CACHE] HIT for key: ${cacheKey}`);
+      return { success: true, ...cachedResult };
+    }
+  } catch (error) {
+    console.error("[CACHE] Redis GET error:", error);
+  }
+
+  console.log(`[CACHE] MISS for key: ${cacheKey}`);
+
   return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
     const prompt = `
     You are an expert AI assistant that processes podcast transcripts for educational use. Your primary goal is to divide a long transcript into smaller, logical, and well-sized topics.
@@ -477,6 +537,12 @@ async function _generateTopicConfig(params: GenerateTopicsParams): Promise<{
         keyword: item.keyword,
       }));
 
+      const result = { data: validatedData };
+
+      kv.set(cacheKey, result, { ex: ONE_WEEK_IN_SECONDS }).catch((err) =>
+        console.error("[CACHE] Redis SET error:", err)
+      );
+
       return { success: true, data: validatedData };
     } catch (error) {
       console.error("AI SDK Error in generateTopicConfigAction:", error);
@@ -492,7 +558,7 @@ interface GenerateDetailsParams {
   rawTranscript: string;
 }
 
-async function _generateCompanionDetails(
+export async function generateCompanionDetailsAction(
   params: GenerateDetailsParams
 ): Promise<{
   success: boolean;
@@ -504,6 +570,21 @@ async function _generateCompanionDetails(
   if (!rawTranscript || rawTranscript.trim().length < 100) {
     return { success: false, error: "Transcript is too short to analyze." };
   }
+
+  const cacheKey = `companion-details:${createHashFromString(params.rawTranscript)}`;
+
+  try {
+    const cachedResult = await kv.get(cacheKey);
+    if (cachedResult) {
+      console.log(`[CACHE] HIT for key: ${cacheKey}`);
+      return { success: true, ...cachedResult };
+    }
+  } catch (error) {
+    console.error("[CACHE] Redis GET error:", error);
+  }
+
+  console.log(`[CACHE] MISS for key: ${cacheKey}`);
+
   return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
     const prompt = `
     You are a helpful AI assistant skilled at analyzing and summarizing content. Your task is to read the following podcast transcript and generate key metadata for it.
@@ -533,6 +614,12 @@ async function _generateCompanionDetails(
           "You are an AI assistant that provides structured JSON output based on a transcript.",
       });
 
+      const result = { data: generatedDetails };
+
+      kv.set(cacheKey, result, { ex: ONE_WEEK_IN_SECONDS }).catch((err) =>
+        console.error("[CACHE] Redis SET error:", err)
+      );
+
       return { success: true, data: generatedDetails };
     } catch (error) {
       console.error("AI SDK Error in generateCompanionDetailsAction:", error);
@@ -543,39 +630,3 @@ async function _generateCompanionDetails(
     }
   });
 }
-
-// --- CÁC HÀM ĐÃ ĐƯỢC CACHE (HÀM SẼ ĐƯỢC EXPORT) ---
-
-// Helper để tạo hash từ object
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createHash = (obj: any) =>
-  crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
-
-export const createLanguageFeedback = cache(
-  _createLanguageFeedback,
-  (params) =>
-    createHash({
-      transcript: params.transcript,
-      script: params.script,
-      userRole: params.userRole,
-    }),
-  { keyPrefix: "language-feedback", expiration: ONE_WEEK_IN_SECONDS }
-);
-
-export const getSmartRetryFeedbackAction = cache(
-  _getSmartRetryFeedback,
-  (data) => `${data.expectedSentence}:${data.userSentence}`, // Key đơn giản
-  { keyPrefix: "smart-retry", expiration: ONE_WEEK_IN_SECONDS }
-);
-
-export const generateTopicConfigAction = cache(
-  _generateTopicConfig,
-  (params) => createHash(params.rawTranscript), // Hash transcript để làm key
-  { keyPrefix: "topic-config", expiration: ONE_WEEK_IN_SECONDS }
-);
-
-export const generateCompanionDetailsAction = cache(
-  _generateCompanionDetails,
-  (params) => createHash(params.rawTranscript), // Hash transcript để làm key
-  { keyPrefix: "companion-details", expiration: ONE_WEEK_IN_SECONDS }
-);
