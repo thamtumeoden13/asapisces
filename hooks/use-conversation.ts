@@ -694,7 +694,7 @@ export const useConversation = ({
         return;
       }
 
-      const isAITurn = line.speaker !== userRole;
+      const isAITurn = line.speaker?.trim() !== userRole.trim();
 
       if (isAITurn) {
         console.log(`🗣️ AI's turn (as ${line.speaker})`);
