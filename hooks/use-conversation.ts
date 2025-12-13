@@ -365,11 +365,11 @@ export const useConversation = ({
       const expectedLine = steps[currentState.currentStep];
       dispatch({ type: "START_PROCESSING_SPEECH" });
 
-      if (!expectedLine || expectedLine.speaker !== userRole) {
+      if (!expectedLine || expectedLine.speaker?.trim() !== userRole.trim()) {
         console.warn(
           "Received user speech when it's not the user's turn or no expected line."
         );
-        // dispatch({ type: "STOP_PROCESSING_SPEECH" });
+        dispatch({ type: "STOP_PROCESSING_SPEECH" });
         return;
       }
 

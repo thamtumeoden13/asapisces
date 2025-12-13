@@ -24,10 +24,7 @@ import { CREDIT_COSTS, ONE_WEEK_IN_SECONDS, subjects } from "@/constants";
 
 import { withCreditCheck } from "./credits.action";
 
-import {
-  createHashFromObject,
-  createHashFromString,
-} from "../utils";
+import { createHashFromObject, createHashFromString } from "../utils";
 
 import { kv } from "@/lib/redis";
 
@@ -133,7 +130,7 @@ export async function createFeedback(params: CreateFeedbackParams) {
           finalAssessment,
         },
       } = await generateObject({
-        model: google("gemini-2.0-flash-001", {
+        model: google("gemini-2.5-flash", {
           structuredOutputs: false,
         }),
         schema: feedbackSchema,
@@ -237,7 +234,7 @@ export async function createLanguageFeedback(
       const aiCompanionRole = userRole === "Leo" ? "Gwen" : "Leo";
 
       const { object: feedbackData } = await generateObject({
-        model: google("gemini-2.5-pro"), // Sử dụng model mới hơn nếu có thể
+        model: google("gemini-2.5-flash"), // Sử dụng model mới hơn nếu có thể
         schema: languageFeedbackSchema,
         prompt: `
         You are an expert AI English tutor. Your task is to provide constructive and encouraging feedback to a student who has just completed a conversation practice session.
@@ -377,7 +374,7 @@ export async function askAboutConversationAction(data: AskData): Promise<{
     try {
       // --- SỬ DỤNG generateObject ---
       const { object: answerObject } = await generateObject({
-        model: google("gemini-1.5-flash-latest"),
+        model: google("gemini-2.5-flash"),
         schema: aiTutorResponseSchema, // Cung cấp schema cho AI
         prompt: prompt,
         system: `You are an AI English language tutor. The user you are evaluating was playing the role of ${userRole}. You must respond in a structured JSON format.`,
@@ -429,26 +426,38 @@ export async function getSmartRetryFeedbackAction(
   console.log(`[CACHE] MISS for key: ${cacheKey}`);
 
   return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    //   const prompt = `
+    //   As an AI English coach, analyze the difference between what a student was supposed to say and what they actually said. Your goal is to identify one key area for improvement and provide a positive opening phrase.
+
+    //   **Context:**
+    //   - Expected Sentence: "${expectedSentence}"
+    //   - Student's Sentence: "${userSentence}"
+
+    //   **Your Task:**
+    //   Based on the comparison, provide a structured JSON object with two fields:
+    //   1.  'focusPoint': Identify the single most important word or short phrase the user needs to work on. Be specific (e.g., 'the word example', 'pronunciation of 'track'', 'the phrase 'fall flat'').
+    //   2.  'encouragingPhrase': Provide a short, positive opening phrase (e.g., 'Almost there!', 'Great effort!', 'You're close!').
+    // `;
+
     const prompt = `
-    As an AI English coach, analyze the difference between what a student was supposed to say and what they actually said. Your goal is to identify one key area for improvement and provide a positive opening phrase.
-
-    **Context:**
-    - Expected Sentence: "${expectedSentence}"
-    - Student's Sentence: "${userSentence}"
-
-    **Your Task:**
-    Based on the comparison, provide a structured JSON object with two fields:
-    1.  'focusPoint': Identify the single most important word or short phrase the user needs to work on. Be specific (e.g., 'the word example', 'pronunciation of 'track'', 'the phrase 'fall flat'').
-    2.  'encouragingPhrase': Provide a short, positive opening phrase (e.g., 'Almost there!', 'Great effort!', 'You're close!').
-  `;
+    Compare user's speech vs expected text.
+    Expected: "${expectedSentence}"
+    User said: "${userSentence}"
+    
+    Task:
+    1. Identify ONE mistake (word/pronunciation).
+    2. Create a very short encouraging phrase (2-3 words).
+    Return JSON.
+    `;
 
     try {
       // --- SỬ DỤNG generateObject ---
       const { object: aiFeedback } = await generateObject({
-        model: google("gemini-1.5-flash-latest"),
+        model: google("gemini-2.5-flash"),
         schema: smartRetryResponseSchema,
         prompt: prompt,
-        system: "You are an AI English coach that responds in structured JSON.",
+        // system: "You are an AI English coach that responds in structured JSON.",
+        system: "You are a helpful English coach. Output JSON only.",
       });
 
       // --- XÂY DỰNG CÂU PHẢN HỒI CUỐI CÙNG TỪ OBJECT ---
@@ -459,7 +468,7 @@ export async function getSmartRetryFeedbackAction(
         console.error("[CACHE] Redis SET error:", err)
       );
 
-      return { success: true, feedbackMessage };
+      return { success: true, ...result };
     } catch (error) {
       console.error("AI SDK error in getSmartRetryFeedbackAction:", error);
       // Fallback nếu AI gặp lỗi
@@ -524,7 +533,7 @@ export async function generateTopicConfigAction(
 
     try {
       const { object: generatedConfig } = await generateObject({
-        model: google("gemini-2.5-pro"),
+        model: google("gemini-2.5-flash"),
         schema: topicConfigGenerationSchema,
         prompt,
         system:
@@ -607,7 +616,7 @@ export async function generateCompanionDetailsAction(
 
     try {
       const { object: generatedDetails } = await generateObject({
-        model: google("gemini-1.5-flash-latest"),
+        model: google("gemini-2.5-flash"),
         schema: companionDetailsGenerationSchema,
         prompt,
         system:
