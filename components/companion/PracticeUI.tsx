@@ -7,6 +7,7 @@ import { ProgressOverview } from "./ProgressOverview";
 import { getFeedbackHistoryForTopic } from "@/lib/actions/feedback.action";
 import { useEffect, useState } from "react";
 import { CompanionComponentProps } from "@/types";
+import { WeaknessProfile } from "./WeaknessProfile";
 
 export const PracticeUI = (props: CompanionComponentProps) => {
   // Truyền các props chưa dùng đến
@@ -31,8 +32,11 @@ export const PracticeUI = (props: CompanionComponentProps) => {
     <>
       <ProgressOverview />
       <div className="flex flex-col gap-8">
-        <div className="w-full mx-auto max-w-7xl">
-          <SettingsPanel />
+        <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+          <div className="lg:col-span-2">
+            <SettingsPanel />
+          </div>
+          <WeaknessProfile />
         </div>
 
         <div className="">

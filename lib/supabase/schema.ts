@@ -105,19 +105,6 @@ export const companions = pgTable(
 
     index("idx_companions_author_type").on(t.author, t.type),
   ]
-  // (table) => {
-  //   // Định nghĩa các index bên trong một callback function
-  //   return {
-  //     // create index IF not exists idx_companions_type ...
-  //     typeIndex: index("idx_companions_type").on(table.type),
-
-  //     // create index IF not exists idx_companions_author_type ...
-  //     authorTypeIndex: index("idx_companions_author_type").on(
-  //       table.author,
-  //       table.type
-  //     ),
-  //   };
-  // }
 );
 
 export const conversationFeedbacks = pgTable("conversation_feedbacks", {
@@ -196,5 +183,21 @@ export const cachedAudios = pgTable("cached_audios", {
     .notNull()
     .defaultNow(),
 });
+
+export const userPronunciationErrors = pgTable(
+  "user_pronunciation_errors",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    word: text("word").notNull(),
+    errorCount: integer("error_count").notNull().default(1),
+    lastOccurredAt: timestamp("last_occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("idx_user_pronunciation_errors_user_id").on(t.userId)]
+);
 
 export const cachedAudiosRelations = relations(cachedAudios, ({}) => ({}));

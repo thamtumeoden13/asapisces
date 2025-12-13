@@ -396,7 +396,13 @@ type SmartRetryData = z.infer<typeof smartRetrySchema>;
 // --- SERVER ACTION MỚI ---
 export async function getSmartRetryFeedbackAction(
   data: SmartRetryData
-): Promise<{ success: boolean; feedbackMessage?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  // Trả về cả 2 trường này
+  encouragingPhrase?: string;
+  focusPoint?: string;
+  error?: string;
+}> {
   const validation = smartRetrySchema.safeParse(data);
   if (!validation.success) {
     return { success: false, error: "Invalid data for smart retry." };
@@ -408,7 +414,8 @@ export async function getSmartRetryFeedbackAction(
   if (userSentence.split(/\s+/).length < 2) {
     return {
       success: true,
-      feedbackMessage: `Let's try the full sentence: "${expectedSentence}"`,
+      encouragingPhrase: "Keep trying!",
+      focusPoint: "Try to say more than one word.",
     };
   }
   const cacheKey = `smart-retry:${data.expectedSentence}:${data.userSentence}`;
@@ -461,21 +468,27 @@ export async function getSmartRetryFeedbackAction(
       });
 
       // --- XÂY DỰNG CÂU PHẢN HỒI CUỐI CÙNG TỪ OBJECT ---
-      const feedbackMessage = `${aiFeedback.encouragingPhrase} Let's focus on ${aiFeedback.focusPoint}. Try saying the full sentence: "${expectedSentence}"`;
-      const result = { feedbackMessage };
+      const result = {
+        encouragingPhrase: aiFeedback.encouragingPhrase,
+        focusPoint: aiFeedback.focusPoint,
+      };
 
       kv.set(cacheKey, result, { ex: ONE_WEEK_IN_SECONDS }).catch((err) =>
         console.error("[CACHE] Redis SET error:", err)
       );
 
-      return { success: true, ...result };
+      return {
+        success: true,
+        ...result,
+      };
     } catch (error) {
       console.error("AI SDK error in getSmartRetryFeedbackAction:", error);
       // Fallback nếu AI gặp lỗi
       return {
         success: false,
         error: "AI feedback is unavailable, using default message.",
-        feedbackMessage: "",
+        encouragingPhrase: "",
+        focusPoint: "",
       };
     }
   });
@@ -636,6 +649,50 @@ export async function generateCompanionDetailsAction(
         success: false,
         error: "Failed to generate details using AI. Please try again.",
       };
+    }
+  });
+}
+
+interface FreestyleChatParams {
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  topicTitle: string;
+}
+
+export async function freestyleChatAction(params: FreestyleChatParams) {
+  return withCreditCheck(CREDIT_COSTS.GEMINI_FLASH_ACTION, async () => {
+    const { conversationHistory, topicTitle } = params;
+
+    const formattedHistory = conversationHistory
+      .map(
+        (msg) => `${msg.role === "user" ? "Learner" : "Tutor"}: ${msg.content}`
+      )
+      .join("\n");
+
+    const prompt = `You are a friendly and encouraging AI English tutor. A student has just finished a practice session on the topic "${topicTitle}". Now, you are in a freestyle conversation with them.
+
+    Based on the conversation history below, provide a natural, engaging response to the learner's last message. Your response should be concise (1-2 sentences) and end with an open-ended question to keep the conversation going.
+    
+    Conversation History:
+    ---
+    ${formattedHistory}
+    ---
+    
+    Your response as Tutor:`;
+
+    try {
+      const { object: response } = await generateObject({
+        model: google("gemini-1.5-flash-latest"),
+        schema: z.object({
+          responseText: z
+            .string()
+            .describe("A concise, natural response ending with a question."),
+        }),
+        prompt,
+      });
+      return { responseText: response.responseText };
+    } catch (error) {
+      console.error("Freestyle chat error:", error);
+      throw new Error("AI tutor is currently unavailable.");
     }
   });
 }

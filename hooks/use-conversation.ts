@@ -23,6 +23,7 @@ import { CallStatus } from "@/types/podcast";
 import type { TimingSettings, Message, SimilarityResult } from "@/types"; // Đảm bảo Message được import từ types của bạn
 import { recordSessionStartAction } from "@/lib/actions/session.action";
 import { getSmartRetryFeedbackAction } from "@/lib/actions/general.action";
+import { recordPronunciationErrorsAction } from "@/lib/actions/analytics.action";
 import {
   LONG_SENTENCE_GRACE_PERIOD_MS_BONUS,
   LONG_SENTENCE_WORD_THRESHOLD,
@@ -389,6 +390,18 @@ export const useConversation = ({
         ...prev,
       ]);
 
+      // --- TÍCH HỢP GHI NHẬN LỖI Ở ĐÂY ---
+      if (similarityResult.words && similarityResult.words.length > 0) {
+        const incorrectWords = similarityResult.words
+          .filter((wordInfo) => !wordInfo.match)
+          .map((wordInfo) => wordInfo.word);
+
+        if (incorrectWords.length > 0) {
+          // Gọi action ở chế độ "fire-and-forget" để không làm chậm UX
+          recordPronunciationErrorsAction(incorrectWords);
+        }
+      }
+
       const shouldAdvance =
         similarityResult.score >= SHOULDADVANCESCORETHERESHOLD;
 
@@ -404,7 +417,7 @@ export const useConversation = ({
         );
         dispatch({ type: "START_PROCESSING_SPEECH" });
         dispatch({ type: "SET_AI_TURN" });
-        let retryMsg: string;
+
         const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
 
         if (geminiFeedback === "gemini" && !lowScoreThreshold) {
@@ -412,31 +425,62 @@ export const useConversation = ({
             expectedSentence: expectedLine.text,
             userSentence: transcript,
           });
-          retryMsg =
-            smartFeedbackResult.feedbackMessage ||
-            generateRetryMessage(
+
+          if (smartFeedbackResult.success && smartFeedbackResult.focusPoint) {
+            // --- LOGIC MỚI NẰM Ở ĐÂY ---
+            const encouragingPhrase =
+              smartFeedbackResult.encouragingPhrase || "Almost there!";
+            const focusPoint = smartFeedbackResult.focusPoint;
+
+            // 1. Hiển thị thông báo ban đầu
+            const initialMsg = `${encouragingPhrase} Let's focus on the phrase:`;
+            setMessages((prev) => [
+              { role: "assistant", content: initialMsg, timestamp: Date.now() },
+              ...prev,
+            ]);
+            await speakAI(initialMsg);
+
+            // 2. Phát âm mẫu cụm từ cần tập trung
+            const focusMsg = `"${focusPoint}"`;
+            setMessages((prev) => [
+              { role: "assistant", content: focusMsg, timestamp: Date.now() },
+              ...prev,
+            ]);
+            await speakAI(focusPoint); // Chỉ nói cụm từ này
+
+            // 3. Đưa ra câu đầy đủ để người dùng thử lại
+            const finalMsg = `Now, try the full sentence: "${expectedLine.text}"`;
+            setMessages((prev) => [
+              { role: "assistant", content: finalMsg, timestamp: Date.now() },
+              ...prev,
+            ]);
+            await speakAI(finalMsg);
+          } else {
+            // Fallback về cách cũ nếu AI lỗi
+            const retryMsg = generateRetryMessage(
               expectedLine.text,
               similarityResult.score,
               transcript
             );
+            setMessages((prev) => [
+              { role: "assistant", content: retryMsg, timestamp: Date.now() },
+              ...prev,
+            ]);
+            await speakAI(retryMsg);
+          }
         } else {
-          retryMsg = generateRetryMessage(
+          const retryMsg = generateRetryMessage(
             expectedLine.text,
             similarityResult.score,
             transcript
           );
+          setMessages((prev) => [
+            { role: "assistant", content: retryMsg, timestamp: Date.now() },
+            ...prev,
+          ]);
+          await speakAI(retryMsg);
         }
 
-        setMessages((prev) => [
-          {
-            type: "assistant",
-            role: "assistant",
-            content: retryMsg,
-            timestamp: Date.now(),
-          },
-          ...prev,
-        ]);
-        await speakAI(retryMsg);
         if (turnTimeoutRef.current) {
           clearTimeout(turnTimeoutRef.current);
         }

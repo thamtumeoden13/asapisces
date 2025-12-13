@@ -33,7 +33,7 @@ const SettingsPanel = () => {
   };
 
   return (
-    <Card className="">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BookOpen className="w-5 h-5" />
