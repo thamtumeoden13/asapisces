@@ -379,16 +379,14 @@ export const useConversation = ({
         expectedLine.text,
         `step-${currentState.currentStep}`
       );
-      setMessages((prev) => [
-        {
-          type: "user",
-          role: "user",
-          content: transcript,
-          timestamp: Date.now(),
-          similarity: similarityResult,
-        },
-        ...prev,
-      ]);
+      // --- BƯỚC 1: TẠO OBJECT TIN NHẮN CỦA USER, CHƯA CẬP NHẬT STATE ---
+      const userMessage: Message = {
+        type: "user",
+        role: "user",
+        content: transcript,
+        timestamp: Date.now(),
+        similarity: similarityResult,
+      };
 
       // --- TÍCH HỢP GHI NHẬN LỖI Ở ĐÂY ---
       if (similarityResult.words && similarityResult.words.length > 0) {
@@ -409,6 +407,8 @@ export const useConversation = ({
         console.log(
           `✅ Good score on step ${currentState.currentStep}. Advancing.`
         );
+        // Nếu điểm cao, chỉ cần cập nhật tin nhắn của user và chuyển bước
+        setMessages((prev) => [userMessage, ...prev]);
 
         dispatch({ type: "ADVANCE_STEP" });
       } else {
@@ -419,6 +419,7 @@ export const useConversation = ({
         dispatch({ type: "SET_AI_TURN" });
 
         const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
+        const allAiMessages: Message[] = [];
 
         if (geminiFeedback === "gemini" && !lowScoreThreshold) {
           const smartFeedbackResult = await getSmartRetryFeedbackAction({
@@ -432,53 +433,62 @@ export const useConversation = ({
               smartFeedbackResult.encouragingPhrase || "Almost there!";
             const focusPoint = smartFeedbackResult.focusPoint;
 
-            // 1. Hiển thị thông báo ban đầu
-            const initialMsg = `${encouragingPhrase} Let's focus on the phrase:`;
-            setMessages((prev) => [
-              { role: "assistant", content: initialMsg, timestamp: Date.now() },
-              ...prev,
-            ]);
-            await speakAI(initialMsg);
+            const initialMsgText = `${encouragingPhrase} Let's focus on the phrase:`;
+            const focusMsgText = `"${focusPoint}"`;
+            const finalMsgText = `Now, try the full sentence: "${expectedLine.text}"`;
 
-            // 2. Phát âm mẫu cụm từ cần tập trung
-            const focusMsg = `"${focusPoint}"`;
-            setMessages((prev) => [
-              { role: "assistant", content: focusMsg, timestamp: Date.now() },
-              ...prev,
-            ]);
-            await speakAI(focusPoint); // Chỉ nói cụm từ này
+            // --- BƯỚC 2: TẠO CÁC OBJECT TIN NHẮN CỦA AI, CHƯA CẬP NHẬT STATE ---
+            allAiMessages.push({
+              role: "assistant",
+              content: finalMsgText,
+              timestamp: Date.now() + 1,
+            });
+            allAiMessages.push({
+              role: "assistant",
+              content: focusMsgText,
+              timestamp: Date.now() + 2,
+            });
+            allAiMessages.push({
+              role: "assistant",
+              content: initialMsgText,
+              timestamp: Date.now() + 3,
+            });
 
-            // 3. Đưa ra câu đầy đủ để người dùng thử lại
-            const finalMsg = `Now, try the full sentence: "${expectedLine.text}"`;
-            setMessages((prev) => [
-              { role: "assistant", content: finalMsg, timestamp: Date.now() },
-              ...prev,
-            ]);
-            await speakAI(finalMsg);
+            // --- BƯỚC 3: CẬP NHẬT STATE `messages` MỘT LẦN DUY NHẤT ---
+            setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
+
+            // --- BƯỚC 4: PHÁT ÂM THANH TUẦN TỰ ---
+            await speakAI(initialMsgText);
+            await speakAI(focusPoint);
+            await speakAI(finalMsgText);
           } else {
-            // Fallback về cách cũ nếu AI lỗi
-            const retryMsg = generateRetryMessage(
+            const retryMsgText = generateRetryMessage(
               expectedLine.text,
               similarityResult.score,
               transcript
             );
-            setMessages((prev) => [
-              { role: "assistant", content: retryMsg, timestamp: Date.now() },
-              ...prev,
-            ]);
-            await speakAI(retryMsg);
+            allAiMessages.push({
+              role: "assistant",
+              content: retryMsgText,
+              timestamp: Date.now() + 1,
+            });
+            setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
+
+            await speakAI(retryMsgText);
           }
         } else {
-          const retryMsg = generateRetryMessage(
+          const retryMsgText = generateRetryMessage(
             expectedLine.text,
             similarityResult.score,
             transcript
           );
-          setMessages((prev) => [
-            { role: "assistant", content: retryMsg, timestamp: Date.now() },
-            ...prev,
-          ]);
-          await speakAI(retryMsg);
+          allAiMessages.push({
+            role: "assistant",
+            content: retryMsgText,
+            timestamp: Date.now() + 1,
+          });
+          setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
+          await speakAI(retryMsgText);
         }
 
         if (turnTimeoutRef.current) {
