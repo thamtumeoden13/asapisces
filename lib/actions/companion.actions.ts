@@ -133,6 +133,7 @@ export async function getCompanionById(id: string) {
 
     const result = {
       ...companion,
+      coverImage: companion.cover_image || "/default-cover.png",
       // Gộp transcript.data vào cấp cao nhất dưới tên `transcript_data`
       transcript_data: (companion.transcript as any)?.data || null,
     };

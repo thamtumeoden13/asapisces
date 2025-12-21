@@ -193,6 +193,7 @@ interface User {
   email: string;
   id: string;
   image: string;
+  role: string;
 }
 
 interface InterviewCardProps {

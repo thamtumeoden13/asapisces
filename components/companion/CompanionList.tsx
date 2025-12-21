@@ -16,12 +16,14 @@ interface CompanionListProps {
   initialCompanions: Companion[];
   initialHasNextPage: boolean;
   filters: { subject?: string; topic?: string };
+  role: string;
 }
 
 export function CompanionList({
   initialCompanions,
   initialHasNextPage,
   filters,
+  role,
 }: CompanionListProps) {
   const [companions, setCompanions] = useState<Companion[]>(initialCompanions);
   const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
@@ -60,14 +62,12 @@ export function CompanionList({
   return (
     <>
       <div className="companions-grid">
-        {companions.map((companion,index) => (
-          <div
-            key={`${companion.id}-${index}`}
-            className="relative"
-          >
+        {companions.map((companion, index) => (
+          <div key={`${companion.id}-${index}`} className="relative">
             <CompanionCard
               key={companion.id}
               {...companion}
+              role={role}
               color={getSubjectColor(companion.subject)}
               href={`/companion-library/conversation`}
             />

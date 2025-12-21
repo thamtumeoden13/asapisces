@@ -27,6 +27,7 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
   if (!user) redirect("/sign-in");
 
   const userName = user?.name || "learner";
+  const role = user.role;
 
   const filters = await searchParams;
   const subject = filters.subject ? filters.subject : "";
@@ -109,6 +110,7 @@ const CompanionsLibrary = async ({ searchParams }: SearchParams) => {
         initialCompanions={initialData.companions}
         initialHasNextPage={initialData.hasNextPage}
         filters={filters}
+        role={role}
       />
     </section>
   );

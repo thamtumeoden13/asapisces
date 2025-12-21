@@ -25,6 +25,7 @@ type CompanionCardProps = {
   // Thêm color prop để nhận màu từ component cha
   color?: string;
   bookmarked: boolean;
+  role: string;
 };
 
 // --- BẢNG MÀU TƯƠNG ỨNG VỚI CÁC SUBJECT ---
@@ -60,6 +61,7 @@ export default function CompanionCard({
   duration,
   href,
   bookmarked,
+  role,
 }: CompanionCardProps) {
   // Lấy màu dựa trên subject
   const colors = subjectColors[subject.toLowerCase()] || subjectColors.default;
@@ -74,7 +76,7 @@ export default function CompanionCard({
           colors.border
         )}
       >
-        <BookmarkButton companionId={id} initialBookmarked={bookmarked} />
+        <BookmarkButton companionId={id} initialBookmarked={bookmarked} role={role} />
         <CardHeader className="p-4">
           <div className="flex justify-between items-center">
             <Badge

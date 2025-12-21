@@ -96,6 +96,7 @@ export default function TranscriptProcessorComponent({
           alert("Invalid configuration format");
         }
       } catch (error) {
+        console.error("Error parsing config file:", error);
         alert("Error parsing configuration file");
       }
     };
@@ -223,6 +224,19 @@ export default function TranscriptProcessorComponent({
         Transcript Processor
       </h1>
 
+      {/* Input Section */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2 text-black">
+          Raw Transcript:
+        </label>
+        <textarea
+          value={rawTranscript}
+          onChange={(e) => setRawTranscript(e.target.value)}
+          className="w-full h-96 p-3 border rounded-lg text-black-300"
+          placeholder="Paste your transcript here..."
+        />
+      </div>
+
       {/* Configuration Management */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <div className="flex justify-between items-center mb-3">
@@ -281,19 +295,6 @@ export default function TranscriptProcessorComponent({
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Input Section */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2 text-black">
-          Raw Transcript:
-        </label>
-        <textarea
-          value={rawTranscript}
-          onChange={(e) => setRawTranscript(e.target.value)}
-          className="w-full h-32 p-3 border rounded-lg text-black-300"
-          placeholder="Paste your transcript here..."
-        />
       </div>
 
       {/* Statistics */}
@@ -391,7 +392,9 @@ export default function TranscriptProcessorComponent({
 
       {/* Topic Breakdown */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold mb-3 text-black-100">Topic Breakdown</h2>
+        <h2 className="text-xl font-bold mb-3 text-black-100">
+          Topic Breakdown
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {Object.entries(stats.topicBreakdown).map(([topic, data]) => (
             <div key={topic} className="bg-blue-50 p-3 rounded-lg">

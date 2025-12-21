@@ -48,7 +48,9 @@ import {
 } from "@/lib/zodSchema";
 
 import { Sparkles } from "lucide-react"; // Thêm icon
+import { Loader2 } from "lucide-react";
 import { generateCompanionDetailsAction } from "@/lib/actions/general.action";
+import { precacheAudioForCompanionAction } from "@/lib/actions/precache.action";
 
 export type CreateTranscriptCompanion = z.infer<
   typeof transcriptCompanionSchema
@@ -62,7 +64,15 @@ interface TranscriptSaveFormProps {
   topicConfig: TopicConfig[];
   processedData: ProcessorResult;
   // Thêm companion để truyền dữ liệu mặc định khi edit
-  companion?: FormValues & { id: string };
+  companion?: FormValues & { id: string } & {
+    transcriptData: {
+      rawTranscript: string;
+      topicConfig: TopicConfig[];
+      podcastTopics: ProcessorResult["podcastTopics"];
+      topicTitles: ProcessorResult["topicTitles"];
+      metadata: ProcessorResult["metadata"];
+    };
+  };
 }
 export function TranscriptSaveForm({
   children,
@@ -72,8 +82,10 @@ export function TranscriptSaveForm({
   companion,
 }: TranscriptSaveFormProps) {
   const [open, setOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingDetails, setIsGeneratingDetails] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPrecaching, setIsPrecaching] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   const isEditMode = !!companion;
 
@@ -126,7 +138,10 @@ export function TranscriptSaveForm({
   };
 
   const onSubmit = async (values: FormValues) => {
-    setIsLoading(true);
+    setIsSaving(true);
+    setStatusText(
+      isEditMode ? "Updating companion..." : "Creating companion..."
+    );
 
     try {
       const companionData: UpsertCompanionData = {
@@ -141,16 +156,97 @@ export function TranscriptSaveForm({
         },
       };
 
-      const savedCompanion = await upsertTranscriptCompanion2(companionData);
+      let shouldPrecache = false;
 
-      if (savedCompanion.success) {
-        setOpen(false);
+      if (!isEditMode) {
+        // 1. Luôn chạy pre-cache khi TẠO MỚI companion
+        shouldPrecache = true;
+      } else {
+        // 2. Khi CẬP NHẬT, chỉ chạy pre-cache nếu transcript hoặc giọng nói thay đổi
+        const originalTranscript = companion?.transcriptData?.rawTranscript;
+        const originalVoice = companion?.voice;
+
+        if (
+          rawTranscript !== originalTranscript ||
+          values.voice !== originalVoice
+        ) {
+          shouldPrecache = true;
+          console.log(
+            "Change detected in transcript or voice. Triggering audio pre-cache."
+          );
+        } else {
+          console.log(
+            "No changes in transcript or voice. Skipping audio pre-cache."
+          );
+        }
       }
+
+      // 1. Lưu hoặc cập nhật companion
+      const savedCompanionResult =
+        await upsertTranscriptCompanion2(companionData);
+
+      if (!savedCompanionResult.success) {
+        throw new Error(
+          savedCompanionResult.error || "Failed to save companion."
+        );
+      }
+
+      console.log(
+        "Companion saved successfully. Starting audio pre-caching..."
+      );
+
+      if (shouldPrecache) {
+        // 2. Bắt đầu pre-caching
+        setIsSaving(false);
+        setIsPrecaching(true);
+        setStatusText("Preparing audio files... This may take a minute.");
+
+        // Lấy voiceId từ form. Giả sử voice "male" -> Adam, "female" -> Rachel
+        const voiceIdMap = {
+          male: "pNInz6obpgDQGcFmaJgB", // Adam
+          female: "21m00Tcm4TlvDq8ikWAM", // Rachel
+        };
+
+        const selectedVoiceId =
+          voiceIdMap[values.voice as keyof typeof voiceIdMap] ||
+          voiceIdMap.female;
+
+        const precacheResult = await precacheAudioForCompanionAction({
+          processedData,
+          voiceId: selectedVoiceId,
+        });
+
+        if (!precacheResult.success) {
+          // Vẫn coi là thành công, nhưng cảnh báo người dùng
+          alert(
+            `Companion saved! However, ${precacheResult.errorCount} audio files failed to cache. They will be generated on the fly.`
+          );
+        } else {
+          // Tùy chọn: bạn có thể muốn redirect người dùng ở đây
+          window.open(
+            `/companion-library/conversation/${savedCompanionResult.companionId}`,
+            "_blank"
+          );
+        }
+      }
+
+      // 3. Hoàn tất
+      setIsSaving(false);
+      setIsPrecaching(false);
+      setOpen(false); // Đóng dialog
     } catch (error) {
-      console.error("Failed to save transcript companion:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred.";
+      console.error(
+        "Failed to save or precache transcript companion:",
+        errorMessage
+      );
+      alert(errorMessage);
       // You can add toast notification here
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
+      setIsPrecaching(false);
+      setStatusText("");
     }
   };
 
@@ -159,6 +255,8 @@ export function TranscriptSaveForm({
       form.reset(companion);
     }
   }, [companion, isEditMode, form]);
+
+  const isLoading = isSaving || isPrecaching;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -396,13 +494,16 @@ export function TranscriptSaveForm({
             />
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading
-                ? isEditMode
-                  ? "Updating..."
-                  : "Creating..."
-                : isEditMode
-                  ? "Update Companion"
-                  : "Create Companion"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <span>{statusText}</span>
+                </>
+              ) : isEditMode ? (
+                "Update Companion"
+              ) : (
+                "Create Companion"
+              )}
             </Button>
           </form>
         </Form>
