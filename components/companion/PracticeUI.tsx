@@ -11,7 +11,7 @@ import { WeaknessProfile } from "./WeaknessProfile";
 
 export const PracticeUI = (props: CompanionComponentProps) => {
   // Truyền các props chưa dùng đến
-  const { selectedTopic } = useConversationContext();
+  const { companionId, selectedTopic } = useConversationContext();
 
   // State và logic fetch biểu đồ có thể ở đây hoặc trong component con
   const [feedbackHistory, setFeedbackHistory] = useState(
@@ -36,7 +36,7 @@ export const PracticeUI = (props: CompanionComponentProps) => {
           <div className="lg:col-span-2">
             <SettingsPanel />
           </div>
-          <WeaknessProfile />
+          <WeaknessProfile companionId={companionId} topicId={selectedTopic!} />
         </div>
 
         <div className="">

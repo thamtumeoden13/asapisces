@@ -41,7 +41,8 @@ type GeminiFeedbackOption = "standard" | "gemini";
 // --- Props ---
 interface UseConversationProps {
   steps: TranscriptLine[];
-  companionId?: string;
+  companionId: string;
+  topicId: string;
   voiceId?: string;
   ttsProvider: TTSProvider;
   geminiFeedback?: GeminiFeedbackOption;
@@ -154,6 +155,7 @@ const conversationReducer = (
 export const useConversation = ({
   steps,
   companionId,
+  topicId,
   voiceId,
   ttsProvider,
   geminiFeedback,
@@ -396,7 +398,11 @@ export const useConversation = ({
 
         if (incorrectWords.length > 0) {
           // Gọi action ở chế độ "fire-and-forget" để không làm chậm UX
-          recordPronunciationErrorsAction(incorrectWords);
+          recordPronunciationErrorsAction({
+            incorrectWords,
+            companionId: companionId!,
+            topicId: topicId,
+          });
         }
       }
 

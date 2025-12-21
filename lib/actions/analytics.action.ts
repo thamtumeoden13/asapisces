@@ -4,43 +4,49 @@
 import { auth } from "@/auth";
 import { supabase } from "@/lib/supabase/server";
 
+// Cập nhật kiểu dữ liệu đầu vào
+interface RecordErrorsParams {
+  incorrectWords: string[];
+  companionId: string;
+  topicId: string;
+}
+
 /**
  * Ghi nhận các từ người dùng phát âm sai vào database.
  * @param {string[]} incorrectWords - Mảng các từ bị phát âm sai.
  */
-export async function recordPronunciationErrorsAction(
-  incorrectWords: string[]
-) {
+export async function recordPronunciationErrorsAction({
+  incorrectWords,
+  companionId,
+  topicId,
+}: RecordErrorsParams) {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId || incorrectWords.length === 0) {
-    return { success: false, error: "Unauthorized or no words to record." };
+  if (!userId || incorrectWords.length === 0 || !companionId || !topicId) {
+    return { success: false, error: "Invalid parameters." };
   }
 
-  // Chuẩn hóa các từ: viết thường, loại bỏ ký tự đặc biệt
   const sanitizedWords = incorrectWords
     .map((word) => word.toLowerCase().replace(/[^a-z'-]/g, ""))
-    .filter(Boolean); // Lọc ra các chuỗi rỗng
+    .filter(Boolean);
 
   if (sanitizedWords.length === 0) {
     return { success: true };
   }
 
-  // Tạo một mảng các object để upsert
+  // Thêm companion_id và topic_id vào mỗi object
   const upsertData = sanitizedWords.map((word) => ({
     user_id: userId,
     word: word,
-    // Chúng ta sẽ dùng logic trong hàm PostgreSQL để tăng `error_count`
+    companion_id: companionId,
+    topic_id: topicId,
   }));
 
   try {
-    // Gọi hàm RPC để thực hiện upsert và tăng `error_count`
     const { error } = await supabase.rpc("record_errors", {
       p_errors: upsertData,
     });
-
     if (error) throw error;
-
     return { success: true };
   } catch (error) {
     console.error("Error recording pronunciation errors:", error);
@@ -53,36 +59,48 @@ export type PronunciationError = {
   error_count: number;
 };
 
+interface GetErrorsParams {
+  limit?: number;
+  companionId?: string;
+  topicId?: string;
+}
+
 /**
  * Lấy danh sách các từ hay phát âm sai nhất của người dùng hiện tại.
  * @param {number} limit - Số lượng từ tối đa cần lấy.
  * @returns {Promise<PronunciationError[]>} Mảng các từ và số lần sai.
  */
-export async function getTopPronunciationErrorsAction(
-  limit: number = 5
-): Promise<PronunciationError[]> {
+export async function getTopPronunciationErrorsAction({
+  limit = 5,
+  companionId,
+  topicId,
+}: GetErrorsParams = {}): Promise<PronunciationError[]> {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) {
-    return []; // Trả về mảng rỗng nếu không có người dùng
-  }
+  if (!userId) return [];
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("user_pronunciation_errors")
       .select("word, error_count")
-      .eq("user_id", userId)
-      .order("error_count", { ascending: false }) // Sắp xếp theo số lần sai giảm dần
-      .limit(limit);
+      .eq("user_id", userId);
 
-    if (error) {
-      console.error("Error fetching top pronunciation errors:", error);
-      throw error;
+    // Thêm bộ lọc động
+    if (companionId) {
+      query = query.eq("companion_id", companionId);
+    }
+    if (topicId) {
+      query = query.eq("topic_id", topicId);
     }
 
+    const { data, error } = await query
+      .order("error_count", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
     return data || [];
   } catch (error) {
     console.error("Failed to get top pronunciation errors:", error);
-    return []; // Trả về mảng rỗng khi có lỗi
+    return [];
   }
 }

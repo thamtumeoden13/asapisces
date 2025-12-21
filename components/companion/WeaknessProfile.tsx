@@ -9,20 +9,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Target, Volume2, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 
-export const WeaknessProfile = () => {
+export const WeaknessProfile = ({
+  companionId,
+  topicId,
+}: {
+  companionId: string;
+  topicId: string;
+}) => {
   const [errors, setErrors] = useState<PronunciationError[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
-    getTopPronunciationErrorsAction(5) // Lấy top 5 từ
+    getTopPronunciationErrorsAction({
+      limit: 5,
+      companionId,
+      topicId,
+    })
       .then((data) => {
         setErrors(data);
       })
       .finally(() => {
         setIsLoading(false);
       });
-  }, []);
+  }, [companionId, topicId]);
 
   // Hàm để phát âm mẫu một từ
   const speakWord = (word: string) => {
@@ -51,8 +61,8 @@ export const WeaknessProfile = () => {
 
         {!isLoading && errors.length === 0 && (
           <p className="text-sm text-gray-500 text-center py-4">
-            Great job! We haven't detected any recurring pronunciation errors
-            yet. Keep practicing!
+            Great job! We haven&apos;t detected any recurring pronunciation
+            errors yet. Keep practicing!
           </p>
         )}
 

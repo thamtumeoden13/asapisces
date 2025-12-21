@@ -163,6 +163,7 @@ const EnhancedCompanionConversationOptimized = ({
     ttsProvider: ttsProvider,
     geminiFeedback: geminiFeedback,
     companionId,
+    topicId: currentTopic,
     onSessionComplete: () => {
       handleSessionComplete(
         messages
