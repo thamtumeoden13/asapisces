@@ -18,6 +18,7 @@ interface ConversationContextType extends CompanionComponentProps {
   ttsProvider: "webspeech" | "elevenlabs";
   geminiFeedback: "standard" | "gemini";
   userLevel: "beginner" | "intermediate" | "advanced";
+  viewMode: 'immersive' | 'classic';
   voiceId: string;
   callState: { status: CallStatus };
 
@@ -28,6 +29,7 @@ interface ConversationContextType extends CompanionComponentProps {
   setTtsProvider: (provider: "webspeech" | "elevenlabs") => void;
   setGeminiFeedback: (feedback: "standard" | "gemini") => void;
   setUserLevel: (level: "beginner" | "intermediate" | "advanced") => void;
+  setViewMode: (mode: 'immersive' | 'classic') => void;
   onCallStateChange: (status: CallStatus) => void;
   getTopicProgress: () => number;
 
@@ -78,6 +80,9 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
     "beginner" | "intermediate" | "advanced"
   >("beginner");
 
+
+  const [viewMode, setViewMode] = useState<'immersive' | 'classic'>('immersive');
+
   const [callState, setCallState] = useState<{ status: CallStatus }>({
     status: CallStatus.IDLE,
   });
@@ -117,12 +122,14 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
     topicConfig,
     topicTitles,
     userLevel,
+    viewMode,
     callState,
     setSelectedTopic,
     setUserRole,
     setTtsProvider,
     setGeminiFeedback,
     setUserLevel,
+    setViewMode,
     onTopicComplete,
     onCallStateChange,
     getTopicProgress,

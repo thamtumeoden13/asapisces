@@ -2,16 +2,17 @@
 
 import { useConversationContext } from "@/contexts/ConversationContext";
 import { SettingsPanel } from "./SettingsPanel"; // Component con
-import EnhancedCompanionConversation from "./enhanced-companion-conversation";
+import ClassicViewComponent from "./ClassicViewComponent";
 import { ProgressOverview } from "./ProgressOverview";
 import { getFeedbackHistoryForTopic } from "@/lib/actions/feedback.action";
 import { useEffect, useState } from "react";
 import { CompanionComponentProps } from "@/types";
 import { WeaknessProfile } from "./WeaknessProfile";
+import ImmersiveViewComponent from "./ImmersiveViewComponent";
 
 export const PracticeUI = (props: CompanionComponentProps) => {
   // Truyền các props chưa dùng đến
-  const { companionId, selectedTopic } = useConversationContext();
+  const { companionId, selectedTopic, viewMode } = useConversationContext();
 
   // State và logic fetch biểu đồ có thể ở đây hoặc trong component con
   const [feedbackHistory, setFeedbackHistory] = useState(
@@ -40,10 +41,17 @@ export const PracticeUI = (props: CompanionComponentProps) => {
         </div>
 
         <div className="">
-          <EnhancedCompanionConversation
-            feedbackHistory={feedbackHistory}
-            isLoadingChart={isLoadingChart}
-          />
+          {viewMode === "immersive" ? (
+            <ImmersiveViewComponent
+              feedbackHistory={feedbackHistory}
+              isLoadingChart={isLoadingChart}
+            />
+          ) : (
+            <ClassicViewComponent
+              feedbackHistory={feedbackHistory}
+              isLoadingChart={isLoadingChart}
+            />
+          )}
         </div>
       </div>
     </>
