@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import EnhancedCompanionConversationV3 from "@/components/companion/enhanced-companion-conversation";
+import EnhancedCompanionConversationV3 from "@/components/companion/ClassicViewComponent";
 import { CallStatus, type TopicKey } from "@/types/podcast";
 import { BookOpen, Target, TrendingUp } from "lucide-react";
 import { CompanionComponentProps, PodcastTopics, TopicTitles } from "@/types";

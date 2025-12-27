@@ -172,6 +172,7 @@ export const useConversation = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState<string>("");
+  const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
 
   const deepgramClientRef = useRef<LiveClient | null>(null);
   const microphoneRef = useRef<{
@@ -221,6 +222,7 @@ export const useConversation = ({
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-US";
+
       utterance.onend = () => {
         setIsSpeaking(false);
         resolve();
@@ -842,6 +844,7 @@ export const useConversation = ({
     currentLine,
     audioPlayerRef,
     partialTranscript,
+    highlightedWordIndex,
     startCall,
     endCall,
     toggleMute,

@@ -53,15 +53,15 @@ const getSubjectColor = (subject: string) => {
   return colors[subject] || colors.default;
 };
 
-interface EnhancedCompanionConversationOptimizedProps {
+interface ClassicViewComponentProps {
   isLoadingChart?: boolean;
   feedbackHistory?: FeedbackHistoryPoint[];
 }
 
-const EnhancedCompanionConversationOptimized = ({
+const ClassicViewComponent = ({
   isLoadingChart = false,
   feedbackHistory = [],
-}: EnhancedCompanionConversationOptimizedProps) => {
+}: ClassicViewComponentProps) => {
   const {
     companionId,
     subject,
@@ -1258,4 +1258,4 @@ const EnhancedCompanionConversationOptimized = ({
   );
 };
 
-export default EnhancedCompanionConversationOptimized;
+export default ClassicViewComponent;

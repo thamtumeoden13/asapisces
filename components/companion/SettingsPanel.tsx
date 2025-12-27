@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CallStatus, type TopicKey } from "@/types/podcast";
-import { BookOpen } from "lucide-react";
+import { BookOpen, MessageSquare, Square } from "lucide-react";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { useConversationContext } from "@/contexts/ConversationContext";
@@ -24,6 +24,8 @@ const SettingsPanel = () => {
     callState,
     geminiFeedback,
     setGeminiFeedback,
+    viewMode,
+    setViewMode,
   } = useConversationContext();
 
   const getTopicBadgeVariant = (topic: TopicKey) => {
@@ -87,6 +89,26 @@ const SettingsPanel = () => {
             }}
           />
         </div>
+        {/* --- THÊM NÚT CHUYỂN ĐỔI CHẾ ĐỘ XEM --- */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-600">View Mode:</span>
+          <Button
+            variant={viewMode === "classic" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("classic")}
+            aria-label="Classic View"
+          >
+            <MessageSquare className="w-5 h-5" />
+          </Button>
+          <Button
+            variant={viewMode === "immersive" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("immersive")}
+            aria-label="Immersive View"
+          >
+            <Square className="w-5 h-5" />
+          </Button>
+        </div>
         {/* Topic Selection */}
         <div>
           <label className="block mb-3 text-sm font-medium">Choose Topic</label>
@@ -103,7 +125,7 @@ const SettingsPanel = () => {
                   size="sm"
                   className={`justify-start text-left h-full p-3 mr-2 whitespace-normal ${
                     isCompleted ? "bg-green-50 border-green-200" : ""
-                  } ${isSelected && isCompleted ? "text-gray-700 bg-green-300": ""}`}
+                  } ${isSelected && isCompleted ? "text-gray-700 bg-green-300" : ""}`}
                   onClick={() => setSelectedTopic(topicKey)}
                   disabled={callState.status === CallStatus.ACTIVE} // Vô hiệu hóa khi đang nói
                 >
