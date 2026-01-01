@@ -214,6 +214,7 @@ export function TranscriptSaveForm({
         const precacheResult = await precacheAudioForCompanionAction({
           processedData,
           voiceId: selectedVoiceId,
+          companionId: savedCompanionResult.companionId,
         });
 
         if (!precacheResult.success) {

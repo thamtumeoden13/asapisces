@@ -536,7 +536,7 @@ const ImmersiveViewComponent = ({
                           <div className="flex justify-between items-center flex-grow">
                             {/* Nhân vật 1 (User) */}
                             <SpeakerAvatar
-                              name={"user"} // Tên nên được lấy từ props, ví dụ: userName
+                              name={"Gwen"} // Tên nên được lấy từ props, ví dụ: userName
                               image={"/img/gallery-1.webp"} // Ảnh nên được lấy từ props, ví dụ: userImage
                               isActive={currentLine?.speaker === userRole}
                             />
@@ -655,7 +655,7 @@ const ImmersiveViewComponent = ({
 
                             {/* Nhân vật 2 (AI) */}
                             <SpeakerAvatar
-                              name={"AI"} // Tên nên được lấy từ props, ví dụ: companion.name
+                              name={"Leo"} // Tên nên được lấy từ props, ví dụ: companion.name
                               image={"/img/gallery-1.webp"} // Ảnh nên được lấy từ props, ví dụ: companion.coverImage
                               isActive={currentLine?.speaker !== userRole}
                             />

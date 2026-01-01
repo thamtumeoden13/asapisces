@@ -4,10 +4,12 @@
 import { generateSpeechAction } from "./tts.action";
 import type { ProcessorResult } from "@/types";
 import { processInBatches } from "@/lib/batchProcessor";
+import { supabase } from "../supabase/server";
 
 interface PrecacheParams {
   processedData: ProcessorResult;
   voiceId: string; // Cần voiceId để biết giọng nào cần cache
+  companionId: string;
 }
 
 /**
@@ -18,6 +20,7 @@ interface PrecacheParams {
 export async function precacheAudioForCompanionAction({
   processedData,
   voiceId,
+  companionId,
 }: PrecacheParams): Promise<{
   success: boolean;
   cachedCount: number;
@@ -68,6 +71,24 @@ export async function precacheAudioForCompanionAction({
   console.log(
     `[PRECACHE] Finished. Success: ${cachedCount}, Failed: ${errorCount}`
   );
+
+  // --- BƯỚC MỚI: CẬP NHẬT TRẠNG THÁI COMPANION ---
+  const finalStatus = errorCount > 0 ? "failed" : "ready";
+
+  try {
+    const { error: updateError } = await supabase
+      .from("companions")
+      .update({ status: finalStatus })
+      .eq("id", companionId);
+
+    if (updateError) throw updateError;
+    console.log(
+      `[PRECACHE] Companion ${companionId} status updated to: ${finalStatus}`
+    );
+  } catch (error) {
+    console.error("Failed to update companion status after precache:", error);
+    // Dù có lỗi cập nhật status, vẫn trả về kết quả cache
+  }
 
   return { success: errorCount === 0, cachedCount, errorCount };
 }
