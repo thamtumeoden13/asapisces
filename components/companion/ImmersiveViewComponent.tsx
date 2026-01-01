@@ -480,14 +480,25 @@ const ImmersiveViewComponent = ({
                 <TabsContent value="conversation" className="space-y-4">
                   <div
                     ref={fullscreenRef}
-                    className="bg-gray-800 text-white rounded-xl relative"
+                    // --- CONTAINER CHA (FULLSCREEN) ---
+                    // Nhiệm vụ: Chiếm toàn màn hình và căn giữa nội dung.
+                    className={cn(
+                      "group relative transition-all duration-300",
+                      isFullscreen
+                        ? "bg-black w-screen h-screen flex items-center justify-center fullscreen"
+                        : "bg-gray-800 rounded-xl"
+                    )}
                   >
-                    <div className="absolute top-4 right-4 z-10">
+                    {/* Nút Fullscreen */}
+                    <div className="absolute top-4 right-4 z-20">
                       <Button
                         onClick={toggleFullscreen}
                         variant="ghost"
                         size="icon"
-                        className="text-white hover:bg-white/10"
+                        className={cn(
+                          "text-white hover:bg-white/20",
+                          isFullscreen ? "text-gray-400 hover:text-white" : ""
+                        )}
                       >
                         {isFullscreen ? (
                           <Minimize className="w-5 h-5" />
@@ -497,122 +508,161 @@ const ImmersiveViewComponent = ({
                       </Button>
                     </div>
 
-                    <Card className="bg-gray-800 text-white p-6 md:p-10 rounded-xl">
-                      <div className="flex justify-between items-center h-[44vh] w-full">
-                        {/* Nhân vật 1 (AI/User) */}
-                        <SpeakerAvatar
-                          name={"user"}
-                          image={"/img/gallery-1.webp"}
-                          isActive={currentLine?.speaker === userRole}
-                        />
+                    {/* --- CONTAINER CON (NỘI DUNG) --- */}
+                    {/* 
+    Nhiệm vụ: Giữ tỷ lệ khung hình và chứa toàn bộ giao diện podcast.
+    Ở chế độ bình thường, nó sẽ chiếm 100% không gian.
+    Ở chế độ fullscreen, nó sẽ giữ tỷ lệ 21:9.
+  */}
+                    <div
+                      className={cn(
+                        "w-full h-full transition-all duration-300",
+                        isFullscreen ? "p-4" : ""
+                      )}
+                    >
+                      <div className="relative w-full h-full">
+                        <Card
+                          // Card giờ là container chính cho nội dung, chiếm toàn bộ không gian của container tỷ lệ.
+                          className={cn(
+                            "bg-gray-800 text-white flex flex-col p-6 md:p-10 rounded-xl transition-all duration-300",
+                            // Ở chế độ bình thường, nó là `w-full h-full`
+                            !isFullscreen ? "w-full h-full" : "",
+                            // Ở chế độ fullscreen:
+                            isFullscreen
+                              ? "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vh*21/9)] max-w-full h-[calc(100vw*9/21)] max-h-full"
+                              : ""
+                          )}
+                        >
+                          <div className="flex justify-between items-center flex-grow">
+                            {/* Nhân vật 1 (User) */}
+                            <SpeakerAvatar
+                              name={"user"} // Tên nên được lấy từ props, ví dụ: userName
+                              image={"/img/gallery-1.webp"} // Ảnh nên được lấy từ props, ví dụ: userImage
+                              isActive={currentLine?.speaker === userRole}
+                            />
 
-                        {/* Khu vực trung tâm: Dòng thoại và Sóng âm */}
-                        <div className="flex flex-col items-center justify-center text-center w-4/6 space-y-4 h-full relative">
-                          <LiveTranscript
-                            text={
-                              currentLine?.text || "Start a session to begin."
-                            }
-                            isUserTurn={conversationState.isWaitingForUser}
-                          />
-                          <AudioVisualizer isSpeaking={isSpeaking} />
-                          <audio ref={audioPlayerRef} className="hidden" />{" "}
-                          <div className="flex flex-row items-between space-y-4 justify-center w-full p-2 absolute bottom-0 left-0 right-0">
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="">
-                                <Button
-                                  onClick={
-                                    callState.status === "ACTIVE"
-                                      ? endCall
-                                      : startCall
+                            {/* Khu vực trung tâm */}
+                            <div className="flex flex-col items-center justify-between text-center w-4/6 h-full">
+                              {/* Phần trên: Dòng thoại và sóng âm */}
+                              <div className="flex flex-col items-center justify-center flex-grow space-y-4">
+                                <LiveTranscript
+                                  text={
+                                    currentLine?.text ||
+                                    "Start a session to begin."
                                   }
-                                  disabled={callState.status === "CONNECTING"}
-                                  className={cn(
-                                    "w-full transition-all duration-200",
-                                    callState.status === "ACTIVE"
-                                      ? "bg-red-600 hover:bg-red-700"
-                                      : "bg-green-600 hover:bg-green-700",
-                                    callState.status === "CONNECTING"
-                                      ? "animate-pulse"
-                                      : undefined
-                                  )}
-                                >
-                                  {callState.status === "ACTIVE"
-                                    ? "End Session"
-                                    : callState.status === "CONNECTING"
-                                      ? "Connecting..."
-                                      : "Start Session"}
-                                </Button>
+                                  isUserTurn={
+                                    conversationState.isWaitingForUser
+                                  }
+                                />
+                                <AudioVisualizer isSpeaking={isSpeaking} />
+                                <audio
+                                  ref={audioPlayerRef}
+                                  className="hidden"
+                                />
                               </div>
-                              <div className="col-span-2">
-                                <div className="grid grid-cols-5 gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={toggleMute}
-                                    disabled={callState.status !== "ACTIVE"}
-                                    className="text-xs bg-transparent"
-                                  >
-                                    {isMuted ? (
-                                      <MicOff className="w-4 h-4" />
-                                    ) : (
-                                      <Mic className="w-4 h-4" />
-                                    )}
-                                  </Button>
 
-                                  <Button
-                                    variant="outline"
-                                    onClick={manualAdvance}
-                                    disabled={callState.status !== "ACTIVE"}
-                                    className="text-xs bg-transparent"
-                                    title="Advance to next step"
-                                  >
-                                    <FastForward className="w-4 h-4" />
-                                  </Button>
+                              {/* Phần dưới: Các nút điều khiển */}
+                              <div className="flex flex-row items-center justify-center w-full p-2">
+                                <div className="grid grid-cols-3 gap-2 w-full max-w-md">
+                                  <div>
+                                    <Button
+                                      onClick={
+                                        callState.status === "ACTIVE"
+                                          ? endCall
+                                          : startCall
+                                      }
+                                      disabled={
+                                        callState.status === "CONNECTING"
+                                      }
+                                      className={cn(
+                                        "w-full transition-all duration-200",
+                                        callState.status === "ACTIVE"
+                                          ? "bg-red-600 hover:bg-red-700"
+                                          : "bg-green-600 hover:bg-green-700",
+                                        callState.status === "CONNECTING"
+                                          ? "animate-pulse"
+                                          : undefined
+                                      )}
+                                    >
+                                      {callState.status === "ACTIVE"
+                                        ? "End Session"
+                                        : callState.status === "CONNECTING"
+                                          ? "Connecting..."
+                                          : "Start Session"}
+                                    </Button>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <div className="grid grid-cols-5 gap-2">
+                                      <Button
+                                        variant="outline"
+                                        onClick={toggleMute}
+                                        disabled={callState.status !== "ACTIVE"}
+                                        className="text-xs bg-transparent"
+                                      >
+                                        {isMuted ? (
+                                          <MicOff className="w-4 h-4" />
+                                        ) : (
+                                          <Mic className="w-4 h-4" />
+                                        )}
+                                      </Button>
 
-                                  <Button
-                                    variant="outline"
-                                    onClick={retryCurrentStep}
-                                    disabled={
-                                      callState.status !== "ACTIVE" ||
-                                      !conversationState.isWaitingForUser
-                                    }
-                                    className="text-xs bg-transparent"
-                                  >
-                                    <RotateCcw className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={resetConversation}
-                                    disabled={callState.status === "ACTIVE"}
-                                    className="text-xs bg-transparent"
-                                  >
-                                    <RotateCcw className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() =>
-                                      skipToStep(
-                                        conversationState.currentStep + 1
-                                      )
-                                    }
-                                    disabled={callState.status !== "ACTIVE"}
-                                    className="text-xs bg-transparent"
-                                  >
-                                    <SkipForward className="w-4 h-4" />
-                                  </Button>
+                                      <Button
+                                        variant="outline"
+                                        onClick={manualAdvance}
+                                        disabled={callState.status !== "ACTIVE"}
+                                        className="text-xs bg-transparent"
+                                        title="Advance to next step"
+                                      >
+                                        <FastForward className="w-4 h-4" />
+                                      </Button>
+
+                                      <Button
+                                        variant="outline"
+                                        onClick={retryCurrentStep}
+                                        disabled={
+                                          callState.status !== "ACTIVE" ||
+                                          !conversationState.isWaitingForUser
+                                        }
+                                        className="text-xs bg-transparent"
+                                      >
+                                        <RotateCcw className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        onClick={resetConversation}
+                                        disabled={callState.status === "ACTIVE"}
+                                        className="text-xs bg-transparent"
+                                      >
+                                        <RotateCcw className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                          skipToStep(
+                                            conversationState.currentStep + 1
+                                          )
+                                        }
+                                        disabled={callState.status !== "ACTIVE"}
+                                        className="text-xs bg-transparent"
+                                      >
+                                        <SkipForward className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
 
-                        {/* Nhân vật 2 (AI/User) */}
-                        <SpeakerAvatar
-                          name={"AI"}
-                          image={"/img/gallery-1.webp"}
-                          isActive={currentLine?.speaker !== userRole}
-                        />
+                            {/* Nhân vật 2 (AI) */}
+                            <SpeakerAvatar
+                              name={"AI"} // Tên nên được lấy từ props, ví dụ: companion.name
+                              image={"/img/gallery-1.webp"} // Ảnh nên được lấy từ props, ví dụ: companion.coverImage
+                              isActive={currentLine?.speaker !== userRole}
+                            />
+                          </div>
+                        </Card>
                       </div>
-                    </Card>
+                    </div>
                   </div>
                 </TabsContent>
 
