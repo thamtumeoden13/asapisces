@@ -34,6 +34,7 @@ import { toast } from "./use-toast";
 
 import { startConversationSessionAction } from "@/lib/actions/conversation.action";
 import { generateSpeechAction } from "@/lib/actions/tts.action";
+import { hasHighQualityTTS } from "@/lib/permissions";
 
 type TTSProvider = "webspeech" | "elevenlabs";
 type GeminiFeedbackOption = "standard" | "gemini";
@@ -249,8 +250,14 @@ export const useConversation = ({
       return new Promise<void>(async (resolve, reject) => {
         if (!text) return resolve();
         setIsSpeaking(true);
+        const isHighQuality = await hasHighQualityTTS();
         try {
-          const result = await generateSpeechAction(text, voiceId);
+          const qualityTier = isHighQuality ? "premium" : "standard";
+          const result = await generateSpeechAction({
+            text,
+            voiceId,
+            qualityTier,
+          });
 
           if (!result.success || !result.audioUrl) {
             // Ném lỗi để khối catch bên dưới xử lý

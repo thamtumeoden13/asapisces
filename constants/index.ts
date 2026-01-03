@@ -1581,18 +1581,32 @@ export const ROLE_PERMISSIONS = {
   // Admin và Developer có quyền không giới hạn
   [USER_ROLES.ADMIN]: {
     UNLIMITED_CREDITS: true,
+    HIGH_QUALITY_TTS: true,
   },
   [USER_ROLES.DEVELOPER]: {
     UNLIMITED_CREDITS: true,
+    HIGH_QUALITY_TTS: false,
   },
   // Người dùng Pro có thể có các quyền lợi khác trong tương lai
   [USER_ROLES.PRO]: {
     UNLIMITED_CREDITS: false, // Hoặc true nếu gói pro là không giới hạn
+    HIGH_QUALITY_TTS: true,
   },
   // Người dùng miễn phí không có quyền đặc biệt
   [USER_ROLES.VIEWER]: {
     UNLIMITED_CREDITS: false,
+    HIGH_QUALITY_TTS: false,
   },
 };
 
 export const ONE_WEEK_IN_SECONDS = 60 * 60 * 24 * 7;
+
+export const TIER_MODELS = {
+  standard: "eleven_flash_v2", // Rẻ, nhanh, chất lượng ổn
+  premium: "eleven_multilingual_v2", // Chất lượng cao nhất
+};
+
+export const VOICEID_MAP = {
+  male: "pNInz6obpgDQGcFmaJgB", // Adam
+  female: "21m00Tcm4TlvDq8ikWAM", // Rachel
+};

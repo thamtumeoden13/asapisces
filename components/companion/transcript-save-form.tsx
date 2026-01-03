@@ -36,10 +36,10 @@ import {
 } from "@/components/ui/dialog";
 
 import { Switch } from "@/components/ui/switch"; // Cần cho isPublic
-import { subjects } from "@/constants";
+import { subjects, VOICEID_MAP } from "@/constants";
 import {
   UpsertCompanionData,
-  upsertTranscriptCompanion2,
+  upsertTranscriptCompanion,
 } from "@/lib/actions/transcript.actions";
 import { ProcessorResult, TopicConfig } from "@/types";
 import {
@@ -51,6 +51,7 @@ import { Sparkles } from "lucide-react"; // Thêm icon
 import { Loader2 } from "lucide-react";
 import { generateCompanionDetailsAction } from "@/lib/actions/general.action";
 import { precacheAudioForCompanionAction } from "@/lib/actions/precache.action";
+import { toast } from "@/hooks/use-toast";
 
 export type CreateTranscriptCompanion = z.infer<
   typeof transcriptCompanionSchema
@@ -183,7 +184,7 @@ export function TranscriptSaveForm({
 
       // 1. Lưu hoặc cập nhật companion
       const savedCompanionResult =
-        await upsertTranscriptCompanion2(companionData);
+        await upsertTranscriptCompanion(companionData);
 
       if (!savedCompanionResult.success) {
         throw new Error(
@@ -194,40 +195,46 @@ export function TranscriptSaveForm({
       console.log(
         "Companion saved successfully. Starting audio pre-caching..."
       );
+      const newCompanionId = savedCompanionResult.companionId;
 
-      if (shouldPrecache) {
+      if (shouldPrecache && newCompanionId) {
         // 2. Bắt đầu pre-caching
         setIsSaving(false);
         setIsPrecaching(true);
         setStatusText("Preparing audio files... This may take a minute.");
 
         // Lấy voiceId từ form. Giả sử voice "male" -> Adam, "female" -> Rachel
-        const voiceIdMap = {
-          male: "pNInz6obpgDQGcFmaJgB", // Adam
-          female: "21m00Tcm4TlvDq8ikWAM", // Rachel
-        };
 
         const selectedVoiceId =
-          voiceIdMap[values.voice as keyof typeof voiceIdMap] ||
-          voiceIdMap.female;
+          VOICEID_MAP[values.voice as keyof typeof VOICEID_MAP] ||
+          VOICEID_MAP.female;
 
         const precacheResult = await precacheAudioForCompanionAction({
           processedData,
           voiceId: selectedVoiceId,
-          companionId: savedCompanionResult.companionId,
+          companionId: newCompanionId,
         });
 
         if (!precacheResult.success) {
           // Vẫn coi là thành công, nhưng cảnh báo người dùng
-          alert(
-            `Companion saved! However, ${precacheResult.errorCount} audio files failed to cache. They will be generated on the fly.`
-          );
+          toast({
+            title: "Audio Pre-cache Failed",
+            description:
+              precacheResult.message ||
+              "There was an issue preparing audio files.",
+            variant: "destructive",
+          });
         } else {
           // Tùy chọn: bạn có thể muốn redirect người dùng ở đây
           window.open(
-            `/companion-library/conversation/${savedCompanionResult.companionId}`,
+            `/companion-library/conversation/${newCompanionId}`,
             "_blank"
           );
+          toast({
+            title: "Companion is ready!",
+            description:
+              "You can now start practicing with your new companion.",
+          });
         }
       }
 

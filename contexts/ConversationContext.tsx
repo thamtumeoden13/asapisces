@@ -8,6 +8,7 @@ import type {
   TopicTitles,
 } from "@/types";
 import { CallStatus, type TopicKey } from "@/types/podcast";
+import { VOICEID_MAP } from "@/constants";
 
 // Định nghĩa các giá trị sẽ được lưu trong context
 interface ConversationContextType extends CompanionComponentProps {
@@ -18,7 +19,7 @@ interface ConversationContextType extends CompanionComponentProps {
   ttsProvider: "webspeech" | "elevenlabs";
   geminiFeedback: "standard" | "gemini";
   userLevel: "beginner" | "intermediate" | "advanced";
-  viewMode: 'immersive' | 'classic';
+  viewMode: "immersive" | "classic";
   voiceId: string;
   callState: { status: CallStatus };
 
@@ -29,7 +30,7 @@ interface ConversationContextType extends CompanionComponentProps {
   setTtsProvider: (provider: "webspeech" | "elevenlabs") => void;
   setGeminiFeedback: (feedback: "standard" | "gemini") => void;
   setUserLevel: (level: "beginner" | "intermediate" | "advanced") => void;
-  setViewMode: (mode: 'immersive' | 'classic') => void;
+  setViewMode: (mode: "immersive" | "classic") => void;
   onCallStateChange: (status: CallStatus) => void;
   getTopicProgress: () => number;
 
@@ -47,16 +48,9 @@ const ConversationContext = createContext<ConversationContextType | undefined>(
   undefined
 );
 
-const voiceStyles = {
-  friendly: "pNInz6obpgDQGcFmaJgB", // Adam
-  professional: "GBv7mTt0atIp3Br8iCZE", // Thomas
-  casual: "2EiwWnXFnvU5JabPnv8n", // Clyde
-  encouraging: "21m00Tcm4TlvDq8ikWAM", // Rachel
-};
-
 // Provider Component
 export const ConversationProvider = (props: ConversationProviderProps) => {
-  const { initialCompletedTopics, transcriptData, style, children } = props;
+  const { initialCompletedTopics, transcriptData, voice, children } = props;
   const { podcastTopics, topicConfig, topicTitles } = transcriptData;
   const completedTopicsSet = new Set(
     initialCompletedTopics.map((item) => item.topicId)
@@ -80,14 +74,16 @@ export const ConversationProvider = (props: ConversationProviderProps) => {
     "beginner" | "intermediate" | "advanced"
   >("beginner");
 
-
-  const [viewMode, setViewMode] = useState<'immersive' | 'classic'>('immersive');
+  const [viewMode, setViewMode] = useState<"immersive" | "classic">(
+    "immersive"
+  );
 
   const [callState, setCallState] = useState<{ status: CallStatus }>({
     status: CallStatus.IDLE,
   });
 
-  const voiceId = voiceStyles[style as keyof typeof voiceStyles];
+  const voiceId =
+    VOICEID_MAP[voice as keyof typeof VOICEID_MAP] || VOICEID_MAP.female;
 
   const onTopicComplete = (topic: TopicKey) => {
     setCompletedTopics((prev) => new Set([...prev, topic]));

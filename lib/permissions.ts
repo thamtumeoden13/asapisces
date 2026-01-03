@@ -1,3 +1,5 @@
+"use server";
+
 // File: lib/permissions.ts
 import { auth } from "@/auth";
 import { supabase } from "@/lib/supabase/server";
@@ -42,4 +44,13 @@ export async function hasUnlimitedCredits(): Promise<boolean> {
 
   const permissions = ROLE_PERMISSIONS[userRole];
   return permissions?.UNLIMITED_CREDITS === true;
+}
+
+export async function hasHighQualityTTS(): Promise<boolean> {
+  const userRole = await getCurrentUserRole();
+  console.log("User role for high quality TTS:", userRole);
+  if (!userRole) return false;
+
+  const permissions = ROLE_PERMISSIONS[userRole];
+  return permissions?.HIGH_QUALITY_TTS === true;
 }

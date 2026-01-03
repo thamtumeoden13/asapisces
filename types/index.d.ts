@@ -418,3 +418,11 @@ type MessageGroup = {
   messages: Message[];
   timestamp: number;
 };
+
+export type QualityTier = 'standard' | 'premium';
+
+export type GenerateSpeechParams = {
+  text: string;
+  voiceId: string;
+  qualityTier?: QualityTier;
+};

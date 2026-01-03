@@ -4,21 +4,28 @@
 import { auth } from "@/auth";
 import { getUserCredits, deductCredits } from "./credits.action";
 import { ElevenLabsClient } from "elevenlabs";
-import { CREDIT_COSTS } from "@/constants";
+import { CREDIT_COSTS, TIER_MODELS } from "@/constants";
 import { hasUnlimitedCredits } from "../permissions";
 
 import { put } from "@vercel/blob";
 import crypto from "crypto";
 import { supabase } from "../supabase/server";
+import { GenerateSpeechParams, QualityTier } from "@/types";
 
 /**
  * Tạo audio từ ElevenLabs và trả về dưới dạng ArrayBuffer.
  * Đã tích hợp kiểm tra và trừ credit.
  */
-export async function generateSpeechAction(
-  text: string,
-  voiceId: string
-): Promise<{ success: boolean; audioUrl?: string; error?: string }> {
+
+export async function generateSpeechAction({
+  text,
+  voiceId,
+  qualityTier = "standard",
+}: GenerateSpeechParams): Promise<{
+  success: boolean;
+  audioUrl?: string;
+  error?: string;
+}> {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Unauthorized" };
   if (!text) return { success: false, error: "No text provided" };
@@ -28,23 +35,83 @@ export async function generateSpeechAction(
   const cacheKey = `${voiceId}_${textHash}`;
 
   try {
-    // 2. Kiểm tra cache trong bảng `cached_audios`
-    const { data: cached, error: cacheError } = await supabase
+    // 1. Luôn kiểm tra cache cho cả hai tier nếu có thể
+    const { data: cachedAudios, error: cacheError } = await supabase
       .from("cached_audios")
-      .select("audio_url")
-      .eq("text_hash", cacheKey)
-      .single();
+      .select("audio_url, quality_tier")
+      .eq("cache_key", cacheKey);
 
-    if (cacheError && cacheError.code !== "PGRST116") {
-      // Bỏ qua lỗi 'không tìm thấy'
-      throw cacheError;
+    if (cacheError) throw cacheError;
+
+    // Tìm trong kết quả trả về
+    const premiumAudio = cachedAudios?.find(
+      (a) => a.quality_tier === "premium"
+    );
+    const standardAudio = cachedAudios?.find(
+      (a) => a.quality_tier === "standard"
+    );
+
+    // 2. Logic trả về dựa trên tier yêu cầu
+    if (qualityTier === "premium") {
+      if (premiumAudio) {
+        console.log(`[CACHE] HIT for tier 'premium'`);
+        return { success: true, audioUrl: premiumAudio.audio_url };
+      }
+      if (standardAudio) {
+        console.log(`[CACHE] FALLBACK for 'premium', using 'standard'.`);
+        // Kích hoạt cache premium ở hậu trường
+        // Bọc tác vụ nền trong một hàm async để bắt lỗi tiềm ẩn
+        (async () => {
+          try {
+            console.log(
+              `[BACKGROUND] Starting to generate 'premium' audio for: ${cacheKey}`
+            );
+            await createAndCacheAudio(text, voiceId, "premium", cacheKey);
+            console.log(
+              `[BACKGROUND] Successfully generated 'premium' audio for: ${cacheKey}`
+            );
+          } catch (e) {
+            console.error(
+              `[BACKGROUND] Failed to generate 'premium' audio for ${cacheKey}:`,
+              e
+            );
+          }
+        })();
+        
+        return { success: true, audioUrl: standardAudio.audio_url };
+      }
+    } else {
+      // Yêu cầu là 'standard'
+      if (standardAudio) {
+        console.log(`[CACHE] HIT for tier 'standard'`);
+        return { success: true, audioUrl: standardAudio.audio_url };
+      }
     }
 
-    if (cached) {
-      console.log(`[AUDIO CACHE] HIT for: "${text.substring(0, 20)}..."`);
-      return { success: true, audioUrl: cached.audio_url };
-    }
+    // 3. Nếu không tìm thấy bất kỳ cache nào, tạo mới
+    console.log(
+      `[CACHE] MISS for all tiers. Generating new for '${qualityTier}'`
+    );
+    return await createAndCacheAudio(text, voiceId, qualityTier, cacheKey);
+  } catch (error) {
+    console.error("ElevenLabs Action error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    return { success: false, error: errorMessage };
+  }
+}
 
+/**
+ * Hàm helper nội bộ để thực hiện việc tạo và cache audio.
+ * Có thể được gọi ở chế độ "fire-and-forget".
+ */
+async function createAndCacheAudio(
+  text: string,
+  voiceId: string,
+  qualityTier: QualityTier,
+  cacheKey: string
+) {
+  try {
     console.log(`[AUDIO CACHE] MISS for: "${text.substring(0, 20)}..."`);
 
     const [isUnlimited, currentCredits] = await Promise.all([
@@ -64,6 +131,8 @@ export async function generateSpeechAction(
       };
     }
 
+    const modelId = TIER_MODELS[qualityTier];
+
     // 4. Gọi API ElevenLabs trực tiếp từ Server Action
     const client = new ElevenLabsClient({
       apiKey: process.env.ELEVENLABS_API_KEY,
@@ -71,7 +140,7 @@ export async function generateSpeechAction(
     const audioStream = await client.generate({
       voice: voiceId,
       text: text,
-      model_id: "eleven_turbo_v2", // Nên dùng model nhanh cho hội thoại
+      model_id: modelId, // Chọn model dựa trên tier
     });
 
     // Chuyển stream thành Buffer -> ArrayBuffer
@@ -79,21 +148,27 @@ export async function generateSpeechAction(
     for await (const chunk of audioStream) {
       chunks.push(chunk);
     }
-    const audioBuffer = Buffer.concat(chunks).buffer;
+    const audioBuffer = Buffer.concat(chunks);
+    if (audioBuffer.length === 0) {
+      throw new Error("ElevenLabs returned an empty audio buffer.");
+    }
 
     // 5. Upload audio lên dịch vụ lưu trữ (Vercel Blob)
-    const blob = await put(`audio/${cacheKey}.mp3`, audioBuffer, {
+    const filePath = `audio/${cacheKey}_${qualityTier}.mp3`;
+    const blob = await put(filePath, audioBuffer, {
       access: "public",
       contentType: "audio/mpeg",
+      allowOverwrite: true,
     });
 
     const { url: audioUrl } = blob; // Lấy URL công khai
 
     // 6. Lưu thông tin vào database để cache cho lần sau
     const { error: insertError } = await supabase.from("cached_audios").insert({
-      text_hash: cacheKey,
+      cache_key: cacheKey,
       voice_id: voiceId,
       audio_url: audioUrl,
+      quality_tier: qualityTier,
     });
     if (insertError) {
       // Log lỗi nhưng vẫn tiếp tục trả về audio cho người dùng
@@ -108,7 +183,10 @@ export async function generateSpeechAction(
     // 8. Trả về URL của file audio vừa tạo và upload
     return { success: true, audioUrl };
   } catch (error) {
-    console.error("ElevenLabs Action error:", error);
+    console.error(
+      `Failed to create/cache audio for ${cacheKey} (Tier: ${qualityTier}):`,
+      error
+    );
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return { success: false, error: errorMessage };

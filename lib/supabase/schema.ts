@@ -176,9 +176,10 @@ export const transcriptsRelations = relations(transcripts, ({ one }) => ({
 
 export const cachedAudios = pgTable("cached_audios", {
   id: uuid("id").primaryKey().defaultRandom(),
-  textHash: varchar("text_hash").unique().notNull(), // unique key with hash SHA-256 of text
+  cacheKey: varchar("cache_key").unique().notNull(), // unique key with hash SHA-256 of text
   voiceId: varchar("voice_id").notNull(),
   audioUrl: text("audio_url").notNull(),
+  qualityTier: varchar("quality_tier").notNull(), // standard, premium
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
