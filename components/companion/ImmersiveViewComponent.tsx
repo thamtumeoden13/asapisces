@@ -1,21 +1,15 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo, useCallback } from "react";
-import Lottie, { type LottieRefCurrentProps } from "lottie-react";
+import { useRef, useState, useEffect, useCallback } from "react";
+import { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useConversation } from "@/hooks/use-conversation";
-import {
-  EnhancedVoiceRecognition,
-  type SpeechQualityMetrics,
-} from "@/lib/enhanced-voice-recognition";
 import { ConversationAnalytics } from "@/lib/conversation-analytics";
 import { type TopicKey, CallStatus } from "@/types/podcast";
-import soundwaves from "@/constants/soundwaves.json";
 import {
   Mic,
   MicOff,
@@ -24,20 +18,16 @@ import {
   Zap,
   Clock,
   FastForward,
-  MessageSquare,
   Maximize,
   Minimize,
 } from "lucide-react";
-import type { MessageGroup } from "@/types";
 import { createLanguageFeedback } from "@/lib/actions/general.action";
 import {
   FeedbackHistoryPoint,
   saveConversationFeedbackAction,
 } from "@/lib/actions/feedback.action";
 import { AnalyticsChart } from "./AnalyticsChart";
-import { TranslatedText } from "./TranslatedText";
 import { AskAITutor } from "./AskAITutor";
-import { SHOULDADVANCESCORETHERESHOLD } from "@/constants";
 import { useConversationContext } from "@/contexts/ConversationContext";
 import { SpeakerAvatar } from "./SpeakerAvatar";
 import { AudioVisualizer } from "./AudioVisualizer";
@@ -47,17 +37,6 @@ import { useFullscreen } from "@/hooks/use-fullscreen";
 
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
-
-const getSubjectColor = (subject: string) => {
-  const colors: Record<string, string> = {
-    english: "#3B82F6",
-    math: "#EF4444",
-    science: "#10B981",
-    history: "#F59E0B",
-    default: "#3B82F6",
-  };
-  return colors[subject] || colors.default;
-};
 
 interface ImmersiveViewComponentProps {
   isLoadingChart?: boolean;
@@ -70,10 +49,7 @@ const ImmersiveViewComponent = ({
 }: ImmersiveViewComponentProps) => {
   const {
     companionId,
-    subject,
     topic,
-    name,
-    userName,
     userId,
     voiceId,
     userRole,
@@ -109,11 +85,7 @@ const ImmersiveViewComponent = ({
   const [showDebug, setShowDebug] = useState(
     process.env.NODE_ENV === "development"
   );
-  const [speechMetrics, setSpeechMetrics] =
-    useState<SpeechQualityMetrics | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [pronunciationFeedback, setPronunciationFeedback] =
-    useState<unknown>(null);
 
   // THÊM CÁC STATE NÀY
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
@@ -129,17 +101,6 @@ const ImmersiveViewComponent = ({
   // Auto-advance timer
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-
-  // Initialize enhanced services with optimized settings
-  const voiceRecognition = useRef(
-    new EnhancedVoiceRecognition({
-      language: "en-US",
-      sensitivity: 6,
-      noiseReduction: true,
-      adaptiveThreshold: true,
-      contextAware: true,
-    })
-  );
 
   const analytics = useRef(new ConversationAnalytics());
 
@@ -157,7 +118,6 @@ const ImmersiveViewComponent = ({
     isSpeaking,
     isMuted,
     currentLine,
-    partialTranscript,
     startCall,
     endCall,
     toggleMute,
@@ -216,49 +176,6 @@ const ImmersiveViewComponent = ({
       skipToStep(conversationState.currentStep + 1);
     }
   }, [conversationState.currentStep, steps.length, skipToStep]);
-
-  // Message grouping with performance optimization
-  const groupedMessages = useMemo(() => {
-    if (messages.length === 0) return [];
-
-    const sortedMessages = [...messages].sort(
-      (a, b) => a.timestamp - b.timestamp
-    );
-    const groups: MessageGroup[] = [];
-    let currentGroup: MessageGroup | null = null;
-
-    for (const message of sortedMessages) {
-      if (!currentGroup || currentGroup.role !== message.role) {
-        currentGroup = {
-          role: message.role,
-          speaker: message.role === "assistant" ? name.split(" ")[0] : userName,
-          messages: [
-            {
-              role: message.role,
-              content: message.content,
-              timestamp: message.timestamp,
-              similarity: message.similarity || null,
-            },
-          ],
-          timestamp: message.timestamp,
-        };
-        groups.push(currentGroup as MessageGroup);
-      } else {
-        currentGroup.messages.push({
-          role: message.role,
-          content: message.content,
-          timestamp: message.timestamp,
-          similarity: message.similarity || null,
-        });
-        currentGroup.timestamp = message.timestamp;
-      }
-    }
-
-    return groups.reverse().map((group) => ({
-      ...group,
-      messages: group.messages.reverse(),
-    }));
-  }, [messages, name, userName]);
 
   // Control Lottie animation with performance optimization
   useEffect(() => {
@@ -352,43 +269,6 @@ const ImmersiveViewComponent = ({
     },
     [userId, companionId, currentTopic, userRole]
   ); // Thêm dependencies
-  // Throttled message handling to reduce re-renders
-  useEffect(() => {
-    const latestMessage = messages[0];
-    if (
-      latestMessage &&
-      latestMessage.role === "user" &&
-      currentSessionId &&
-      currentLine
-    ) {
-      requestAnimationFrame(() => {
-        const mockMetrics: SpeechQualityMetrics = {
-          clarity: Math.random() * 0.3 + 0.6,
-          pace: Math.random() * 0.4 + 0.6,
-          volume: Math.random() * 0.2 + 0.8,
-          pronunciation: Math.random() * 0.3 + 0.6,
-          fluency: Math.random() * 0.4 + 0.6,
-          confidence: Math.random() * 0.3 + 0.6,
-        };
-
-        setSpeechMetrics(mockMetrics);
-
-        if (performanceMode.instantFeedback) {
-          const feedback = voiceRecognition.current.getPronunciationFeedback(
-            latestMessage.content,
-            currentLine.text,
-            mockMetrics
-          );
-          setPronunciationFeedback(feedback);
-        }
-      });
-    }
-  }, [
-    messages,
-    currentSessionId,
-    currentLine,
-    performanceMode.instantFeedback,
-  ]);
 
   useEffect(() => {
     onCallStateChange?.(callState.status);
@@ -508,12 +388,6 @@ const ImmersiveViewComponent = ({
                       </Button>
                     </div>
 
-                    {/* --- CONTAINER CON (NỘI DUNG) --- */}
-                    {/* 
-    Nhiệm vụ: Giữ tỷ lệ khung hình và chứa toàn bộ giao diện podcast.
-    Ở chế độ bình thường, nó sẽ chiếm 100% không gian.
-    Ở chế độ fullscreen, nó sẽ giữ tỷ lệ 21:9.
-  */}
                     <div
                       className={cn(
                         "w-full h-full transition-all duration-300",
@@ -522,26 +396,21 @@ const ImmersiveViewComponent = ({
                     >
                       <div className="relative w-full h-full">
                         <Card
-                          // Card giờ là container chính cho nội dung, chiếm toàn bộ không gian của container tỷ lệ.
                           className={cn(
                             "bg-gray-800 text-white flex flex-col p-6 md:p-10 rounded-xl transition-all duration-300",
-                            // Ở chế độ bình thường, nó là `w-full h-full`
                             !isFullscreen ? "w-full h-full" : "",
-                            // Ở chế độ fullscreen:
                             isFullscreen
                               ? "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vh*21/9)] max-w-full h-[calc(100vw*9/21)] max-h-full"
                               : ""
                           )}
                         >
                           <div className="flex justify-between items-center flex-grow">
-                            {/* Nhân vật 1 (User) */}
                             <SpeakerAvatar
                               name={"Gwen"} // Tên nên được lấy từ props, ví dụ: userName
                               image={"/img/gallery-1.webp"} // Ảnh nên được lấy từ props, ví dụ: userImage
                               isActive={currentLine?.speaker === userRole}
                             />
 
-                            {/* Khu vực trung tâm */}
                             <div className="flex flex-col items-center justify-between text-center w-4/6 h-full">
                               {/* Phần trên: Dòng thoại và sóng âm */}
                               <div className="flex flex-col items-center justify-center flex-grow space-y-4">
@@ -553,6 +422,8 @@ const ImmersiveViewComponent = ({
                                   isUserTurn={
                                     conversationState.isWaitingForUser
                                   }
+                                  isSpeaking={isSpeaking}
+                                  highlightedWordIndex={highlightedWordIndex}
                                 />
                                 <AudioVisualizer isSpeaking={isSpeaking} />
                                 <audio

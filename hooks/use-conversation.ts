@@ -219,19 +219,58 @@ export const useConversation = ({
     return new Promise<void>((resolve, reject) => {
       if (!text || typeof window === "undefined" || !window.speechSynthesis)
         return resolve();
-      setIsSpeaking(true);
+
+      window.speechSynthesis.resume();
       window.speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-US";
 
-      utterance.onend = () => {
+      const cleanupAndResolve = () => {
         setIsSpeaking(false);
+        setHighlightedWordIndex(-1); // Reset highlight khi kết thúc
         resolve();
       };
-      utterance.onerror = (e) => {
-        setIsSpeaking(false);
-        reject(e);
+
+      utterance.onboundary = (event) => {
+        if (event.name === "word") {
+          const words = text.split(/\s+/);
+          let charCount = 0;
+          for (let i = 0; i < words.length; i++) {
+            // +1 cho khoảng trắng
+            charCount += words[i].length + 1;
+            // event.charIndex là vị trí bắt đầu của từ
+            if (event.charIndex < charCount) {
+              setHighlightedWordIndex(i);
+              break;
+            }
+          }
+        }
       };
+
+      utterance.onend = () => {
+        cleanupAndResolve();
+      };
+      utterance.onerror = (e) => {
+        console.error("Web Speech Synthesis error:", e.error);
+        cleanupAndResolve();
+      };
+
+      const safetyTimeout = setTimeout(
+        () => {
+          console.warn(
+            `WebSpeech safety timer triggered for: "${text.substring(0, 20)}..."`
+          );
+          cleanupAndResolve();
+        },
+        5000 + text.length * 100
+      ); // Tăng thời gian chờ một chút
+
+      utterance.addEventListener("end", () => clearTimeout(safetyTimeout));
+      utterance.addEventListener("error", () => clearTimeout(safetyTimeout));
+
+      setIsSpeaking(true);
+      setHighlightedWordIndex(-1); // Reset trước khi bắt đầu nói
       window.speechSynthesis.speak(utterance);
     });
   }, []);
