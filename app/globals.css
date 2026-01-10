@@ -1253,6 +1253,17 @@
   }
 }
 
+@keyframes bar {
+  0% {
+    transform: scaleY(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scaleY(1.0);
+    opacity: 1.0;
+  }
+}
+
 .root {
   @apply relative flex flex-col items-center justify-center px-5 mx-auto overflow-x-hidden bg-white dark:bg-black-100 sm:px-10;
 }

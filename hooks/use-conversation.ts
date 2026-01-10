@@ -75,7 +75,7 @@ type ConversationAction =
   | { type: "SET_AI_TURN" }
   | { type: "START_PROCESSING_SPEECH" }
   | { type: "STOP_PROCESSING_SPEECH" }
-  | { type: "RETRY_STEP" }
+  | { type: "RETRY_STEP"; payload: { similarity: SimilarityResult | null } }
   | { type: "SKIP_TO_STEP"; payload: { stepIndex: number } };
 
 const initialConversationState: ConversationReducerState = {
@@ -138,6 +138,7 @@ const conversationReducer = (
         isWaitingForUser: false,
         isAwaitingAI: false,
         preventProcessingSpeech: false,
+        similarity: action.payload.similarity,
       };
     case "SKIP_TO_STEP":
       return {
@@ -171,9 +172,13 @@ export const useConversation = ({
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState<string>("");
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
+  const [similarity, setSimilarity] = useState<SimilarityResult | null>(null);
+  const [realtimeSimilarity, setRealtimeSimilarity] =
+    useState<SimilarityResult | null>(null);
 
   const deepgramClientRef = useRef<LiveClient | null>(null);
   const microphoneRef = useRef<{
@@ -216,7 +221,7 @@ export const useConversation = ({
 
   // --- HÀM TIỆN ÍCH ---
   const speakAIByWebSpeechAPI = useCallback((text: string) => {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve) => {
       if (!text || typeof window === "undefined" || !window.speechSynthesis)
         return resolve();
 
@@ -415,6 +420,7 @@ export const useConversation = ({
       const currentState = stateRef.current;
       const expectedLine = steps[currentState.currentStep];
       dispatch({ type: "START_PROCESSING_SPEECH" });
+      setIsListening(false);
 
       if (!expectedLine || expectedLine.speaker?.trim() !== userRole.trim()) {
         console.warn(
@@ -429,6 +435,11 @@ export const useConversation = ({
         expectedLine.text,
         `step-${currentState.currentStep}`
       );
+      // setSimilarity(similarityResult); // Cập nhật similarity cuối cùng
+
+      // Xóa highlight real-time để nhường chỗ cho highlight cuối cùng
+      setRealtimeSimilarity(null);
+
       // --- BƯỚC 1: TẠO OBJECT TIN NHẮN CỦA USER, CHƯA CẬP NHẬT STATE ---
       const userMessage: Message = {
         type: "user",
@@ -469,6 +480,10 @@ export const useConversation = ({
         console.log(
           `🔄 Low score on step ${currentState.currentStep}. Retrying.`
         );
+        dispatch({
+          type: "RETRY_STEP",
+          payload: { similarity: similarityResult },
+        });
         dispatch({ type: "START_PROCESSING_SPEECH" });
         dispatch({ type: "SET_AI_TURN" });
 
@@ -620,6 +635,7 @@ export const useConversation = ({
   const endCall = useCallback(() => {
     if (state.status === CallStatus.FINISHED) return;
     dispatch({ type: "END_CALL" });
+    setIsListening(false);
 
     deepgramClientRef.current?.requestClose();
     deepgramClientRef.current = null;
@@ -689,7 +705,9 @@ export const useConversation = ({
       const client = createClient(sessionResult.token).listen.live({
         model: "nova-2",
         language: "en-US",
-        interim_results: true,
+        interim_results: true, // Đảm bảo luôn bật
+        endpointing: 300, // (Tùy chọn) Giúp Deepgram nhận biết câu kết thúc nhanh hơn
+        utterance_end_ms: 1000, // (Tùy chọn)
         keepalive: "true",
       });
       deepgramClientRef.current = client;
@@ -724,14 +742,33 @@ export const useConversation = ({
           !currentState.isWaitingForUser ||
           currentState.preventProcessingSpeech ||
           currentState.isAwaitingAI
-        )
+        ) {
+          if (isListening)
+            // Nếu không lắng nghe, đảm bảo isListening là false
+            setIsListening(false);
           return;
-        resetInactivityTimer();
+        }
+        setIsListening(true);
+
+        const expectedLine = steps[currentState.currentStep];
+        if (!expectedLine) return;
+
         if (data.is_final) {
+          setIsListening(false);
+          setRealtimeSimilarity(null); // Xóa highlight real-time
+          setPartialTranscript(""); // Xóa transcript tạm
           processFinalTranscript(transcript);
         } else if (!data.is_final) {
           setPartialTranscript(transcript);
+          // Thực hiện so sánh trên transcript tạm thời
+          const interimSimilarity = calculateAdvancedSimilarity(
+            transcript,
+            expectedLine.text,
+            `interim-step-${currentState.currentStep}` // Dùng context riêng cho interim
+          );
+          setRealtimeSimilarity(interimSimilarity);
         }
+        resetInactivityTimer();
       });
 
       client.on(LiveTranscriptionEvents.Error, (e) => {
@@ -752,6 +789,7 @@ export const useConversation = ({
   }, [
     resetConversation,
     companionId,
+    steps,
     resetInactivityTimer,
     processFinalTranscript,
     endCall,
@@ -779,12 +817,14 @@ export const useConversation = ({
   );
 
   const retryCurrentStep = useCallback(() => {
-    if (currentLine) dispatch({ type: "RETRY_STEP" });
+    if (currentLine)
+      dispatch({ type: "RETRY_STEP", payload: { similarity: null } });
   }, [currentLine]);
 
   // --- useEffect TRUNG TÂM ---
   useEffect(() => {
     if (state.status !== "ACTIVE") return;
+    setSimilarity(null);
 
     const currentState = stateRef.current;
 
@@ -867,6 +907,7 @@ export const useConversation = ({
         }
       }
     };
+
     processTurn();
 
     return () => {
@@ -883,9 +924,12 @@ export const useConversation = ({
       currentStep: state.currentStep,
       totalSteps: steps.length,
       isWaitingForUser: state.isWaitingForUser,
+      similarity,
     },
+    realtimeSimilarity,
     messages,
     isSpeaking,
+    isListening,
     isMuted,
     currentLine,
     audioPlayerRef,

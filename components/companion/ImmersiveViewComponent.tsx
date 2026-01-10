@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,8 @@ import { AudioVisualizer } from "./AudioVisualizer";
 import { LiveTranscript } from "./LiveTranscript";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 // import { PodcastPlayer } from "./podcast-player";
+import { Subtitle } from "./Subtitle";
+import { SHOULDADVANCESCORETHERESHOLD } from "@/constants";
 
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -114,8 +116,10 @@ const ImmersiveViewComponent = ({
   const {
     callState,
     conversationState,
+    realtimeSimilarity,
     messages,
     isSpeaking,
+    isListening,
     isMuted,
     currentLine,
     startCall,
@@ -150,6 +154,40 @@ const ImmersiveViewComponent = ({
   });
 
   const { isFullscreen, toggleFullscreen } = useFullscreen(fullscreenRef);
+
+  const isAnyoneSpeaking = useMemo(() => {
+    return isSpeaking || isListening;
+  }, [isSpeaking, isListening]);
+
+  // --- LOGIC MỚI: TÌM TIN NHẮN RETRY GẦN NHẤT ---
+  const retryMessage = useMemo(() => {
+    // Điều kiện để hiển thị retry:
+    // 1. Phải là lượt của user.
+    // 2. Phải có kết quả similarity.
+    // 3. Điểm số similarity phải thấp (dưới ngưỡng advance).
+    if (
+      !conversationState.isWaitingForUser ||
+      !conversationState.similarity ||
+      conversationState.similarity.score >= SHOULDADVANCESCORETHERESHOLD
+    ) {
+      return null;
+    }
+
+    // Lọc ra các câu thoại trong kịch bản để không hiển thị nhầm
+    const scriptLines = new Set(steps.map((step) => step.text));
+
+    // Tìm tin nhắn gần nhất của assistant mà KHÔNG phải là một câu thoại gốc
+    const latestAiMessage = messages.find(
+      (msg) => msg.role === "assistant" && !scriptLines.has(msg.content)
+    );
+
+    return latestAiMessage?.content || null;
+  }, [
+    messages,
+    conversationState.isWaitingForUser,
+    conversationState.similarity, // Thêm similarity làm dependency
+    steps, // Thêm steps làm dependency
+  ]);
 
   // ✨ NEW: Debug state tracking
   useEffect(() => {
@@ -424,8 +462,11 @@ const ImmersiveViewComponent = ({
                                   }
                                   isSpeaking={isSpeaking}
                                   highlightedWordIndex={highlightedWordIndex}
+                                  finalSimilarity={conversationState.similarity}
+                                  realtimeSimilarity={realtimeSimilarity}
                                 />
-                                <AudioVisualizer isSpeaking={isSpeaking} />
+                                <AudioVisualizer isActive={isAnyoneSpeaking} />
+                                <Subtitle message={retryMessage} />
                                 <audio
                                   ref={audioPlayerRef}
                                   className="hidden"
