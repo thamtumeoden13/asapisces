@@ -35,7 +35,6 @@ import { LiveTranscript } from "./LiveTranscript";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 // import { PodcastPlayer } from "./podcast-player";
 import { Subtitle } from "./Subtitle";
-import { SHOULDADVANCESCORETHERESHOLD } from "@/constants";
 
 const cn = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
@@ -84,6 +83,7 @@ const ImmersiveViewComponent = ({
   });
 
   // Enhanced state management
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showDebug, setShowDebug] = useState(
     process.env.NODE_ENV === "development"
   );
@@ -91,6 +91,7 @@ const ImmersiveViewComponent = ({
 
   // THÊM CÁC STATE NÀY
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sessionFeedback, setSessionFeedback] = useState<any | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -102,6 +103,7 @@ const ImmersiveViewComponent = ({
 
   // Auto-advance timer
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const analytics = useRef(new ConversationAnalytics());
@@ -118,7 +120,9 @@ const ImmersiveViewComponent = ({
     conversationState,
     realtimeSimilarity,
     messages,
+    retryInfo,
     isSpeaking,
+    isSpeakingScriptLine,
     isListening,
     isMuted,
     currentLine,
@@ -156,38 +160,8 @@ const ImmersiveViewComponent = ({
   const { isFullscreen, toggleFullscreen } = useFullscreen(fullscreenRef);
 
   const isAnyoneSpeaking = useMemo(() => {
-    return isSpeaking || isListening;
-  }, [isSpeaking, isListening]);
-
-  // --- LOGIC MỚI: TÌM TIN NHẮN RETRY GẦN NHẤT ---
-  const retryMessage = useMemo(() => {
-    // Điều kiện để hiển thị retry:
-    // 1. Phải là lượt của user.
-    // 2. Phải có kết quả similarity.
-    // 3. Điểm số similarity phải thấp (dưới ngưỡng advance).
-    if (
-      !conversationState.isWaitingForUser ||
-      !conversationState.similarity ||
-      conversationState.similarity.score >= SHOULDADVANCESCORETHERESHOLD
-    ) {
-      return null;
-    }
-
-    // Lọc ra các câu thoại trong kịch bản để không hiển thị nhầm
-    const scriptLines = new Set(steps.map((step) => step.text));
-
-    // Tìm tin nhắn gần nhất của assistant mà KHÔNG phải là một câu thoại gốc
-    const latestAiMessage = messages.find(
-      (msg) => msg.role === "assistant" && !scriptLines.has(msg.content)
-    );
-
-    return latestAiMessage?.content || null;
-  }, [
-    messages,
-    conversationState.isWaitingForUser,
-    conversationState.similarity, // Thêm similarity làm dependency
-    steps, // Thêm steps làm dependency
-  ]);
+    return isSpeaking || isSpeakingScriptLine || isListening;
+  }, [isSpeaking, isSpeakingScriptLine, isListening]);
 
   // ✨ NEW: Debug state tracking
   useEffect(() => {
@@ -310,6 +284,7 @@ const ImmersiveViewComponent = ({
 
   useEffect(() => {
     onCallStateChange?.(callState.status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callState.status]);
 
   console.log(
@@ -460,13 +435,12 @@ const ImmersiveViewComponent = ({
                                   isUserTurn={
                                     conversationState.isWaitingForUser
                                   }
-                                  isSpeaking={isSpeaking}
+                                  isSpeakingScriptLine={isSpeakingScriptLine}
                                   highlightedWordIndex={highlightedWordIndex}
-                                  finalSimilarity={conversationState.similarity}
                                   realtimeSimilarity={realtimeSimilarity}
                                 />
                                 <AudioVisualizer isActive={isAnyoneSpeaking} />
-                                <Subtitle message={retryMessage} />
+                                <Subtitle retryInfo={retryInfo} />
                                 <audio
                                   ref={audioPlayerRef}
                                   className="hidden"

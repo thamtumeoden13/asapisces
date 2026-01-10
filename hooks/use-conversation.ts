@@ -171,6 +171,10 @@ export const useConversation = ({
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [retryInfo, setRetryInfo] = useState<{
+    message: string;
+    score: number;
+  } | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -179,6 +183,7 @@ export const useConversation = ({
   const [similarity, setSimilarity] = useState<SimilarityResult | null>(null);
   const [realtimeSimilarity, setRealtimeSimilarity] =
     useState<SimilarityResult | null>(null);
+  const [isSpeakingScriptLine, setIsSpeakingScriptLine] = useState(false);
 
   const deepgramClientRef = useRef<LiveClient | null>(null);
   const microphoneRef = useRef<{
@@ -284,8 +289,6 @@ export const useConversation = ({
   const speakAIByElevenLabs = useCallback(
     (text: string) => {
       if (!voiceId) {
-        console.error("ElevenLabs voiceId is required.");
-        // Trả về một Promise đã bị reject ngay lập tức
         return Promise.reject(
           new Error("ElevenLabs voiceId is not configured.")
         );
@@ -329,7 +332,13 @@ export const useConversation = ({
             setIsSpeaking(false);
             // Vẫn resolve để không làm treo cuộc gọi, nhưng log lỗi
             // Hoặc bạn có thể reject nếu muốn dừng cuộc gọi khi audio lỗi
-            reject(new Error("Audio playback failed."));
+            URL.revokeObjectURL(player.src);
+            // --- SỬA LỖI Ở ĐÂY: Luôn reject với một Error object ---
+            reject(
+              new Error(
+                "Audio playback failed. Check browser console for details."
+              )
+            );
           };
 
           await player.play();
@@ -353,13 +362,24 @@ export const useConversation = ({
   );
 
   const speakAI = useCallback(
-    (text: string) => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (ttsProvider === "elevenlabs") {
-        return speakAIByElevenLabs(text);
+    (text: string, isScriptLine: boolean = false) => {
+      setIsSpeaking(true);
+      if (isScriptLine) {
+        setIsSpeakingScriptLine(true);
       }
-      // Mặc định hoặc khi ttsProvider là 'webspeech'
-      return speakAIByWebSpeechAPI(text);
+      try {
+        if (inactivityTimerRef.current)
+          clearTimeout(inactivityTimerRef.current);
+        if (ttsProvider === "elevenlabs") {
+          return speakAIByElevenLabs(text);
+        }
+        // Mặc định hoặc khi ttsProvider là 'webspeech'
+        return speakAIByWebSpeechAPI(text);
+      } finally {
+        // Dọn dẹp state sau khi nói xong
+        setIsSpeaking(false);
+        setIsSpeakingScriptLine(false);
+      }
     },
     [ttsProvider, speakAIByElevenLabs, speakAIByWebSpeechAPI]
   );
@@ -421,6 +441,8 @@ export const useConversation = ({
       const expectedLine = steps[currentState.currentStep];
       dispatch({ type: "START_PROCESSING_SPEECH" });
       setIsListening(false);
+      setRealtimeSimilarity(null);
+      setPartialTranscript("");
 
       if (!expectedLine || expectedLine.speaker?.trim() !== userRole.trim()) {
         console.warn(
@@ -430,28 +452,24 @@ export const useConversation = ({
         return;
       }
 
-      const similarityResult = calculateAdvancedSimilarity(
+      const finalSimilarity = calculateAdvancedSimilarity(
         transcript,
         expectedLine.text,
         `step-${currentState.currentStep}`
       );
-      // setSimilarity(similarityResult); // Cập nhật similarity cuối cùng
-
-      // Xóa highlight real-time để nhường chỗ cho highlight cuối cùng
-      setRealtimeSimilarity(null);
+      setSimilarity(finalSimilarity);
 
       // --- BƯỚC 1: TẠO OBJECT TIN NHẮN CỦA USER, CHƯA CẬP NHẬT STATE ---
       const userMessage: Message = {
-        type: "user",
         role: "user",
         content: transcript,
         timestamp: Date.now(),
-        similarity: similarityResult,
+        similarity: finalSimilarity,
       };
 
       // --- TÍCH HỢP GHI NHẬN LỖI Ở ĐÂY ---
-      if (similarityResult.words && similarityResult.words.length > 0) {
-        const incorrectWords = similarityResult.words
+      if (finalSimilarity.words && finalSimilarity.words.length > 0) {
+        const incorrectWords = finalSimilarity.words
           .filter((wordInfo) => !wordInfo.match)
           .map((wordInfo) => wordInfo.word);
 
@@ -466,7 +484,7 @@ export const useConversation = ({
       }
 
       const shouldAdvance =
-        similarityResult.score >= SHOULDADVANCESCORETHERESHOLD;
+        finalSimilarity.score >= SHOULDADVANCESCORETHERESHOLD;
 
       if (shouldAdvance) {
         console.log(
@@ -474,6 +492,7 @@ export const useConversation = ({
         );
         // Nếu điểm cao, chỉ cần cập nhật tin nhắn của user và chuyển bước
         setMessages((prev) => [userMessage, ...prev]);
+        setRetryInfo(null);
 
         dispatch({ type: "ADVANCE_STEP" });
       } else {
@@ -482,12 +501,12 @@ export const useConversation = ({
         );
         dispatch({
           type: "RETRY_STEP",
-          payload: { similarity: similarityResult },
+          payload: { similarity: finalSimilarity },
         });
         dispatch({ type: "START_PROCESSING_SPEECH" });
         dispatch({ type: "SET_AI_TURN" });
 
-        const lowScoreThreshold = similarityResult.score < LOWSCORETHERESHOLD;
+        const lowScoreThreshold = finalSimilarity.score < LOWSCORETHERESHOLD;
         const allAiMessages: Message[] = [];
 
         if (geminiFeedback === "gemini" && !lowScoreThreshold) {
@@ -507,24 +526,30 @@ export const useConversation = ({
             const finalMsgText = `Now, try the full sentence: "${expectedLine.text}"`;
 
             // --- BƯỚC 2: TẠO CÁC OBJECT TIN NHẮN CỦA AI, CHƯA CẬP NHẬT STATE ---
+            const now = Date.now();
             allAiMessages.push({
               role: "assistant",
               content: finalMsgText,
-              timestamp: Date.now() + 1,
+              timestamp: now + 2,
             });
             allAiMessages.push({
               role: "assistant",
               content: focusMsgText,
-              timestamp: Date.now() + 2,
+              timestamp: now + 1,
             });
             allAiMessages.push({
               role: "assistant",
               content: initialMsgText,
-              timestamp: Date.now() + 3,
+              timestamp: now,
             });
 
             // --- BƯỚC 3: CẬP NHẬT STATE `messages` MỘT LẦN DUY NHẤT ---
             setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
+            const retryMsgText = `${initialMsgText} ${focusMsgText} ${finalMsgText}`;
+            setRetryInfo({
+              message: retryMsgText,
+              score: finalSimilarity.score,
+            });
 
             // --- BƯỚC 4: PHÁT ÂM THANH TUẦN TỰ ---
             await speakAI(initialMsgText);
@@ -533,7 +558,7 @@ export const useConversation = ({
           } else {
             const retryMsgText = generateRetryMessage(
               expectedLine.text,
-              similarityResult.score,
+              finalSimilarity.score,
               transcript
             );
             allAiMessages.push({
@@ -542,13 +567,18 @@ export const useConversation = ({
               timestamp: Date.now() + 1,
             });
             setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
+            
+            setRetryInfo({
+              message: retryMsgText,
+              score: finalSimilarity.score,
+            });
 
             await speakAI(retryMsgText);
           }
         } else {
           const retryMsgText = generateRetryMessage(
             expectedLine.text,
-            similarityResult.score,
+            finalSimilarity.score,
             transcript
           );
           allAiMessages.push({
@@ -557,6 +587,10 @@ export const useConversation = ({
             timestamp: Date.now() + 1,
           });
           setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
+            setRetryInfo({
+              message: retryMsgText,
+              score: finalSimilarity.score,
+            });
           await speakAI(retryMsgText);
         }
 
@@ -575,7 +609,15 @@ export const useConversation = ({
       }
       setPartialTranscript("");
     },
-    [steps, userRole, geminiFeedback, generateRetryMessage, speakAI]
+    [
+      steps,
+      userRole,
+      geminiFeedback,
+      generateRetryMessage,
+      speakAI,
+      companionId,
+      topicId,
+    ]
   );
 
   // HÀM SỐ 2: CHỈ XỬ LÝ VIỆC GOM BẢN GHI VÀ GRACE PERIOD
@@ -634,10 +676,16 @@ export const useConversation = ({
   );
   const endCall = useCallback(() => {
     if (state.status === CallStatus.FINISHED) return;
+
     dispatch({ type: "END_CALL" });
     setIsListening(false);
 
-    deepgramClientRef.current?.requestClose();
+    if (
+      deepgramClientRef.current &&
+      deepgramClientRef.current.getReadyState() === 1
+    ) {
+      deepgramClientRef.current.requestClose();
+    }
     deepgramClientRef.current = null;
 
     if (microphoneRef.current) {
@@ -731,10 +779,16 @@ export const useConversation = ({
         const currentState = stateRef.current;
         const transcript = data.channel.alternatives[0].transcript;
 
-        console.log("isWaitingForUser:", currentState.isWaitingForUser);
-        console.log("isAwaitingAI:", currentState.isAwaitingAI);
         console.log(
-          "preventProcessingSpeech:",
+          "LiveTranscriptionEvents-isWaitingForUser:",
+          currentState.isWaitingForUser
+        );
+        console.log(
+          "LiveTranscriptionEvents-isAwaitingAI:",
+          currentState.isAwaitingAI
+        );
+        console.log(
+          "LiveTranscriptionEvents-preventProcessingSpeech:",
           currentState.preventProcessingSpeech
         );
         if (
@@ -748,23 +802,21 @@ export const useConversation = ({
             setIsListening(false);
           return;
         }
-        setIsListening(true);
+
+        if (!isListening) setIsListening(true);
 
         const expectedLine = steps[currentState.currentStep];
         if (!expectedLine) return;
 
         if (data.is_final) {
           setIsListening(false);
-          setRealtimeSimilarity(null); // Xóa highlight real-time
-          setPartialTranscript(""); // Xóa transcript tạm
           processFinalTranscript(transcript);
-        } else if (!data.is_final) {
+        } else {
           setPartialTranscript(transcript);
-          // Thực hiện so sánh trên transcript tạm thời
           const interimSimilarity = calculateAdvancedSimilarity(
             transcript,
             expectedLine.text,
-            `interim-step-${currentState.currentStep}` // Dùng context riêng cho interim
+            `interim-step-${currentState.currentStep}`
           );
           setRealtimeSimilarity(interimSimilarity);
         }
@@ -789,6 +841,7 @@ export const useConversation = ({
   }, [
     resetConversation,
     companionId,
+    isListening,
     steps,
     resetInactivityTimer,
     processFinalTranscript,
@@ -825,6 +878,7 @@ export const useConversation = ({
   useEffect(() => {
     if (state.status !== "ACTIVE") return;
     setSimilarity(null);
+    setRetryInfo(null);
 
     const currentState = stateRef.current;
 
@@ -868,7 +922,7 @@ export const useConversation = ({
         ]);
         try {
           console.log("Speaking AI line:", line.text);
-          await speakAI(line.text);
+          await speakAI(line.text, true);
           if (keepAliveInterval) clearInterval(keepAliveInterval);
           if (isCancelled) return;
           turnTimeoutId = setTimeout(() => {
@@ -928,6 +982,7 @@ export const useConversation = ({
     },
     realtimeSimilarity,
     messages,
+    retryInfo,
     isSpeaking,
     isListening,
     isMuted,
@@ -935,6 +990,7 @@ export const useConversation = ({
     audioPlayerRef,
     partialTranscript,
     highlightedWordIndex,
+    isSpeakingScriptLine,
     startCall,
     endCall,
     toggleMute,

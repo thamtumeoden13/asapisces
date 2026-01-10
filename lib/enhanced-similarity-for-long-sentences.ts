@@ -38,6 +38,7 @@ class EnhancedSimilarityCalculator {
     input: string,
     expected: string,
     isLongSentence: boolean,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     context: ConversationContext
   ): boolean {
     const inputWords = this.normalizeText(input).split(/\s+/);
@@ -206,7 +207,6 @@ class EnhancedSimilarityCalculator {
       .filter((phrase) => phrase.length >= this.MIN_PHRASE_LENGTH);
 
     // Also extract noun phrases and important concepts
-    const words = text.split(/\s+/);
     const importantPhrases: string[] = [];
 
     // Look for patterns like "According to X", "Research shows", etc.
@@ -290,16 +290,16 @@ class EnhancedSimilarityCalculator {
 
   // ... (keep all other existing methods unchanged)
   private calculateExactSimilarity(input: string, expected: string): number {
-    const inputWords = this.normalizeText(input).split(/\s+/);
-    const expectedWords = this.normalizeText(expected).split(/\s+/);
+    const expectedWords = this.normalizeText(expected)
+      .split(/\s+/)
+      .filter(Boolean);
+    if (expectedWords.length === 0) return 1.0;
 
-    if (expectedWords.length === 0) return 0;
+    const analysis = this.analyzeWords(input, expected);
+    const matchedWordCount = analysis.filter((w) => w.match).length;
 
-    const matchedWords = inputWords.filter((word) =>
-      expectedWords.some((expectedWord) => this.wordsMatch(word, expectedWord))
-    );
-
-    return matchedWords.length / expectedWords.length;
+    // Tỷ lệ khớp dựa trên CÂU MỤC TIÊU, không phải câu người dùng nói
+    return matchedWordCount / expectedWords.length;
   }
 
   private calculateSemanticSimilarity(input: string, expected: string): number {
@@ -400,6 +400,7 @@ class EnhancedSimilarityCalculator {
       positive: ["positive", "positiv"],
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const [key, variants] of Object.entries(variations)) {
       if (variants.includes(word1) && variants.includes(word2)) {
         return true;
@@ -481,36 +482,49 @@ class EnhancedSimilarityCalculator {
   }
 
   private analyzeWords(userInput: string, expectedText: string): WordResult[] {
-    const inputWords = userInput.split(/\s+/).filter(Boolean); // Lấy các từ từ input của người dùng
-    const expectedWordsNormalized = this.normalizeText(expectedText)
+    const inputWords = this.normalizeText(userInput)
       .split(/\s+/)
       .filter(Boolean);
-    const expectedWordSet = new Set(expectedWordsNormalized);
+    const expectedWords = this.normalizeText(expectedText)
+      .split(/\s+/)
+      .filter(Boolean);
 
-    const result: WordResult[] = [];
+    if (inputWords.length === 0) return [];
 
-    for (const inputWord of inputWords) {
-      const normalizedInputWord = this.normalizeText(inputWord);
+    const dp = Array(inputWords.length + 1)
+      .fill(null)
+      .map(() => Array(expectedWords.length + 1).fill(0));
 
-      // Kiểm tra sự tồn tại trực tiếp hoặc qua các biến thể
-      let isMatch = expectedWordSet.has(normalizedInputWord);
-
-      // Nếu không khớp trực tiếp, thử so sánh với các biến thể
-      if (!isMatch) {
-        // Tìm từ gần nhất trong expectedText để so sánh
-        for (const expectedWord of expectedWordsNormalized) {
-          if (this.wordsMatch(normalizedInputWord, expectedWord)) {
-            isMatch = true;
-            break;
-          }
+    for (let i = 1; i <= inputWords.length; i++) {
+      for (let j = 1; j <= expectedWords.length; j++) {
+        if (this.wordsMatch(inputWords[i - 1], expectedWords[j - 1])) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else {
+          dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
         }
       }
-
-      result.push({
-        word: inputWord, // Giữ lại từ gốc để hiển thị
-        match: isMatch,
-      });
     }
+
+    const matchedInputIndices = new Set<number>();
+    let i = inputWords.length;
+    let j = expectedWords.length;
+    while (i > 0 && j > 0) {
+      if (this.wordsMatch(inputWords[i - 1], expectedWords[j - 1])) {
+        matchedInputIndices.add(i - 1);
+        i--;
+        j--;
+      } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+        // Sửa nhỏ: >= để ưu tiên đường đi
+        i--;
+      } else {
+        j--;
+      }
+    }
+
+    const result: WordResult[] = inputWords.map((word, index) => ({
+      word: word,
+      match: matchedInputIndices.has(index),
+    }));
 
     return result;
   }
@@ -538,11 +552,7 @@ class EnhancedSimilarityCalculator {
       isLongSentence?: boolean;
     } = {}
   ): SimilarityResult {
-    const {
-      allowPartial = true,
-      semanticMatching = true,
-      strictMode = false,
-    } = options;
+    const { semanticMatching = true } = options;
 
     // Auto-detect if this is a long sentence
     const expectedWords = this.normalizeText(expectedText).split(/\s+/);
@@ -692,7 +702,12 @@ export const calculateAdvancedSimilarity = (
   userInput: string,
   expectedText: string,
   contextId?: string,
-  options?: any
+  options?: {
+    allowPartial?: boolean;
+    semanticMatching?: boolean;
+    strictMode?: boolean;
+    isLongSentence?: boolean;
+  }
 ) =>
   enhancedSimilarityCalculator.calculateSimilarity(
     userInput,
