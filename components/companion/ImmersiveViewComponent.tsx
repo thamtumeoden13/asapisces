@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { type LottieRefCurrentProps } from "lottie-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,7 +123,6 @@ const ImmersiveViewComponent = ({
     retryInfo,
     isSpeaking,
     isSpeakingScriptLine,
-    isListening,
     isMuted,
     currentLine,
     startCall,
@@ -132,8 +131,9 @@ const ImmersiveViewComponent = ({
     resetConversation,
     skipToStep,
     retryCurrentStep,
-    audioPlayerRef,
     highlightedWordIndex,
+    isAnyoneSpeaking,
+    isListening,
   } = useConversation({
     steps,
     voiceId,
@@ -157,11 +157,14 @@ const ImmersiveViewComponent = ({
     userRole, // Pass userRole to the hook
   });
 
-  const { isFullscreen, toggleFullscreen } = useFullscreen(fullscreenRef);
+  console.log("Rendering ImmersiveViewComponent with state:", {
+    isListening,
+    isSpeaking,
+    isSpeakingScriptLine,
+    isAnyoneSpeaking,
+  });
 
-  const isAnyoneSpeaking = useMemo(() => {
-    return isSpeaking || isSpeakingScriptLine || isListening;
-  }, [isSpeaking, isSpeakingScriptLine, isListening]);
+  const { isFullscreen, toggleFullscreen } = useFullscreen(fullscreenRef);
 
   // ✨ NEW: Debug state tracking
   useEffect(() => {
@@ -441,10 +444,6 @@ const ImmersiveViewComponent = ({
                                 />
                                 <AudioVisualizer isActive={isAnyoneSpeaking} />
                                 <Subtitle retryInfo={retryInfo} />
-                                <audio
-                                  ref={audioPlayerRef}
-                                  className="hidden"
-                                />
                               </div>
 
                               {/* Phần dưới: Các nút điều khiển */}

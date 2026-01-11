@@ -93,20 +93,20 @@ const SettingsPanel = () => {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-600">View Mode:</span>
           <Button
-            variant={viewMode === "classic" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setViewMode("classic")}
-            aria-label="Classic View"
-          >
-            <MessageSquare className="w-5 h-5" />
-          </Button>
-          <Button
             variant={viewMode === "immersive" ? "secondary" : "ghost"}
             size="icon"
             onClick={() => setViewMode("immersive")}
             aria-label="Immersive View"
           >
             <Square className="w-5 h-5" />
+          </Button>
+          <Button
+            variant={viewMode === "classic" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("classic")}
+            aria-label="Classic View"
+          >
+            <MessageSquare className="w-5 h-5" />
           </Button>
         </div>
         {/* Topic Selection */}

@@ -35,6 +35,7 @@ import { toast } from "./use-toast";
 import { startConversationSessionAction } from "@/lib/actions/conversation.action";
 import { generateSpeechAction } from "@/lib/actions/tts.action";
 import { hasHighQualityTTS } from "@/lib/permissions";
+import { audioPlayer } from "@/lib/AudioPlayer";
 
 type TTSProvider = "webspeech" | "elevenlabs";
 type GeminiFeedbackOption = "standard" | "gemini";
@@ -190,7 +191,6 @@ export const useConversation = ({
     stream: MediaStream;
     recorder: MediaRecorder;
   } | null>(null);
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   const messagesRef = useRef(messages);
   const accumulatedTranscriptRef = useRef<string>("");
@@ -198,6 +198,7 @@ export const useConversation = ({
   const turnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
   const stateRef = useRef<ConversationReducerState>(state);
+  const callEndedRef = useRef(false);
 
   // Cập nhật refs khi state thay đổi
   useEffect(() => {
@@ -205,6 +206,7 @@ export const useConversation = ({
   }, [messages]);
 
   useEffect(() => {
+    console.log("Conversation state updated:", state);
     stateRef.current = state;
   }, [state]);
 
@@ -223,6 +225,10 @@ export const useConversation = ({
     }),
     [timingSettings]
   );
+
+  const isAnyoneSpeaking = isSpeaking || isSpeakingScriptLine || isListening;
+
+  console.log(`--- isAnyoneSpeaking updated --- `, isAnyoneSpeaking);
 
   // --- HÀM TIỆN ÍCH ---
   const speakAIByWebSpeechAPI = useCallback((text: string) => {
@@ -294,12 +300,16 @@ export const useConversation = ({
         );
       }
 
+      // Hàm này giờ chỉ là một trình bao bọc mỏng
       return new Promise<void>(async (resolve, reject) => {
         if (!text) return resolve();
+
         setIsSpeaking(true);
-        const isHighQuality = await hasHighQualityTTS();
+
         try {
+          const isHighQuality = await hasHighQualityTTS();
           const qualityTier = isHighQuality ? "premium" : "standard";
+
           const result = await generateSpeechAction({
             text,
             voiceId,
@@ -307,76 +317,65 @@ export const useConversation = ({
           });
 
           if (!result.success || !result.audioUrl) {
-            // Ném lỗi để khối catch bên dưới xử lý
             throw new Error(result.error || "Failed to get audio URL.");
           }
 
-          // 2. Phát audio từ URL nhận được
-          if (!audioPlayerRef.current) {
-            audioPlayerRef.current = new Audio();
-          }
-          const player = audioPlayerRef.current;
-          player.src = result.audioUrl;
+          // --- SỬ DỤNG AUDIO PLAYER SERVICE ---
+          // Giao phó hoàn toàn việc phát âm thanh cho service
+          await audioPlayer.play(result.audioUrl);
 
-          // Xóa các event listener cũ để tránh bị gọi nhiều lần
-          player.onended = null;
-          player.onerror = null;
-
-          player.onended = () => {
-            setIsSpeaking(false);
-            resolve();
-          };
-
-          player.onerror = (e) => {
-            console.error("Audio playback error:", e);
-            setIsSpeaking(false);
-            // Vẫn resolve để không làm treo cuộc gọi, nhưng log lỗi
-            // Hoặc bạn có thể reject nếu muốn dừng cuộc gọi khi audio lỗi
-            URL.revokeObjectURL(player.src);
-            // --- SỬA LỖI Ở ĐÂY: Luôn reject với một Error object ---
-            reject(
-              new Error(
-                "Audio playback failed. Check browser console for details."
-              )
-            );
-          };
-
-          await player.play();
+          // Nếu Promise của audioPlayer.play() resolve, có nghĩa là đã phát xong
+          setIsSpeaking(false);
+          resolve();
         } catch (error) {
-          // 3. Bắt tất cả các lỗi (từ generateSpeechAction hoặc player.play())
+          setIsSpeaking(false);
           const errorMessage =
             error instanceof Error
               ? error.message
-              : "An unknown speech error occurred.";
+              : "An unknown error occurred.";
           console.error("Failed to speak with ElevenLabs:", errorMessage);
-
-          setIsSpeaking(false);
-
-          // Reject Promise để `useEffect` trung tâm có thể bắt và xử lý
-          // (ví dụ: hiển thị toast và endCall)
           reject(new Error(errorMessage));
         }
       });
     },
     [voiceId]
   );
-
   const speakAI = useCallback(
-    (text: string, isScriptLine: boolean = false) => {
+    // BƯỚC 1: BIẾN HÀM NÀY THÀNH ASYNC
+    async (text: string, isScriptLine: boolean = false) => {
+      // BƯỚC 2: ĐẶT CÁC CỜ TRẠNG THÁI
       setIsSpeaking(true);
       if (isScriptLine) {
         setIsSpeakingScriptLine(true);
       }
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+
       try {
-        if (inactivityTimerRef.current)
-          clearTimeout(inactivityTimerRef.current);
+        // BƯỚC 3: AWAIT PROMISE TỪ HÀM CON
         if (ttsProvider === "elevenlabs") {
-          return speakAIByElevenLabs(text);
+          await speakAIByElevenLabs(text);
+        } else {
+          await speakAIByWebSpeechAPI(text);
         }
-        // Mặc định hoặc khi ttsProvider là 'webspeech'
-        return speakAIByWebSpeechAPI(text);
+      } catch (error) {
+        // --- LOGIC XỬ LÝ LỖI "BỊ HỦY BỎ" ---
+        if (
+          error instanceof Error &&
+          (error.message.includes("interrupted") ||
+            error.message.includes("stopped by user"))
+        ) {
+          // Nếu lỗi là do chúng ta chủ động dừng, chỉ cần log và không làm gì cả
+          console.log(`SpeakAI cancelled as expected: ${error.message}`);
+        } else {
+          // Nếu là một lỗi thực sự, ném lại để useEffect trung tâm xử lý
+          console.error("speakAI encountered an unexpected error:", error);
+          throw error;
+        }
       } finally {
-        // Dọn dẹp state sau khi nói xong
+        // BƯỚC 4: DỌN DẸP SAU KHI AWAIT HOÀN THÀNH (DÙ THÀNH CÔNG HAY THẤT BẠI)
+        // Khối finally này giờ sẽ chạy vào đúng thời điểm.
         setIsSpeaking(false);
         setIsSpeakingScriptLine(false);
       }
@@ -567,7 +566,7 @@ export const useConversation = ({
               timestamp: Date.now() + 1,
             });
             setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
-            
+
             setRetryInfo({
               message: retryMsgText,
               score: finalSimilarity.score,
@@ -587,10 +586,10 @@ export const useConversation = ({
             timestamp: Date.now() + 1,
           });
           setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
-            setRetryInfo({
-              message: retryMsgText,
-              score: finalSimilarity.score,
-            });
+          setRetryInfo({
+            message: retryMsgText,
+            score: finalSimilarity.score,
+          });
           await speakAI(retryMsgText);
         }
 
@@ -675,10 +674,14 @@ export const useConversation = ({
     [steps, resolvedTimingSettings.responseWaitTime, handleUserSpeech]
   );
   const endCall = useCallback(() => {
-    if (state.status === CallStatus.FINISHED) return;
+    if (callEndedRef.current) return;
+    callEndedRef.current = true;
 
+    console.log("[ACTION] End call requested.");
     dispatch({ type: "END_CALL" });
-    setIsListening(false);
+
+    audioPlayer.stop();
+    window.speechSynthesis?.cancel();
 
     if (
       deepgramClientRef.current &&
@@ -695,12 +698,9 @@ export const useConversation = ({
       microphoneRef.current = null;
     }
 
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.pause();
-      audioPlayerRef.current.src = "";
-    }
+    audioPlayer.stop();
     window.speechSynthesis?.cancel();
-  }, [state.status]);
+  }, []);
 
   const handleCompletedCall = useCallback(() => {
     endCall();
@@ -708,7 +708,11 @@ export const useConversation = ({
   }, [endCall, onSessionComplete]);
 
   const resetConversation = useCallback(() => {
+    audioPlayer.stop();
+    window.speechSynthesis.cancel();
+
     endCall();
+    callEndedRef.current = true;
     dispatch({ type: "RESET" });
     setMessages([]);
     setPartialTranscript("");
@@ -728,6 +732,7 @@ export const useConversation = ({
 
   const startCall = useCallback(async () => {
     resetConversation();
+    callEndedRef.current = false;
     dispatch({ type: "STARTING_CALL" });
     try {
       // if (companionId) recordSessionStartAction(companionId);
@@ -863,6 +868,18 @@ export const useConversation = ({
   const skipToStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex >= 0 && stepIndex < steps.length) {
+        console.log(`[ACTION] Skipping to step ${stepIndex}`);
+
+        // --- BƯỚC 1: NGẮT ÂM THANH HIỆN TẠI NGAY LẬP TỨC ---
+        audioPlayer.stop();
+        window.speechSynthesis.cancel();
+
+        // Ngắt các timer có thể đang chạy
+        if (turnTimeoutRef.current) {
+          clearTimeout(turnTimeoutRef.current);
+        }
+
+        // --- BƯỚC 2: CẬP NHẬT STATE ---
         dispatch({ type: "SKIP_TO_STEP", payload: { stepIndex } });
       }
     },
@@ -870,13 +887,17 @@ export const useConversation = ({
   );
 
   const retryCurrentStep = useCallback(() => {
-    if (currentLine)
+    if (currentLine) {
+      // Cũng nên dừng âm thanh hiện tại nếu có
+      audioPlayer.stop();
+      window.speechSynthesis.cancel();
       dispatch({ type: "RETRY_STEP", payload: { similarity: null } });
+    }
   }, [currentLine]);
 
   // --- useEffect TRUNG TÂM ---
   useEffect(() => {
-    if (state.status !== "ACTIVE") return;
+    if (state.status !== "ACTIVE" || callEndedRef.current) return;
     setSimilarity(null);
     setRetryInfo(null);
 
@@ -987,10 +1008,10 @@ export const useConversation = ({
     isListening,
     isMuted,
     currentLine,
-    audioPlayerRef,
     partialTranscript,
     highlightedWordIndex,
     isSpeakingScriptLine,
+    isAnyoneSpeaking,
     startCall,
     endCall,
     toggleMute,
