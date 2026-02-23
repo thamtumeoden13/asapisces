@@ -1,4 +1,4 @@
-// File: lib/AudioPlayer.ts
+// File: lib/AudioPlayer.ts (PHIÊN BẢN HOÀN THIỆN)
 
 class PlayerService {
   private player: HTMLAudioElement;
@@ -6,85 +6,120 @@ class PlayerService {
     resolve: () => void;
     reject: (reason?: any) => void;
   } | null = null;
+  private currentAudioUrl: string | null = null;
+
+  // Listeners cần được dọn dẹp
+  private onEndedListener = () => this.handleEnded();
+  private onErrorListener = (e: Event) => this.handleError(e);
+  private onCanPlayListener = () => this.handleCanPlay();
+  // MỚI: Listeners để theo dõi trạng thái buffering
+  private onWaitingListener = () => console.log("AudioPlayer: Buffering... Waiting for more data.");
+  private onPlayingListener = () => console.log("AudioPlayer: Resumed playback after buffering.");
+  private onStalledListener = () => console.warn("AudioPlayer: Media data transfer stalled.");
+
 
   constructor() {
     if (typeof window !== "undefined") {
       this.player = new Audio();
-
-      this.player.onended = () => {
-        // Chỉ resolve nếu có một promise đang chờ
-        if (this.currentPromise) {
-          console.log("AudioPlayer: Playback ended naturally.");
-          this.currentPromise.resolve();
-          this.currentPromise = null; // Dọn dẹp
-        }
-      };
-
-      this.player.onerror = () => {
-        // Chỉ reject nếu có một promise đang chờ
-        if (this.currentPromise) {
-          console.error("AudioPlayer: Playback error.");
-          this.currentPromise.reject(new Error("Audio playback failed."));
-          this.currentPromise = null; // Dọn dẹp
-        }
-      };
     } else {
       this.player = {} as HTMLAudioElement;
     }
   }
 
-  play(audioUrl: string): Promise<void> {
-    console.log("AudioPlayer: Play request for URL:", audioUrl);
+  private cleanupListeners() {
+    this.player.removeEventListener('ended', this.onEndedListener);
+    this.player.removeEventListener('error', this.onErrorListener);
+    this.player.removeEventListener('canplay', this.onCanPlayListener);
+    // MỚI: Dọn dẹp listeners buffering
+    this.player.removeEventListener('waiting', this.onWaitingListener);
+    this.player.removeEventListener('playing', this.onPlayingListener);
+    this.player.removeEventListener('stalled', this.onStalledListener);
+  }
 
-    // --- LOGIC MỚI: HỦY BỎ PROMISE CŨ ---
-    // Nếu có một audio đang phát hoặc đang tải, hủy nó trước
+  private handleEnded() {
+    console.log("AudioPlayer: Playback finished successfully.");
     if (this.currentPromise) {
-      console.warn("AudioPlayer: Interrupting previous playback.");
-      this.stop(); // Dừng audio hiện tại
-      this.currentPromise.reject(new Error("Playback interrupted by a new request."));
-      this.currentPromise = null;
+      this.currentPromise.resolve();
     }
+    this.resetState();
+  }
 
+  private handleError(e: Event) {
+    const error = this.player.error;
+    console.error("AudioPlayer: An error occurred during playback.", {
+        code: error?.code,
+        message: error?.message,
+        event: e
+    });
+    if (this.currentPromise) {
+      this.currentPromise.reject(error || new Error("Audio playback failed."));
+    }
+    this.resetState();
+  }
+  
+  private handleCanPlay() {
+     console.log("AudioPlayer: Audio is ready to play, attempting to start.");
+     this.player.play().catch(playError => {
+        console.error("AudioPlayer: play() command was rejected.", playError);
+        if (this.currentPromise) {
+            this.currentPromise.reject(playError);
+        }
+        this.resetState();
+     });
+  }
+
+  private resetState() {
+    this.cleanupListeners();
+    this.currentPromise = null;
+    this.currentAudioUrl = null;
+    
+    if (this.player && this.player.src) {
+      // Dừng hẳn việc tải và giải phóng bộ nhớ
+      this.player.src = "";
+      this.player.removeAttribute("src"); // Quan trọng để đảm bảo trình duyệt không giữ lại tham chiếu
+      this.player.load();
+    }
+  }
+
+  play(audioUrl: string): Promise<void> {
+    console.log(`AudioPlayer: Play request for URL: ${audioUrl}`);
+
+    if (this.currentPromise) {
+      console.warn("AudioPlayer: Interrupting previous playback for a new request.");
+      this.stop(new Error("Playback interrupted by a new request.")); 
+    }
+    
     return new Promise((resolve, reject) => {
-      // Lưu lại resolve và reject của Promise mới
       this.currentPromise = { resolve, reject };
-
-      const onCanPlay = () => {
-        this.player.play().catch((playError) => {
-          console.error("AudioPlayer: play() was rejected.", playError);
-          // Gỡ bỏ listener để tránh memory leak
-          this.player.removeEventListener('canplaythrough', onCanPlay);
-          this.currentPromise?.reject(playError);
-          this.currentPromise = null;
-        });
-      };
+      this.currentAudioUrl = audioUrl;
       
-      // Gán listener mới
-      this.player.addEventListener('canplaythrough', onCanPlay, { once: true });
+      this.cleanupListeners();
+      
+      this.player.addEventListener('ended', this.onEndedListener);
+      this.player.addEventListener('error', this.onErrorListener);
+      this.player.addEventListener('canplay', this.onCanPlayListener);
+      // MỚI: Thêm listeners để theo dõi buffering
+      this.player.addEventListener('waiting', this.onWaitingListener);
+      this.player.addEventListener('playing', this.onPlayingListener);
+      this.player.addEventListener('stalled', this.onStalledListener);
 
-      // Gán src và bắt đầu tải
       this.player.src = audioUrl;
       this.player.load();
     });
   }
 
-  stop() {
-    console.log("AudioPlayer: Stop requested.");
+  stop(reason: Error = new Error("Playback stopped by user.")) {
+    console.log(`AudioPlayer: Stop requested. Reason: ${reason.message}`);
     
-    // Ngắt Promise đang chờ (nếu có)
-    if (this.currentPromise) {
-      // Reject Promise với một lý do cụ thể để bên ngoài biết nó đã bị hủy
-      this.currentPromise.reject(new Error("Playback stopped by user."));
-      this.currentPromise = null;
-    }
-
-    // Dừng audio player
     if (this.player && !this.player.paused) {
       this.player.pause();
-      this.player.currentTime = 0;
     }
-    // Đảm bảo src được xóa để ngăn việc tải tiếp
-    this.player.src = ""; 
+    
+    if (this.currentPromise) {
+      this.currentPromise.reject(reason);
+    }
+
+    this.resetState();
   }
 }
 

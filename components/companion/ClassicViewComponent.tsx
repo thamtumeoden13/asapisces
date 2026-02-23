@@ -156,7 +156,7 @@ const ClassicViewComponent = ({
     resetConversation,
     skipToStep,
     retryCurrentStep,
-    audioPlayerRef,
+    // audioPlayerRef,
   } = useConversation({
     steps,
     voiceId,
@@ -467,7 +467,7 @@ const ClassicViewComponent = ({
                 </div>
                 {/* Enhanced Control Buttons */}
                 <div className="flex flex-col items-center flex-1 space-y-4 justify-items-center">
-                  <audio ref={audioPlayerRef} className="hidden" />{" "}
+                  {/* <audio ref={audioPlayerRef} className="hidden" />{" "} */}
                   {/* THÊM DÒNG NÀY */}
                   <Button
                     onClick={

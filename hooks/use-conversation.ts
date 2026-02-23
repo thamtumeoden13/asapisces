@@ -1,4 +1,4 @@
-// File: hooks/use-conversation.ts (FINAL, RESTRUCTURED VERSION)
+// File: hooks/use-conversation.ts (FIXED AND RESTRUCTURED VERSION)
 "use client";
 
 import {
@@ -20,7 +20,7 @@ import {
 } from "@/lib/enhanced-similarity-for-long-sentences";
 import type { TranscriptLine } from "@/types/podcast";
 import { CallStatus } from "@/types/podcast";
-import type { TimingSettings, Message, SimilarityResult } from "@/types"; // Đảm bảo Message được import từ types của bạn
+import type { TimingSettings, Message, SimilarityResult } from "@/types";
 import { recordSessionStartAction } from "@/lib/actions/session.action";
 import { getSmartRetryFeedbackAction } from "@/lib/actions/general.action";
 import { recordPronunciationErrorsAction } from "@/lib/actions/analytics.action";
@@ -59,9 +59,12 @@ interface ConversationReducerState {
   error?: string;
   currentStep: number;
   isWaitingForUser: boolean;
-  isAwaitingAI: boolean;
-  preventProcessingSpeech: boolean;
-  similarity: SimilarityResult | null;
+  isProcessingSpeech: boolean;
+  isSpeaking: boolean;
+  isSpeakingScriptLine: boolean;
+  isListening: boolean;
+  similarity: SimilarityResult | null; // Thêm similarity vào state chính
+  retryMessage: string | null; // Thêm thông điệp retry
 }
 
 // Định nghĩa tất cả các hành động có thể thay đổi state
@@ -69,44 +72,62 @@ type ConversationAction =
   | { type: "STARTING_CALL" }
   | { type: "CALL_STARTED" }
   | { type: "CALL_FAILED"; payload: string }
-  | { type: "END_CALL" }
+  | { type: "END_CALL"; payload?: { reason: string } }
   | { type: "RESET" }
   | { type: "ADVANCE_STEP" }
   | { type: "SET_USER_TURN" }
-  | { type: "SET_AI_TURN" }
   | { type: "START_PROCESSING_SPEECH" }
-  | { type: "STOP_PROCESSING_SPEECH" }
-  | { type: "RETRY_STEP"; payload: { similarity: SimilarityResult | null } }
-  | { type: "SKIP_TO_STEP"; payload: { stepIndex: number } };
+  | {
+      type: "RETRY_STEP";
+      payload: { similarity: SimilarityResult; message: string };
+    }
+  | { type: "SKIP_TO_STEP"; payload: { stepIndex: number } }
+  | { type: "SPEAK_START"; payload: { isScriptLine: boolean } }
+  | { type: "SPEAK_END" }
+  | { type: "LISTEN_START" }
+  | { type: "LISTEN_END" };
 
 const initialConversationState: ConversationReducerState = {
   status: CallStatus.INACTIVE,
   currentStep: 0,
   isWaitingForUser: false,
-  isAwaitingAI: false,
-  preventProcessingSpeech: true,
+  isProcessingSpeech: true, // Khóa xử lý lúc đầu
+  isSpeaking: false,
+  isSpeakingScriptLine: false,
+  isListening: false,
   similarity: null,
+  retryMessage: null,
 };
 
 // Hàm Reducer: Logic trung tâm để xử lý các thay đổi state
 const conversationReducer = (
   state: ConversationReducerState,
-  action: ConversationAction
+  action: ConversationAction,
 ): ConversationReducerState => {
   switch (action.type) {
     case "STARTING_CALL":
-      return { ...state, status: CallStatus.CONNECTING, error: undefined };
+      return {
+        ...initialConversationState,
+        status: CallStatus.CONNECTING,
+        isProcessingSpeech: false, // Mở khóa khi bắt đầu gọi
+      };
     case "CALL_STARTED":
       return { ...state, status: CallStatus.ACTIVE };
     case "CALL_FAILED":
-      return { ...state, status: CallStatus.ERROR, error: action.payload };
+      return {
+        ...state,
+        status: CallStatus.ERROR,
+        error: action.payload,
+        isProcessingSpeech: true, // Khóa xử lý khi có lỗi
+      };
     case "END_CALL":
       return {
         ...state,
         status: CallStatus.FINISHED,
         isWaitingForUser: false,
-        isAwaitingAI: false,
-        preventProcessingSpeech: true,
+        isProcessingSpeech: true,
+        isSpeaking: false,
+        isListening: false,
       };
     case "RESET":
       return initialConversationState;
@@ -115,41 +136,43 @@ const conversationReducer = (
         ...state,
         currentStep: state.currentStep + 1,
         isWaitingForUser: false,
-        isAwaitingAI: false,
+        isProcessingSpeech: false,
+        similarity: null,
+        retryMessage: null,
       };
     case "SET_USER_TURN":
-      return {
-        ...state,
-        isWaitingForUser: true,
-        isAwaitingAI: false,
-      };
-    case "SET_AI_TURN":
-      return {
-        ...state,
-        isAwaitingAI: true,
-        isWaitingForUser: false,
-      };
+      return { ...state, isWaitingForUser: true, isProcessingSpeech: false };
     case "START_PROCESSING_SPEECH":
-      return { ...state, preventProcessingSpeech: true };
-    case "STOP_PROCESSING_SPEECH":
-      return { ...state, preventProcessingSpeech: false };
+      return { ...state, isProcessingSpeech: true, isWaitingForUser: false };
     case "RETRY_STEP":
       return {
         ...state,
         isWaitingForUser: false,
-        isAwaitingAI: false,
-        preventProcessingSpeech: false,
+        isProcessingSpeech: true, // Đang xử lý việc retry
         similarity: action.payload.similarity,
+        retryMessage: action.payload.message,
       };
     case "SKIP_TO_STEP":
       return {
         ...state,
         currentStep: action.payload.stepIndex,
-        similarity: null,
         isWaitingForUser: false,
-        isAwaitingAI: false,
-        preventProcessingSpeech: false,
+        isProcessingSpeech: false,
+        similarity: null,
+        retryMessage: null,
       };
+    case "SPEAK_START":
+      return {
+        ...state,
+        isSpeaking: true,
+        isSpeakingScriptLine: action.payload.isScriptLine,
+      };
+    case "SPEAK_END":
+      return { ...state, isSpeaking: false, isSpeakingScriptLine: false };
+    case "LISTEN_START":
+      return { ...state, isListening: true };
+    case "LISTEN_END":
+      return { ...state, isListening: false };
     default:
       return state;
   }
@@ -168,83 +191,67 @@ export const useConversation = ({
 }: UseConversationProps) => {
   const [state, dispatch] = useReducer(
     conversationReducer,
-    initialConversationState
+    initialConversationState,
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [retryInfo, setRetryInfo] = useState<{
-    message: string;
-    score: number;
-  } | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState<string>("");
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
-  const [similarity, setSimilarity] = useState<SimilarityResult | null>(null);
   const [realtimeSimilarity, setRealtimeSimilarity] =
     useState<SimilarityResult | null>(null);
-  const [isSpeakingScriptLine, setIsSpeakingScriptLine] = useState(false);
+  const [retryInfo, setRetryInfo] = useState<any>(null); // Để tạm any cho dễ debug
 
-  const deepgramClientRef = useRef<LiveClient | null>(null);
-  const microphoneRef = useRef<{
-    stream: MediaStream;
-    recorder: MediaRecorder;
-  } | null>(null);
-
-  const messagesRef = useRef(messages);
-  const accumulatedTranscriptRef = useRef<string>("");
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const turnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const stateRef = useRef<ConversationReducerState>(state);
-  const callEndedRef = useRef(false);
-
-  // Cập nhật refs khi state thay đổi
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    console.log("Conversation state updated:", state);
-    stateRef.current = state;
-  }, [state]);
-
-  // --- DERIVED STATE & MEMOS ---
+  const isAnyoneSpeaking = state.isSpeaking || state.isListening;
   const currentLine: TranscriptLine | null = useMemo(
     () => steps[state.currentStep] || null,
-    [steps, state.currentStep]
+    [steps, state.currentStep],
   );
-
   const resolvedTimingSettings = useMemo(
     () => ({
       stepTransitionDelay: 1000,
-      responseWaitTime: 2500, // Grace period mặc định
-      speechTimeout: 90000, // Inactivity timeout mặc định (90 giây)
+      responseWaitTime: 2500,
+      speechTimeout: 90000,
       ...timingSettings,
     }),
-    [timingSettings]
+    [timingSettings],
   );
 
-  const isAnyoneSpeaking = isSpeaking || isSpeakingScriptLine || isListening;
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const deepgramClientRef = useRef<LiveClient | null>(null);
+  const microphoneRef = useRef<any>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const accumulatedTranscriptRef = useRef<string>("");
+  const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  console.log(`--- isAnyoneSpeaking updated --- `, isAnyoneSpeaking);
+  // Hàm tiện ích để lấy stack trace của caller, giúp xác định ai đã gọi hàm hiện tại
+  const getCallerInfo = (offset: number = 2): string => {
+    try {
+      throw new Error();
+    } catch (e: any) {
+      // Stack trace sẽ có dạng: Error\n  at getCallerInfo (...)\n  at callingFunction (...)\n ...
+      return e.stack?.split('\n')[offset + 1]?.trim() || "Unknown Caller";
+    }
+  };
+
 
   // --- HÀM TIỆN ÍCH ---
   const speakAIByWebSpeechAPI = useCallback((text: string) => {
-    return new Promise<void>((resolve) => {
-      if (!text || typeof window === "undefined" || !window.speechSynthesis)
+    return new Promise<void>((resolve, reject) => {
+      if (!text || typeof window === "undefined" || !window.speechSynthesis) {
         return resolve();
-
+      }
       window.speechSynthesis.resume();
       window.speechSynthesis.cancel();
+
+      setHighlightedWordIndex(-1);
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-US";
 
       const cleanupAndResolve = () => {
-        setIsSpeaking(false);
-        setHighlightedWordIndex(-1); // Reset highlight khi kết thúc
+        setHighlightedWordIndex(-1);
         resolve();
       };
 
@@ -253,9 +260,7 @@ export const useConversation = ({
           const words = text.split(/\s+/);
           let charCount = 0;
           for (let i = 0; i < words.length; i++) {
-            // +1 cho khoảng trắng
             charCount += words[i].length + 1;
-            // event.charIndex là vị trí bắt đầu của từ
             if (event.charIndex < charCount) {
               setHighlightedWordIndex(i);
               break;
@@ -264,138 +269,66 @@ export const useConversation = ({
         }
       };
 
-      utterance.onend = () => {
-        cleanupAndResolve();
-      };
+      utterance.onend = cleanupAndResolve;
       utterance.onerror = (e) => {
         console.error("Web Speech Synthesis error:", e.error);
-        cleanupAndResolve();
+        reject(e);
       };
 
-      const safetyTimeout = setTimeout(
-        () => {
-          console.warn(
-            `WebSpeech safety timer triggered for: "${text.substring(0, 20)}..."`
-          );
-          cleanupAndResolve();
-        },
-        5000 + text.length * 100
-      ); // Tăng thời gian chờ một chút
-
-      utterance.addEventListener("end", () => clearTimeout(safetyTimeout));
-      utterance.addEventListener("error", () => clearTimeout(safetyTimeout));
-
-      setIsSpeaking(true);
-      setHighlightedWordIndex(-1); // Reset trước khi bắt đầu nói
       window.speechSynthesis.speak(utterance);
     });
   }, []);
 
-  // 1. Hàm phát giọng nói của AI qua ElevenLabs
   const speakAIByElevenLabs = useCallback(
-    (text: string) => {
+    async (text: string) => {
       if (!voiceId) {
-        return Promise.reject(
-          new Error("ElevenLabs voiceId is not configured.")
-        );
+        throw new Error("ElevenLabs voiceId is not configured.");
       }
+      if (!text) return;
 
-      // Hàm này giờ chỉ là một trình bao bọc mỏng
-      return new Promise<void>(async (resolve, reject) => {
-        if (!text) return resolve();
+      const isHighQuality = await hasHighQualityTTS();
+      const qualityTier = isHighQuality ? "premium" : "standard";
 
-        setIsSpeaking(true);
-
-        try {
-          const isHighQuality = await hasHighQualityTTS();
-          const qualityTier = isHighQuality ? "premium" : "standard";
-
-          const result = await generateSpeechAction({
-            text,
-            voiceId,
-            qualityTier,
-          });
-
-          if (!result.success || !result.audioUrl) {
-            throw new Error(result.error || "Failed to get audio URL.");
-          }
-
-          // --- SỬ DỤNG AUDIO PLAYER SERVICE ---
-          // Giao phó hoàn toàn việc phát âm thanh cho service
-          await audioPlayer.play(result.audioUrl);
-
-          // Nếu Promise của audioPlayer.play() resolve, có nghĩa là đã phát xong
-          setIsSpeaking(false);
-          resolve();
-        } catch (error) {
-          setIsSpeaking(false);
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : "An unknown error occurred.";
-          console.error("Failed to speak with ElevenLabs:", errorMessage);
-          reject(new Error(errorMessage));
-        }
-      });
-    },
-    [voiceId]
-  );
-  const speakAI = useCallback(
-    // BƯỚC 1: BIẾN HÀM NÀY THÀNH ASYNC
-    async (text: string, isScriptLine: boolean = false) => {
-      // BƯỚC 2: ĐẶT CÁC CỜ TRẠNG THÁI
-      setIsSpeaking(true);
-      if (isScriptLine) {
-        setIsSpeakingScriptLine(true);
+      const result = await generateSpeechAction({ text, voiceId, qualityTier });
+      if (!result.success || !result.audioUrl) {
+        throw new Error(result.error || "Failed to get audio URL.");
       }
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-
+      // Bổ sung try-catch cục bộ để log lỗi từ audioPlayer.play()
       try {
-        // BƯỚC 3: AWAIT PROMISE TỪ HÀM CON
+        await audioPlayer.play(result.audioUrl);
+      } catch (playError) {
+        console.error("speakAIByElevenLabs: audioPlayer.play() rejected!", playError);
+        throw playError; // Re-throw để speakAI có thể bắt được
+      }
+    },
+    [voiceId],
+  );
+
+  const speakAI = useCallback(
+    async (text: string, isScriptLine: boolean = false) => {
+      dispatch({ type: "SPEAK_START", payload: { isScriptLine } });
+      try {
         if (ttsProvider === "elevenlabs") {
           await speakAIByElevenLabs(text);
         } else {
           await speakAIByWebSpeechAPI(text);
         }
       } catch (error) {
-        // --- LOGIC XỬ LÝ LỖI "BỊ HỦY BỎ" ---
-        if (
-          error instanceof Error &&
-          (error.message.includes("interrupted") ||
-            error.message.includes("stopped by user"))
-        ) {
-          // Nếu lỗi là do chúng ta chủ động dừng, chỉ cần log và không làm gì cả
-          console.log(`SpeakAI cancelled as expected: ${error.message}`);
-        } else {
-          // Nếu là một lỗi thực sự, ném lại để useEffect trung tâm xử lý
-          console.error("speakAI encountered an unexpected error:", error);
-          throw error;
-        }
+        // Chỉ ném lại lỗi để useEffect bắt. speakAIByElevenLabs đã log lỗi cụ thể.
+        throw error;
       } finally {
-        // BƯỚC 4: DỌN DẸP SAU KHI AWAIT HOÀN THÀNH (DÙ THÀNH CÔNG HAY THẤT BẠI)
-        // Khối finally này giờ sẽ chạy vào đúng thời điểm.
-        setIsSpeaking(false);
-        setIsSpeakingScriptLine(false);
+        dispatch({ type: "SPEAK_END" });
       }
     },
-    [ttsProvider, speakAIByElevenLabs, speakAIByWebSpeechAPI]
+    [ttsProvider, speakAIByElevenLabs, speakAIByWebSpeechAPI],
   );
 
   const generateRetryMessage = useCallback(
     (originalText: string, score: number, partialText?: string) => {
-      // --- CÁC NHÓM MẪU CÂU THEO NGỮ CẢNH ---
-
-      // 1. Điểm cao (> 0.6): Rất khích lệ, chỉ cần một chút chỉnh sửa.
       const high_score_templates = [
         `Almost perfect! Let's try it one more time: "${originalText}"`,
         `You're so close! Just a little tweak. Say: "${originalText}"`,
-        `Excellent effort! Let's nail the final version: "${originalText}"`,
       ];
-
-      // 2. Điểm trung bình (0.4 - 0.6): Khích lệ và hướng dẫn.
-      // Ưu tiên sử dụng partialText nếu có.
       const medium_score_templates = partialText
         ? [
             `That's a great start with "${partialText}". Now for the full sentence: "${originalText}"`,
@@ -405,79 +338,61 @@ export const useConversation = ({
             `Good attempt! Let's practice the full sentence now: "${originalText}"`,
             `You're on the right track. Let's try it like this: "${originalText}"`,
           ];
-
-      // 3. Điểm thấp (< 0.4): Hướng dẫn nhẹ nhàng, rõ ràng.
       const low_score_templates = [
         `Let's try that one from the beginning. Say: "${originalText}"`,
         `Let me help you with that. The sentence is: "${originalText}"`,
-        `No worries! Let's practice together: "${originalText}"`,
       ];
 
-      // --- LOGIC CHỌN MẪU CÂU ---
-
       let selectedTemplates;
+      if (score > 0.6) selectedTemplates = high_score_templates;
+      else if (score >= 0.4) selectedTemplates = medium_score_templates;
+      else selectedTemplates = low_score_templates;
 
-      if (score > 0.6) {
-        selectedTemplates = high_score_templates;
-      } else if (score >= 0.4) {
-        selectedTemplates = medium_score_templates;
-      } else {
-        selectedTemplates = low_score_templates;
-      }
-
-      // Chọn ngẫu nhiên một câu trong nhóm đã được chọn
       return selectedTemplates[
         Math.floor(Math.random() * selectedTemplates.length)
       ];
     },
-    []
+    [],
   );
 
   const handleUserSpeech = useCallback(
     async (transcript: string) => {
-      // --- Bắt đầu xử lý ---
       const currentState = stateRef.current;
       const expectedLine = steps[currentState.currentStep];
+
       dispatch({ type: "START_PROCESSING_SPEECH" });
-      setIsListening(false);
+      dispatch({ type: "LISTEN_END" });
       setRealtimeSimilarity(null);
       setPartialTranscript("");
 
       if (!expectedLine || expectedLine.speaker?.trim() !== userRole.trim()) {
-        console.warn(
-          "Received user speech when it's not the user's turn or no expected line."
-        );
-        dispatch({ type: "STOP_PROCESSING_SPEECH" });
+        console.warn("User speech received, but it's not their turn.");
         return;
       }
 
       const finalSimilarity = calculateAdvancedSimilarity(
         transcript,
         expectedLine.text,
-        `step-${currentState.currentStep}`
+        `step-${currentState.currentStep}`,
       );
-      setSimilarity(finalSimilarity);
 
-      // --- BƯỚC 1: TẠO OBJECT TIN NHẮN CỦA USER, CHƯA CẬP NHẬT STATE ---
       const userMessage: Message = {
         role: "user",
         content: transcript,
         timestamp: Date.now(),
         similarity: finalSimilarity,
       };
+      setMessages((prev) => [userMessage, ...prev]);
 
-      // --- TÍCH HỢP GHI NHẬN LỖI Ở ĐÂY ---
-      if (finalSimilarity.words && finalSimilarity.words.length > 0) {
+      if (finalSimilarity.words?.length > 0) {
         const incorrectWords = finalSimilarity.words
-          .filter((wordInfo) => !wordInfo.match)
-          .map((wordInfo) => wordInfo.word);
-
+          .filter((word) => !word.match)
+          .map((word) => word.word);
         if (incorrectWords.length > 0) {
-          // Gọi action ở chế độ "fire-and-forget" để không làm chậm UX
           recordPronunciationErrorsAction({
             incorrectWords,
-            companionId: companionId!,
-            topicId: topicId,
+            companionId,
+            topicId,
           });
         }
       }
@@ -486,127 +401,91 @@ export const useConversation = ({
         finalSimilarity.score >= SHOULDADVANCESCORETHERESHOLD;
 
       if (shouldAdvance) {
-        console.log(
-          `✅ Good score on step ${currentState.currentStep}. Advancing.`
-        );
-        // Nếu điểm cao, chỉ cần cập nhật tin nhắn của user và chuyển bước
-        setMessages((prev) => [userMessage, ...prev]);
+        console.log(`✅ Good score. Advancing.`);
         setRetryInfo(null);
-
-        dispatch({ type: "ADVANCE_STEP" });
+        setTimeout(() => {
+          dispatch({ type: "ADVANCE_STEP" });
+        }, resolvedTimingSettings.stepTransitionDelay);
       } else {
-        console.log(
-          `🔄 Low score on step ${currentState.currentStep}. Retrying.`
-        );
-        dispatch({
-          type: "RETRY_STEP",
-          payload: { similarity: finalSimilarity },
-        });
-        dispatch({ type: "START_PROCESSING_SPEECH" });
-        dispatch({ type: "SET_AI_TURN" });
+        console.log(`🔄 Low score. Retrying.`);
+        let retryMsgText: string;
+        let assistantMessages: Message[];
 
-        const lowScoreThreshold = finalSimilarity.score < LOWSCORETHERESHOLD;
-        const allAiMessages: Message[] = [];
-
-        if (geminiFeedback === "gemini" && !lowScoreThreshold) {
+        if (
+          geminiFeedback === "gemini" &&
+          finalSimilarity.score >= LOWSCORETHERESHOLD
+        ) {
           const smartFeedbackResult = await getSmartRetryFeedbackAction({
             expectedSentence: expectedLine.text,
             userSentence: transcript,
           });
 
           if (smartFeedbackResult.success && smartFeedbackResult.focusPoint) {
-            // --- LOGIC MỚI NẰM Ở ĐÂY ---
-            const encouragingPhrase =
-              smartFeedbackResult.encouragingPhrase || "Almost there!";
-            const focusPoint = smartFeedbackResult.focusPoint;
+            const { encouragingPhrase, focusPoint } = smartFeedbackResult;
+            const initialMsg = `${encouragingPhrase || "Almost there!"} Let's focus on the phrase:`;
+            const finalMsg = `Now, try the full sentence: "${expectedLine.text}"`;
 
-            const initialMsgText = `${encouragingPhrase} Let's focus on the phrase:`;
-            const focusMsgText = `"${focusPoint}"`;
-            const finalMsgText = `Now, try the full sentence: "${expectedLine.text}"`;
+            retryMsgText = `${initialMsg} "${focusPoint}" ${finalMsg}`;
 
-            // --- BƯỚC 2: TẠO CÁC OBJECT TIN NHẮN CỦA AI, CHƯA CẬP NHẬT STATE ---
             const now = Date.now();
-            allAiMessages.push({
-              role: "assistant",
-              content: finalMsgText,
-              timestamp: now + 2,
-            });
-            allAiMessages.push({
-              role: "assistant",
-              content: focusMsgText,
-              timestamp: now + 1,
-            });
-            allAiMessages.push({
-              role: "assistant",
-              content: initialMsgText,
-              timestamp: now,
-            });
+            assistantMessages = [
+              {
+                role: "assistant",
+                content: initialMsg,
+                timestamp: now,
+              },
+              {
+                role: "assistant",
+                content: `"${focusPoint}"`,
+                timestamp: now + 1,
+              },
+              {
+                role: "assistant",
+                content: finalMsg,
+                timestamp: now + 2,
+              },
+            ];
 
-            // --- BƯỚC 3: CẬP NHẬT STATE `messages` MỘT LẦN DUY NHẤT ---
-            setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
-            const retryMsgText = `${initialMsgText} ${focusMsgText} ${finalMsgText}`;
-            setRetryInfo({
-              message: retryMsgText,
-              score: finalSimilarity.score,
-            });
-
-            // --- BƯỚC 4: PHÁT ÂM THANH TUẦN TỰ ---
-            await speakAI(initialMsgText);
+            await speakAI(initialMsg);
             await speakAI(focusPoint);
-            await speakAI(finalMsgText);
+            await speakAI(finalMsg);
           } else {
-            const retryMsgText = generateRetryMessage(
+            retryMsgText = generateRetryMessage(
               expectedLine.text,
               finalSimilarity.score,
-              transcript
+              transcript,
             );
-            allAiMessages.push({
-              role: "assistant",
-              content: retryMsgText,
-              timestamp: Date.now() + 1,
-            });
-            setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
-
-            setRetryInfo({
-              message: retryMsgText,
-              score: finalSimilarity.score,
-            });
-
+            assistantMessages = [
+              {
+                role: "assistant",
+                content: retryMsgText,
+                timestamp: Date.now(),
+              },
+            ];
             await speakAI(retryMsgText);
           }
         } else {
-          const retryMsgText = generateRetryMessage(
+          retryMsgText = generateRetryMessage(
             expectedLine.text,
             finalSimilarity.score,
-            transcript
+            transcript,
           );
-          allAiMessages.push({
-            role: "assistant",
-            content: retryMsgText,
-            timestamp: Date.now() + 1,
-          });
-          setMessages((prev) => [...allAiMessages, userMessage, ...prev]);
-          setRetryInfo({
-            message: retryMsgText,
-            score: finalSimilarity.score,
-          });
+          assistantMessages = [
+            {
+              role: "assistant",
+              content: retryMsgText,
+              timestamp: Date.now(),
+            },
+          ];
           await speakAI(retryMsgText);
         }
 
-        if (turnTimeoutRef.current) {
-          clearTimeout(turnTimeoutRef.current);
-        }
-        turnTimeoutRef.current = setTimeout(() => {
-          console.log(
-            `👤 User's turn (step ${currentState.currentStep}). Listener is now active.`
-          );
+        setMessages((prev) => [...assistantMessages, ...prev]);
+        setRetryInfo({ message: retryMsgText, score: finalSimilarity.score });
 
-          resetSimilarityContext(`step-${currentState.currentStep}`);
-          dispatch({ type: "STOP_PROCESSING_SPEECH" });
-          dispatch({ type: "SET_USER_TURN" });
-        }, 750);
+        resetSimilarityContext(`step-${currentState.currentStep}`);
+        dispatch({ type: "SET_USER_TURN" });
       }
-      setPartialTranscript("");
     },
     [
       steps,
@@ -616,103 +495,84 @@ export const useConversation = ({
       speakAI,
       companionId,
       topicId,
-    ]
+      resolvedTimingSettings.stepTransitionDelay,
+    ],
   );
 
-  // HÀM SỐ 2: CHỈ XỬ LÝ VIỆC GOM BẢN GHI VÀ GRACE PERIOD
   const processFinalTranscript = useCallback(
     (transcript: string) => {
-      const messageContent = transcript.trim();
-      if (!messageContent) return;
+      if (!transcript.trim()) return;
 
-      // Gom transcript vào bộ đệm
       accumulatedTranscriptRef.current = (
         accumulatedTranscriptRef.current +
         " " +
-        messageContent
+        transcript
       ).trim();
-
-      // Cập nhật UI để người dùng thấy họ đang nói gì
       setPartialTranscript(accumulatedTranscriptRef.current);
 
-      // Xóa timer cũ nếu người dùng nói tiếp
       if (gracePeriodTimerRef.current) {
         clearTimeout(gracePeriodTimerRef.current);
       }
+
       const currentState = stateRef.current;
       const expectedLine = steps[currentState.currentStep];
-      if (!expectedLine) return; // Bảo vệ nếu không có step tiếp theo
+      if (!expectedLine) return;
 
-      if (
-        expectedLine.text.split(/\s+/).length > LONG_SENTENCE_WORD_THRESHOLD &&
-        accumulatedTranscriptRef.current.split(/\s+/).length <
-          expectedLine.text.split(/\s+/).length / 2
-      ) {
-        // Nếu số từ hiện tại trong bộ đệm còn ít hơn một nửa số từ của câu mục tiêu, không cần thiết phải xử lý ngay
-        return;
-      }
-
-      // Xác định xem có phải câu dài không và tính toán grace period
-      const isLongSentence = expectedLine.text.split(/\s+/).length > 8;
+      const isLongSentence =
+        expectedLine.text.split(/\s+/).length > LONG_SENTENCE_WORD_THRESHOLD;
       const gracePeriod = isLongSentence
         ? resolvedTimingSettings.responseWaitTime +
           LONG_SENTENCE_GRACE_PERIOD_MS_BONUS
         : resolvedTimingSettings.responseWaitTime;
 
-      // Đặt timer mới
       gracePeriodTimerRef.current = setTimeout(() => {
         const fullTranscript = accumulatedTranscriptRef.current.trim();
-        // Dọn dẹp bộ đệm ngay lập tức
         accumulatedTranscriptRef.current = "";
 
-        // Chỉ xử lý nếu có transcript và không có xử lý nào khác đang chạy
-        if (fullTranscript && !currentState.preventProcessingSpeech) {
+        if (fullTranscript && !stateRef.current.isProcessingSpeech) {
           handleUserSpeech(fullTranscript);
         }
       }, gracePeriod);
     },
-    [steps, resolvedTimingSettings.responseWaitTime, handleUserSpeech]
+    [steps, resolvedTimingSettings.responseWaitTime, handleUserSpeech],
   );
-  const endCall = useCallback(() => {
-    if (callEndedRef.current) return;
-    callEndedRef.current = true;
 
-    console.log("[ACTION] End call requested.");
-    dispatch({ type: "END_CALL" });
+  const endCall = useCallback((reason: string = "No reason specified") => {
+    // Tránh gọi endCall nhiều lần liên tiếp
+    if (
+      stateRef.current.status === CallStatus.INACTIVE ||
+      stateRef.current.status === CallStatus.FINISHED
+    )
+      return;
 
-    audioPlayer.stop();
+    const caller = getCallerInfo(2); // Lấy thông tin về hàm đã gọi endCall
+    console.log(`[ACTION] Ending call. Reason: "${reason}". Called by: ${caller}`);
+    dispatch({ type: "END_CALL", payload: { reason } });
+
+    // Cần phải truyền lý do dừng vào audioPlayer.stop() để có thể phân biệt trong log của AudioPlayer
+    audioPlayer.stop(new Error(`Call ended: "${reason}". Initiated by: ${caller}`));
     window.speechSynthesis?.cancel();
 
-    if (
-      deepgramClientRef.current &&
-      deepgramClientRef.current.getReadyState() === 1
-    ) {
-      deepgramClientRef.current.requestClose();
-    }
+    deepgramClientRef.current?.requestClose();
     deepgramClientRef.current = null;
 
     if (microphoneRef.current) {
-      if (microphoneRef.current.recorder?.state === "recording")
-        microphoneRef.current.recorder.stop();
-      microphoneRef.current.stream.getTracks().forEach((track) => track.stop());
+      microphoneRef.current.recorder?.stop();
+      microphoneRef.current.stream.getTracks().forEach((track: any) => track.stop());
       microphoneRef.current = null;
     }
 
-    audioPlayer.stop();
-    window.speechSynthesis?.cancel();
-  }, []);
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+  }, []); // `getCallerInfo` không cần trong dependency array
+
 
   const handleCompletedCall = useCallback(() => {
-    endCall();
+    endCall("Conversation completed naturally");
     onSessionComplete?.();
   }, [endCall, onSessionComplete]);
 
   const resetConversation = useCallback(() => {
-    audioPlayer.stop();
-    window.speechSynthesis.cancel();
-
-    endCall();
-    callEndedRef.current = true;
+    endCall("Resetting conversation via user action");
     dispatch({ type: "RESET" });
     setMessages([]);
     setPartialTranscript("");
@@ -720,60 +580,44 @@ export const useConversation = ({
 
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-
-    // --- SỬ DỤNG TIMINGSETTINGS Ở ĐÂY ---
     inactivityTimerRef.current = setTimeout(() => {
-      console.log(
-        `⏰ Inactivity timeout of ${resolvedTimingSettings.speechTimeout / 1000}s reached. Ending call.`
-      );
-      endCall();
+      console.log(`⏰ Inactivity timeout reached. Ending call.`);
+      endCall("Inactivity timeout triggered");
     }, resolvedTimingSettings.speechTimeout);
-  }, [endCall, resolvedTimingSettings]);
+  }, [endCall, resolvedTimingSettings.speechTimeout]);
 
   const startCall = useCallback(async () => {
-    resetConversation();
-    callEndedRef.current = false;
+    resetConversation(); // Ensures clean state. This will call endCall internally.
     dispatch({ type: "STARTING_CALL" });
+
     try {
-      // if (companionId) recordSessionStartAction(companionId);
-      // const response = await fetch("/api/deepgram");
-      // const data = await response.json();
-      // if (!data.deepgramToken) throw new Error("Failed to get Deepgram token.");
-
-      // 1. Gọi Server Action để kiểm tra credit và lấy token
       const sessionResult = await startConversationSessionAction();
-
       if (!sessionResult.success || !sessionResult.token) {
-        // Ném lỗi để khối catch bên dưới xử lý và hiển thị cho người dùng
-        console.error(
-          "Failed to start conversation session:",
-          sessionResult.error
-        );
         throw new Error(sessionResult.error || "Failed to start session.");
       }
 
-      // 2. Nếu thành công, tiếp tục logic kết nối Deepgram với token đã nhận
       if (companionId) recordSessionStartAction(companionId);
 
       const client = createClient(sessionResult.token).listen.live({
         model: "nova-2",
         language: "en-US",
-        interim_results: true, // Đảm bảo luôn bật
-        endpointing: 300, // (Tùy chọn) Giúp Deepgram nhận biết câu kết thúc nhanh hơn
-        utterance_end_ms: 1000, // (Tùy chọn)
+        interim_results: true,
+        endpointing: 300,
+        utterance_end_ms: 1000,
         keepalive: "true",
       });
       deepgramClientRef.current = client;
 
       client.on(LiveTranscriptionEvents.Open, async () => {
-        console.log("✅ Deepgram connection established. Recorder will start.");
+        console.log("✅ Deepgram connection opened.");
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
         const recorder = new MediaRecorder(stream);
         recorder.ondataavailable = (e) => {
-          if (e.data.size > 0 && client.getReadyState() === 1)
+          if (e.data.size > 0 && client.getReadyState() === 1) {
             client.send(e.data);
+          }
         };
         microphoneRef.current = { stream, recorder };
         recorder.start(250);
@@ -781,58 +625,53 @@ export const useConversation = ({
       });
 
       client.on(LiveTranscriptionEvents.Transcript, (data) => {
+        const { is_final, channel } = data;
+        const transcript = channel.alternatives[0].transcript;
         const currentState = stateRef.current;
-        const transcript = data.channel.alternatives[0].transcript;
 
-        console.log(
-          "LiveTranscriptionEvents-isWaitingForUser:",
-          currentState.isWaitingForUser
-        );
-        console.log(
-          "LiveTranscriptionEvents-isAwaitingAI:",
-          currentState.isAwaitingAI
-        );
-        console.log(
-          "LiveTranscriptionEvents-preventProcessingSpeech:",
-          currentState.preventProcessingSpeech
-        );
         if (
           !transcript ||
           !currentState.isWaitingForUser ||
-          currentState.preventProcessingSpeech ||
-          currentState.isAwaitingAI
+          currentState.isProcessingSpeech
         ) {
-          if (isListening)
-            // Nếu không lắng nghe, đảm bảo isListening là false
-            setIsListening(false);
           return;
         }
 
-        if (!isListening) setIsListening(true);
+        if (!currentState.isListening) {
+          dispatch({ type: "LISTEN_START" });
+        }
 
-        const expectedLine = steps[currentState.currentStep];
-        if (!expectedLine) return;
+        resetInactivityTimer();
 
-        if (data.is_final) {
-          setIsListening(false);
+        if (is_final) {
+          dispatch({ type: "LISTEN_END" });
           processFinalTranscript(transcript);
         } else {
           setPartialTranscript(transcript);
-          const interimSimilarity = calculateAdvancedSimilarity(
-            transcript,
-            expectedLine.text,
-            `interim-step-${currentState.currentStep}`
-          );
-          setRealtimeSimilarity(interimSimilarity);
+          const expectedLine = steps[currentState.currentStep];
+          if (expectedLine) {
+            const interimSimilarity = calculateAdvancedSimilarity(
+              transcript,
+              expectedLine.text,
+              `interim-step-${currentState.currentStep}`,
+            );
+            setRealtimeSimilarity(interimSimilarity);
+          }
         }
-        resetInactivityTimer();
       });
 
       client.on(LiveTranscriptionEvents.Error, (e) => {
-        console.error(e);
-        endCall();
+        console.error("Deepgram Error:", e);
+        dispatch({
+          type: "CALL_FAILED",
+          payload: "A connection error occurred.",
+        });
+        endCall("Deepgram Client Error during transcription"); // Gán lý do cụ thể
       });
-      client.on(LiveTranscriptionEvents.Close, () => endCall());
+      client.on(LiveTranscriptionEvents.Close, () => {
+        console.log("Deepgram connection closed.");
+        endCall("Deepgram connection closed by server/client"); // Gán lý do cụ thể
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An unknown error occurred.";
@@ -842,26 +681,23 @@ export const useConversation = ({
         title: "Error",
         description: errorMessage,
       });
+      endCall(`Start call initialization failed: ${errorMessage}`); // Gán lý do cụ thể
     }
   }, [
-    resetConversation,
     companionId,
-    isListening,
-    steps,
-    resetInactivityTimer,
     processFinalTranscript,
+    resetConversation,
+    resetInactivityTimer,
+    steps,
     endCall,
   ]);
-
-  // ... (Các hàm điều khiển phụ như toggleMute, skipToStep, ...)
 
   const toggleMute = useCallback(() => {
     if (!microphoneRef.current) return;
     const audioTracks = microphoneRef.current.stream.getAudioTracks();
     if (audioTracks.length > 0) {
-      const isCurrentlyMuted = !audioTracks[0].enabled;
-      audioTracks[0].enabled = isCurrentlyMuted;
-      setIsMuted(!isCurrentlyMuted);
+      audioTracks[0].enabled = !audioTracks[0].enabled;
+      setIsMuted(!audioTracks[0].enabled);
     }
   }, []);
 
@@ -869,116 +705,94 @@ export const useConversation = ({
     (stepIndex: number) => {
       if (stepIndex >= 0 && stepIndex < steps.length) {
         console.log(`[ACTION] Skipping to step ${stepIndex}`);
-
-        // --- BƯỚC 1: NGẮT ÂM THANH HIỆN TẠI NGAY LẬP TỨC ---
-        audioPlayer.stop();
+        audioPlayer.stop(new Error(`Skipping to step ${stepIndex} (user action)`)); // Gán lý do cụ thể
         window.speechSynthesis.cancel();
-
-        // Ngắt các timer có thể đang chạy
-        if (turnTimeoutRef.current) {
-          clearTimeout(turnTimeoutRef.current);
-        }
-
-        // --- BƯỚC 2: CẬP NHẬT STATE ---
+        if (gracePeriodTimerRef.current)
+          clearTimeout(gracePeriodTimerRef.current);
+        accumulatedTranscriptRef.current = "";
         dispatch({ type: "SKIP_TO_STEP", payload: { stepIndex } });
       }
     },
-    [steps.length]
+    [steps.length],
   );
 
   const retryCurrentStep = useCallback(() => {
-    if (currentLine) {
-      // Cũng nên dừng âm thanh hiện tại nếu có
-      audioPlayer.stop();
+    if (currentLine && !stateRef.current.isProcessingSpeech) {
+      console.log(`[ACTION] Retrying current step.`);
+      audioPlayer.stop(new Error(`Retrying current step (user action)`)); // Gán lý do cụ thể
       window.speechSynthesis.cancel();
-      dispatch({ type: "RETRY_STEP", payload: { similarity: null } });
+      setMessages((prev) => [
+        { role: "assistant", content: currentLine.text, timestamp: Date.now() },
+        ...prev,
+      ]);
+      speakAI(currentLine.text, true).then(() => {
+        dispatch({ type: "SET_USER_TURN" });
+      }).catch(err => {
+        console.error("Error during retryCurrentStep speakAI:", err);
+        // Có thể quyết định endCall tại đây nếu lỗi nghiêm trọng
+      });
     }
-  }, [currentLine]);
+  }, [currentLine, speakAI]);
 
-  // --- useEffect TRUNG TÂM ---
+  // --- DEBUGGING EFFECT: GIỮ NGUYÊN HOẶC XÓA NẾU KHÔNG CÓ LOG UNMOUNTED ---
   useEffect(() => {
-    if (state.status !== "ACTIVE" || callEndedRef.current) return;
-    setSimilarity(null);
+    console.log("--- Conversation Hook MOUNTED ---");
+    return () => {
+      // Nếu không có log này thì có nghĩa component không bị unmount.
+      // Bạn có thể xóa effect này nếu muốn.
+      // console.error("--- Conversation Hook UNMOUNTED --- This might be the cause of the problem!");
+    };
+  }, []);
+
+  // --- useEffect TRUNG TÂM (PHIÊN BẢN ỔN ĐỊNH) ---
+  useEffect(() => {
+    if (state.status !== CallStatus.ACTIVE) return;
+
+    const line = steps[state.currentStep];
+    if (!line) {
+      handleCompletedCall();
+      return;
+    }
+
     setRetryInfo(null);
 
-    const currentState = stateRef.current;
+    const isAITurn = line.speaker?.trim() !== userRole.trim();
+    let delayTimeout: NodeJS.Timeout;
 
-    let isCancelled = false;
-    let keepAliveInterval: NodeJS.Timeout | null = null;
-    let turnTimeoutId: NodeJS.Timeout | null = null;
     const processTurn = async () => {
-      if (isCancelled) return;
-
-      const line = steps[state.currentStep];
-      if (!line) {
-        handleCompletedCall();
-        // endCall();
-        // onSessionComplete?.();
-        return;
-      }
-
-      const isAITurn = line.speaker?.trim() !== userRole.trim();
-
+      const currentState = stateRef.current;
+      
       if (isAITurn) {
-        console.log(`🗣️ AI's turn (as ${line.speaker})`);
-        const lastMessage = messagesRef.current[0];
-        if (
-          lastMessage?.role === "assistant" &&
-          lastMessage?.content === line.text
-        ) {
+        if (currentState.isSpeaking || currentState.isProcessingSpeech) {
+          console.log("useEffect guard: AI is already speaking or processing, skipping turn logic.");
           return;
         }
+
         dispatch({ type: "START_PROCESSING_SPEECH" });
-        const client = deepgramClientRef.current;
-        if (client)
-          keepAliveInterval = setInterval(() => client.keepAlive(), 10000);
-        setMessages((prev) => [
-          {
-            type: "assistant",
-            role: "assistant",
-            content: line.text,
-            timestamp: Date.now(),
-          },
-          ...prev,
-        ]);
+        setMessages((prev) => [{ role: "assistant", content: line.text, timestamp: Date.now() }, ...prev]);
+
         try {
-          console.log("Speaking AI line:", line.text);
           await speakAI(line.text, true);
-          if (keepAliveInterval) clearInterval(keepAliveInterval);
-          if (isCancelled) return;
-          turnTimeoutId = setTimeout(() => {
-            if (isCancelled) return;
-            console.log("Advancing to next step after AI speech.");
+          delayTimeout = setTimeout(() => {
             dispatch({ type: "ADVANCE_STEP" });
           }, resolvedTimingSettings.stepTransitionDelay);
         } catch (error) {
-          // Xử lý lỗi ở đây
-          if (isCancelled) return; // Bỏ qua nếu đã cleanup
-
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : "An unknown error occurred.";
-          console.error("Critical speak error:", errorMessage);
-
-          // Hiển thị toast cho người dùng
-          toast({
-            variant: "destructive",
-            title: "Speech Error",
-            description: errorMessage,
-          });
-          // Kết thúc cuộc gọi
-          endCall();
+          if (error instanceof Error && (error.message.includes("interrupted") || error.message.includes("stopped") || error.message.includes("ended"))) {
+             console.warn(`AI speech was interrupted as expected. The flow will stop here for this turn. Reason: ${error.message}`);
+             // Không làm gì cả, không chuyển step. Đảm bảo isProcessingSpeech được reset ở một nơi khác nếu cần.
+             // Nếu không chuyển step, thì currentState.isProcessingSpeech vẫn là true, nó sẽ bị guard ở lần chạy useEffect tiếp theo.
+             // Đây là một điểm cần chú ý.
+          } else {
+            console.error("Critical error during AI speech, ending call:", error);
+            endCall("Critical speech error from speakAI catch block");
+          }
         }
-      } else {
-        console.log(`👤 User's turn (as ${line.speaker})`);
-        if (!currentState.isWaitingForUser) {
-          turnTimeoutId = setTimeout(() => {
-            if (isCancelled) return;
-            dispatch({ type: "STOP_PROCESSING_SPEECH" });
+      } else { // Lượt của người dùng
+        if (!currentState.isWaitingForUser && !currentState.isProcessingSpeech) {
+          delayTimeout = setTimeout(() => {
             dispatch({ type: "SET_USER_TURN" });
             resetInactivityTimer();
-          }, 750);
+          }, 500);
         }
       }
     };
@@ -986,12 +800,10 @@ export const useConversation = ({
     processTurn();
 
     return () => {
-      isCancelled = true;
-      if (keepAliveInterval) clearInterval(keepAliveInterval);
-      if (turnTimeoutId) clearTimeout(turnTimeoutId);
+      if (delayTimeout) clearTimeout(delayTimeout);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.status, state.currentStep, userRole]);
+  }, [state.status, state.currentStep, endCall, handleCompletedCall, resolvedTimingSettings.stepTransitionDelay, resetInactivityTimer, speakAI, steps, userRole]);
+
 
   return {
     callState: { status: state.status, error: state.error },
@@ -999,21 +811,23 @@ export const useConversation = ({
       currentStep: state.currentStep,
       totalSteps: steps.length,
       isWaitingForUser: state.isWaitingForUser,
-      similarity,
+      // similarity không còn trong reducer state, nó là state phụ
+      // bạn có thể trả về null hoặc giá trị khác nếu cần
+      similarity: realtimeSimilarity,
     },
     realtimeSimilarity,
     messages,
     retryInfo,
-    isSpeaking,
-    isListening,
+    isSpeaking: state.isSpeaking,
+    isListening: state.isListening,
     isMuted,
     currentLine,
     partialTranscript,
     highlightedWordIndex,
-    isSpeakingScriptLine,
+    isSpeakingScriptLine: state.isSpeakingScriptLine,
     isAnyoneSpeaking,
     startCall,
-    endCall,
+    endCall, // Trả về hàm endCall có lý do
     toggleMute,
     resetConversation,
     skipToStep,
